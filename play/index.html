@@ -88,6 +88,8 @@
     transition:filter .15s ease, opacity .25s ease, transform .15s ease;
     animation:coinPulse 2.6s ease-in-out infinite;
   }
+  /* phone-landscape: shrink hard so the card can't swallow menu taps */
+  @media (max-height:520px){ #getguns{ width:min(200px,26vw); font-size:11px; padding:8px 10px } #getguns img{display:none} }
   #getguns img{width:100%;height:auto;filter:drop-shadow(0 0 12px rgba(124,249,165,.55))}
   #getguns small{font-size:.52em;letter-spacing:1px;color:#7cf9a5;line-height:1.8}
   #getguns:hover,#getguns:focus-visible{filter:brightness(1.35);transform:translateY(-2px)}
@@ -131,7 +133,7 @@
 /* GET GUNS card: only on the pre-game screens. Hidden the instant a run starts and
    stays hidden through the clear/death/gauntlet-over/ending screens — a run isn't
    over just because you finished a level. Driven from render() so there's no lag. */
-const GUNS_BTN_SCREENS={menu:1,board:1,guide:1};
+const GUNS_BTN_SCREENS={menu:1,guide:1};   // NOT the board — the card was covering the very scores the prize contest exists to show
 let gunsBtnShown=null;
 function syncGunsBtn(){
   const want = typeof state!=="undefined" && !!GUNS_BTN_SCREENS[state];
@@ -196,7 +198,13 @@ function tiltMove(){ // returns -1/0/1 steer from current tilt vs neutral
 
 /* ---------- audio ---------- */
 let AC=null,sfxOn=true,masterG=null;
-function audio(){ if(AC)return AC; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); masterG=AC.createGain(); masterG.gain.value=0.5; masterG.connect(AC.destination);}catch(e){} return AC; }
+function audio(){
+  // If the context was created without a gesture (boot-time cached-wallet restore)
+  // it's born suspended and NEVER recovers without this — returning holders got a
+  // permanently silent game. Any later gesture routes through here and heals it.
+  // (Also fixes iOS suspending audio on app-switch.)
+  if(AC){ if(AC.state==="suspended"){ try{ AC.resume(); }catch(e){} } return AC; }
+  try{ AC=new (window.AudioContext||window.webkitAudioContext)(); masterG=AC.createGain(); masterG.gain.value=0.5; masterG.connect(AC.destination);}catch(e){} return AC; }
 function blip(f0,f1,type,peak,dur,when){ const a=audio(); if(!a||!sfxOn)return; const t=when||a.currentTime;
   const o=a.createOscillator(),gn=a.createGain(); o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
   gn.gain.setValueAtTime(peak,t); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(gn); gn.connect(masterG); o.start(t); o.stop(t+dur+0.02); }
@@ -1537,6 +1545,7 @@ async function getEth(){                       // one provider for connect + eve
   return wcProvider;
 }
 let walletAddr=null, ownedGunTypes=[], loadoutType=null, walletStatus="", walletBusy=false, watchMode=false;
+let nftGen=0;   // bumped by applyGuns — stale timers compare against it before touching the session
 /* Hand-off from mint.wick.pics: ?w=0x… unlocks guns with no wallet app at all.
    Connecting is easy on a normal portrait page and awful inside a landscape-locked
    canvas game, so we let the mint site do it and carry the result over. */
@@ -1563,23 +1572,28 @@ async function connectWallet(){
     // bail BEFORE getEth() — that lazily downloads the WalletConnect bundle, which is
     // 8s of "connecting…" spent on a bridge that can't come back to an in-app webview
     if(INAPP&&!window.ethereum){
-      walletStatus="in-app browser — use ⌖ ADDRESS, or open in Chrome/Safari"; walletBusy=false; return; }
+      walletStatus="in-app browser — paste your address instead"; walletBusy=false;
+      enterAddress();                                  // open the sheet, don't just describe it
+      return; }
     const eth=await getEth();
     if(!eth){ walletStatus="no wallet — install MetaMask/Rabby"; walletBusy=false; return; }
     let accts;
     if(eth===window.ethereum){ accts=await eth.request({method:"eth_requestAccounts"}); }
-    else { walletStatus="approve in your wallet…"; accts=await eth.enable(); }   // Reown modal: QR on desktop, wallet-picker deeplink on phones
-    const addr=accts[0]; walletAddr=addr;
-    walletStatus="sign to prove ownership…";
-    const msg="PEPE WICK login\naddress:"+addr+"\nnonce:"+Math.random().toString(36).slice(2)+"\nts:"+Date.now();
-    const sig=await eth.request({method:"personal_sign",params:[msg,addr]});
-    walletStatus="verifying…";
-    const r=await fetchT(NFT_VERIFY_URL,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({address:addr,message:msg,signature:sig})});
-    const data=await r.json();
-    if(!r.ok||!data.ok){ walletStatus=(data&&data.error)||"verify failed"; walletBusy=false; return; }
-    const types=[...new Set((data.guns||[]).map(x=>x.type))];
-    applyGuns(types, addr, false);
-  }catch(e){ walletStatus=(e&&(e.message||e.code))?("error: "+(e.shortMessage||e.message||e.code)):"connect cancelled"; }
+    else { walletStatus="approve in your wallet app, then come back to this tab…"; accts=await eth.enable(); }   // Reown modal: QR on desktop, wallet-picker deeplink on phones
+    const addr=accts[0];
+    // Unlock straight from the CONNECTED address — NO login signature. Ownership is
+    // public chain data (the GET endpoint serves it unsigned = watch mode), and
+    // submitScore signs its own message per submission, which is what the board
+    // verifies. The old personal_sign here bought nothing and cost a second
+    // wallet app-switch on phones — the exact moment most players gave up.
+    walletStatus="loading your guns…";
+    let types=null;
+    try{ const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const d=await r.json();
+         if(r.ok&&d.ok)types=[...new Set((d.guns||[]).map(x=>x.type))]; }catch(e){}
+    if(types===null)types=await rpcGunsOf(addr);       // API down → straight to PulseChain
+    applyGuns(types, addr, false);                     // signed-capable: submitScore re-signs anyway
+  }catch(e){ walletAddr=null; watchMode=false;         // never leave a half-"connected" session behind
+    walletStatus=(e&&(e.message||e.code))?("error: "+(e.shortMessage||e.message||e.code)):"connect cancelled"; }
   walletBusy=false;
 }
 /* The rotate screen doubles as the post-login screen: once guns are in, it should
@@ -1596,36 +1610,46 @@ function syncRotMsg(){
   }
 }
 /* apply verified guns + remember them (24h cache) so returning players stay unlocked */
-function applyGuns(types, addr, watch){
+function applyGuns(types, addr, watch, quiet){
   types=Array.isArray(types)?types.filter(n=>typeof n==="number"&&isFinite(n)):[];   // poisoned cache can't half-apply
   ownedGunTypes=types; watchMode=!!watch;
   if(!watch)walletAddr=addr; else walletAddr=null;                    // watch mode can't sign scores
-  let saved=null; try{ const s=localStorage.getItem("pw_loadout"); if(s!==null&&s!=="")saved=+s; }catch(e){}
-  loadoutType=(saved!=null&&!isNaN(saved)&&types.includes(saved))?saved:(types[0]!=null?types[0]:null);
+  let saved=null, sawPref=false;
+  try{ const s=localStorage.getItem("pw_loadout");
+       if(s==="d"){ saved=null; sawPref=true; }                      // an explicit choice of the default sidearm
+       else if(s!==null&&s!==""&&!isNaN(+s)){ saved=+s; sawPref=true; } }catch(e){}
+  loadoutType=(sawPref&&(saved==null||types.includes(saved)))?saved:(types[0]!=null?types[0]:null);
   walletStatus=types.length
     ? (watch?"👁 watch: ":"✓ ")+types.length+" gun"+(types.length>1?"s":"")+" unlocked"+(watch?" — connect to submit scores":"")
     : (watch?"👁 watching — no WICK guns at that address":"✓ connected — no WICK guns in wallet");
   try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,watch:!!watch,ts:Date.now()})); }catch(e){}
   syncRotMsg();
-  if(types.length)SFX.unlock();
+  nftGen++;                                             // invalidates any pending boot-time cache refresh (see restoreNft)
+  if(types.length&&!quiet)SFX.unlock();                 // quiet = boot-time restore: no gesture yet, don't birth a suspended AudioContext
 }
 /* WAY 2 — WATCH MODE: paste any address, no wallet app needed (API lookup, on-chain RPC fallback) */
 async function verifyWatch(addrRaw){
-  if(walletBusy)return;                                             // never race a connect in progress
-  if(walletAddr)return;                                             // a SIGNED session is never downgraded by a watch lookup
+  // returns {addr, types} for what was actually APPLIED, null on every other path —
+  // callers must judge success by this, never by reading the ownedGunTypes global
+  // (which may still hold a previous wallet's guns after a failed lookup)
+  if(walletBusy){ walletStatus="busy — another lookup is still running"; return null; }
+  if(walletAddr){ walletStatus="already connected — disconnect first to watch another wallet"; return null; }
   const addr=String(addrRaw||"").trim();
-  if(!/^0x[a-fA-F0-9]{40}$/.test(addr)){ walletStatus="that's not a wallet address (0x…)"; return; }
+  if(!/^0x[a-fA-F0-9]{40}$/.test(addr)){ walletStatus="that's not a wallet address (0x…)"; return null; }
   walletBusy=true; walletStatus="looking up guns on-chain…";
+  let applied=null;
   try{
     const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const data=await r.json();
-    if(r.ok&&data.ok){ applyGuns([...new Set((data.guns||[]).map(x=>x.type))], addr, true); walletBusy=false; return; }
-    if(/not configured/.test((data&&data.error)||"")){ walletStatus="⏳ guns contract goes live at mint — watch mode will work then"; walletBusy=false; return; }
+    if(r.ok&&data.ok){ const types=[...new Set((data.guns||[]).map(x=>x.type))];
+      applyGuns(types, addr, true); walletBusy=false; return {addr,types}; }
+    if(/not configured/.test((data&&data.error)||"")){ walletStatus="⏳ guns contract goes live at mint — watch mode will work then"; walletBusy=false; return null; }
     throw new Error((data&&data.error)||"api-down");
   }catch(e){
-    try{ const types=await rpcGunsOf(addr); applyGuns(types, addr, true); }               // independent path: straight to PulseChain
+    try{ const types=await rpcGunsOf(addr); applyGuns(types, addr, true); applied={addr,types}; }   // independent path: straight to PulseChain
     catch(e2){ walletStatus=ownedGunTypes.length?"👁 watch (cached — refresh failed)":"lookup failed — try again or use CONNECT"; }
   }
   walletBusy=false;
+  return applied;
 }
 /* direct eth_call WickGuns.gunsOfOwner(address) — no API, no wallet, just the chain */
 async function rpcGunsOf(addr){
@@ -1662,12 +1686,15 @@ try{ lastWatchAddr=(JSON.parse(localStorage.getItem("pw_nft")||"null")||{}).addr
     const a=(inp.value||"").trim();
     if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ say("That doesn't look like a wallet address — it should start 0x and be 42 characters.",true); return; }
     say("Looking up your guns on-chain…");
-    await verifyWatch(a);
-    if(ownedGunTypes.length){ lastWatchAddr=a;
+    const r=await verifyWatch(a);
+    // judge by what the lookup APPLIED, never by the global — after a failed lookup
+    // ownedGunTypes still holds the previous wallet's guns and would fake a success
+    if(r && r.addr===a && r.types.length){ lastWatchAddr=a;
       const portrait=matchMedia("(orientation:portrait)").matches;
-      say("✓ "+ownedGunTypes.length+" gun"+(ownedGunTypes.length>1?"s":"")+" unlocked — "+(portrait?"just turn your phone sideways to play.":"pick one under LOADOUT."));
+      say("✓ "+r.types.length+" gun"+(r.types.length>1?"s":"")+" unlocked — "+(portrait?"just turn your phone sideways to play.":"pick one under LOADOUT."));
       setTimeout(closeAddress,1600); }
-    else say(walletStatus||"No WICK ARSENAL guns at that address.",true);
+    else if(r) say("No WICK ARSENAL guns at that address.",true);
+    else say(walletStatus||"Couldn't verify that address.",true);
   }
   document.getElementById("wsGo").addEventListener("click",go);
   inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } });
@@ -1695,14 +1722,18 @@ function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/"+l
    type 0 (sealed) and would otherwise keep a holder on the default sidearm. */
 async function refreshGuns(addr, watch){
   if(!addr)return;
+  const gen=nftGen;                                   // if another wallet lands during our awaits, stand down
   let types=null;
   try{ const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const d=await r.json();
        if(r.ok&&d.ok)types=[...new Set((d.guns||[]).map(x=>x.type))]; }catch(e){}
-  if(types===null){ try{ types=await rpcGunsOf(addr); }catch(e){ return; } }   // chain fallback; on total failure keep what we have
-  if(!types.length)return;                                                    // never silently revoke guns on a bad read
+  if(types===null){ try{ types=await rpcGunsOf(addr); }catch(e){ return; } }   // BOTH lookups failed → keep the cache
+  if(gen!==nftGen)return;                             // session changed mid-flight — this result is about the wrong wallet
+  // types!==null here means a lookup SUCCEEDED — a verified zero applies (they
+  // really sold everything); only failures above keep the cache alive
   const before=ownedGunTypes.join(",");
-  applyGuns(types, addr, watch);
-  if(before!==types.join(",")&&types.some(t=>t>0)) floats.push({x:W/2,y:120,txt:"GUNS REVEALED — "+specFor(loadoutType).name,t:2.2,size:13,c:"#ffd75e"});
+  applyGuns(types, addr, watch, true);
+  if(before!==types.join(",")&&types.some(t=>t>0))
+    walletStatus="✨ GUNS REVEALED — "+specFor(loadoutType).name;   // the menu draws walletStatus; floats never render there
 }
 /* restore cached verification on boot, then ALWAYS re-check in the background.
    The old code only re-checked watch sessions, so a signed holder who connected
@@ -1713,15 +1744,16 @@ async function refreshGuns(addr, watch){
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
   if(!c||!c.types||!c.types.length)return;
   const sealed=c.types.every(t=>!t);                                          // cache from before the reveal
-  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch); // show something instantly
-  setTimeout(()=>refreshGuns(c.addr, c.watch), sealed?300:2500);               // sealed caches refresh straight away
+  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch, true); // quiet: no gesture yet — a chime here births a dead AudioContext
+  const gen=nftGen;                                  // captured NOW — if any other wallet applies before the timer fires, gen goes stale
+  setTimeout(()=>{ if(gen===nftGen)refreshGuns(c.addr, c.watch); }, sealed?300:2500);  // sealed caches refresh straight away
   }catch(e){} })();
 function loadoutOpts(){ return [null,...ownedGunTypes]; }              // default sidearm + every gun you own
 function cycleLoadout(dir){
   const opts=loadoutOpts(), n=opts.length;
   let i=opts.indexOf(loadoutType); if(i<0)i=0;
   i=((i+(dir===-1?-1:1))%n+n)%n;                                      // wraps both ways
-  loadoutType=opts[i]; try{ localStorage.setItem("pw_loadout",loadoutType==null?"":String(loadoutType)); }catch(e){}
+  loadoutType=opts[i]; try{ localStorage.setItem("pw_loadout",loadoutType==null?"d":String(loadoutType)); }catch(e){}   // "d" = the player CHOSE the default sidearm; "" would read as no-preference
   SFX.coin(3);
 }
 function loadoutPos(){ const o=loadoutOpts(); const i=o.indexOf(loadoutType); return (i<0?1:i+1)+"/"+o.length; }
@@ -1734,7 +1766,9 @@ async function fetchBoard(force){
   catch(e){ if(!lbTop)lbTop=null; }
   lbTried=true;
 }
-const best=(()=>{ try{ return JSON.parse(localStorage.getItem("pw_best")||"{}"); }catch(e){ return {}; } })();
+const best=(()=>{ try{ const b=JSON.parse(localStorage.getItem("pw_best")||"{}");
+  return (b&&typeof b==="object"&&!Array.isArray(b))?b:{};   // the string "null" is valid JSON and survives the || fallback
+}catch(e){ return {}; } })();
 function totalScore(){ let s=0; for(let i=0;i<LEVELS.length;i++){ const b=best["l"+i];
   if(b&&typeof b.score==="number"&&isFinite(b.score)&&b.score>0)s+=b.score; } return s; }   // legacy/poisoned strings can't concatenate
 async function submitScore(){
@@ -1747,7 +1781,9 @@ async function submitScore(){
   if(s<=0){ lbMsg="no score yet"; return; }
   // holders-only board — say so here rather than making them sign for a 403
   if(!ownedGunTypes.length){ lbMsg="holders only — mint a gun at mint.wick.pics to enter"; return; }
-  lbBusy=true; lbMsg="sign the score in your wallet…";
+  lbBusy=true;
+  lbMsg = window.ethereum ? "sign the score in your wallet…"
+                          : "sign in your wallet APP — open it, approve, come back";   // WalletConnect: the request went to the phone app
   try{
     const msg="WICK score\naddress:"+walletAddr+"\nscore:"+s+"\nmode:"+mode+"\nts:"+Date.now();   // mode is SIGNED — no cross-mode replay
     const sig=await seth.request({method:"personal_sign",params:[msg,walletAddr]});
@@ -2054,6 +2090,7 @@ function newPlayer(x){
 const HPMAP={goon:28,heavy:90,blade:20,shield:60,marksman:22,bomber:26,hound:14,zero:200,butcher:440};
 function mkEnemy(e){ const t=e.t,x=e.x,y=e.y||GY; return {t,x,y,hp:HPMAP[t]||28,maxhp:HPMAP[t]||28,face:e.face||-1,dead:false,cd:rand(0.8,1.6),tel:0,muzzle:0,walk:Math.random()*7,px:x,dir:-1,patrol:(y&&y!==GY)?34:70,fuse:0,block:0,phase:1,summoned:0}; }
 function startLevel(i,keepDeaths){
+  releaseAllInput();   // a fresh level starts from rest — held keys/touches must not carry across the transition
   gauntlet=false;
   lvIdx=i; lvl=LEVELS[i]; applyTheme(i);
   P=newPlayer(120); camX=0; checkpointX=120;
@@ -2082,6 +2119,7 @@ function startLevel(i,keepDeaths){
   state="play";
 }
 function respawnLevel(){ /* death → last checkpoint, world progress kept */
+  releaseAllInput();
   deathsThisRun++; campDeaths++;
   const cx=checkpointX;
   P=newPlayer(cx); P.ifr=1.6;
@@ -2097,6 +2135,7 @@ function respawnLevel(){ /* death → last checkpoint, world progress kept */
 /* ---------- endless gauntlet ---------- */
 let preGLvIdx=0;
 function startGauntlet(){
+  releaseAllInput();
   if(!gauntlet)preGLvIdx=lvIdx;         // remember the campaign selection ONCE — RUN AGAIN must not overwrite it with 0
   gauntlet=true; lvIdx=0; lvl=GAUNTLET_LV; applyTheme(0);
   P=newPlayer(GAUNTLET_LV.len/2); camX=Math.max(0,P.x-W/2); checkpointX=P.x;
@@ -2696,7 +2735,12 @@ function onClear(){
 }
 
 /* ---------- input ---------- */
-addEventListener("keydown",e=>{ if(e.repeat)return; keys.add(e.code); audio();
+addEventListener("keydown",e=>{ if(e.repeat)return;
+  // wallet sheet open = keys belong to the sheet. Its own stopPropagation only covers
+  // keystrokes that ORIGINATE inside it — click the box's title, focus lands on body,
+  // and an Enter here would start a level behind the overlay.
+  { const ws=document.getElementById("wsheet"); if(ws&&ws.classList.contains("on"))return; }
+  keys.add(e.code); audio();
   if(state==="play"){
     if(e.code==="KeyW"||e.code==="ArrowUp"||e.code==="Space"){ e.preventDefault(); P.jbuf=0.16; P.jumpHeld=true; }
     if(e.code==="KeyS"||e.code==="ArrowDown")P.dropT=0.24;
@@ -3048,6 +3092,7 @@ function getGrain(){ if(grainTile)return grainTile; const c=document.createEleme
   cx.putImageData(id,0,0); grainTile=c; return c; }
 function setBg(i){ bgStyle=(i+3)%3; try{ localStorage.setItem("pw_bg",bgStyle); }catch(e){} }
 try{ const s=localStorage.getItem("pw_bg"); if(s!=null)bgStyle=+s; }catch(e){}
+if(bgStyle!==0&&bgStyle!==1&&bgStyle!==2)bgStyle=2;   // "oops" or "1.5" in storage would index BGCFG as undefined and freeze the game
 /* ---------- detailed procedural skyline (window grids + rooftop variety + atmospheric tint) ---------- */
 function hsh(n){ n=(n^61)^(n>>>16); n=(n+(n<<3))|0; n=n^(n>>>4); n=Math.imul(n,0x27d4eb2d); n=n^(n>>>15); return (n>>>0)/4294967295; }
 function shade(hex,f){ const n=parseInt(hex.slice(1),16); let r=(n>>16)&255,gc=(n>>8)&255,b=n&255; const m=f<0?0:255,a=Math.min(1,Math.abs(f));
@@ -3917,14 +3962,14 @@ function drawGuide(){
   line(L,y,"Mint or buy at mint.wick.pics — each gun is a"); y+=lh;
   line(L,y,"real weapon in this game (holo 1/1s hit +20% harder)."); y+=lh+8;
   head(L,y,"✅ VERIFY YOU OWN IT — 3 WAYS"); y+=lh;
-  line(L,y,"1  CONNECT — connect & sign (MetaMask/Rabby).","#9fd8ff"); y+=lh;
+  line(L,y,"1  CONNECT — approve once, no signing.","#9fd8ff"); y+=lh;
   line(L,y,"    Full unlock: guns + leaderboard + bonus ♥.","#8fa3bf"); y+=lh;
   line(L,y,"2  ⌖ ADDRESS — paste your wallet address.","#9fd8ff"); y+=lh;
-  line(L,y,"    Instant watch-mode: guns unlock, no signing.","#8fa3bf"); y+=lh;
+  line(L,y,"    Instant watch-mode: guns unlock, 3 hearts.","#8fa3bf"); y+=lh;
+  line(L,y,"3  PHONE — connect on mint.wick.pics, then tap","#9fd8ff"); y+=lh;
+  line(L,y,"    PLAY WITH MY GUNS in Your Arsenal.","#8fa3bf"); y+=lh;
   line(L,y,"    (Scores are signed by the submitting wallet and reviewed","#5f6b7c"); y+=lh;
-  line(L,y,"     before any prize pays out.)","#5f6b7c"); y+=lh;
-  line(L,y,"3  PHONE — no wallet in this browser? CONNECT","#9fd8ff"); y+=lh;
-  line(L,y,"    opens this game inside the MetaMask app.","#8fa3bf"); y+=lh+8;
+  line(L,y,"     before any prize pays out.)","#5f6b7c"); y+=lh+8;
   head(L,y,"⇄ PICK YOUR GUN"); y+=lh;
   line(L,y,"Menu: tap LOADOUT to cycle your guns."); y+=lh;
   line(L,y,"In game: press Q (desktop) or tap the gun name"); y+=lh;
@@ -3940,8 +3985,8 @@ function drawGuide(){
   line(R2,z,"tap RIGHT side — jump · swipe ↓ — drop · auto-fire"); z+=lh;
   line(R2,z,"tap gun name — swap · menu: TILT & ⛶ FULLSCREEN"); z+=lh+8;
   head(R2,z,"❤ HOLDER PERKS"); z+=lh;
-  line(R2,z,"Any Arsenal gun: 4th heart + real firepower"); z+=lh;
-  line(R2,z,"Holo 1/1 (5 exist): +20% damage, rainbow gun"); z+=lh+8;
+  line(R2,z,"Any gun: real firepower · CONNECTED holders: 4th ♥"); z+=lh;
+  line(R2,z,"Holo 1/1 (6 exist): +20% damage, rainbow gun"); z+=lh+8;
   head(R2,z,"🏆 LEADERBOARD"); z+=lh;
   line(R2,z,"Scores are signed by your wallet — connect via"); z+=lh;
   line(R2,z,"CONNECT, then SUBMIT on the ending/gauntlet screen."); z+=lh;
@@ -3962,20 +4007,24 @@ function drawBoard(){
   g.font="900 30px Verdana"; g.fillStyle="#ffd75e";
   g.fillText("🏆 TOP ASSASSINS — $WICK WORLD BOARD",W/2,66);
   g.font="bold 10px Verdana"; g.fillStyle="#66707f";
-  g.fillText("one entry per wallet · signed scores · shared across the PEPE WICK games",W/2,88);
+  g.fillText("any mode · one prize slot per wallet (your best run) · signed scores",W/2,88);
   if(lbTop===null){ g.font="bold 13px Verdana"; g.fillStyle="#8fa3bf"; g.fillText(lbTried?"board unreachable — try again later":"loading…",W/2,240); }
   else if(!lbTop){ g.font="bold 13px Verdana"; g.fillStyle="#8fa3bf"; g.fillText("loading…",W/2,240); }
   else{
+    // CONTEST RULE (matches mint.wick.pics): the API keeps a row per wallet PER MODE;
+    // the prize board shows each wallet once, at its best score across modes
+    const seenW=new Set();
+    const board=lbTop.filter(e=>!seenW.has(e.a)&&seenW.add(e.a));
     g.font="bold 14px monospace";
-    for(let i=0;i<Math.min(10,lbTop.length);i++){
-      const e=lbTop[i], y=132+i*32;
+    for(let i=0;i<Math.min(10,board.length);i++){
+      const e=board[i], y=132+i*32;
       g.fillStyle=i===0?"#ffd75e":i===1?"#cfd6e0":i===2?"#e8a869":"#8fa3bf";
       g.textAlign="left";
       g.fillText("#"+(i+1)+"  "+boardLabel(e),W/2-260,y);
       g.textAlign="right";
       g.fillText((e.score||0).toLocaleString(),W/2+260,y);
     }
-    if(!lbTop.length){ g.font="bold 13px Verdana"; g.textAlign="center"; g.fillStyle="#8fa3bf"; g.fillText("no scores yet — be the first",W/2,240); }
+    if(!board.length){ g.font="bold 13px Verdana"; g.textAlign="center"; g.fillStyle="#8fa3bf"; g.fillText("no scores yet — be the first",W/2,240); }
   }
   g.textAlign="center"; g.font="bold 12px Verdana"; g.fillStyle="#ffd75e";
   g.fillText("YOUR CAREER SCORE: "+totalScore().toLocaleString(),W/2,H-98);   // clear of row #10's baseline
@@ -4015,12 +4064,16 @@ function applyBloom(){
 let last=performance.now(), acc=0; const STEP=1/60;
 const isPortrait=()=>{ try{ return MOBILE&&matchMedia("(orientation: portrait)").matches; }catch(e){ return false; } };
 function frame(now){
-  let el=(now-last)/1000; last=now;
-  if(el<0)el=0; if(el>0.12)el=0.12;                                  // returning from a stall never bursts the sim
-  if(document.hidden||isPortrait()){ acc=0; }                        // hidden tab / rotate overlay = PAUSED, not dying off-screen
-  else { acc+=el; let n=0;
-    while(acc>=STEP&&n<8){ update(STEP); acc-=STEP; n++; } }
-  render();
+  // one thrown exception must not kill the rAF chain — that's a frozen canvas,
+  // dead input, and only a manual reload recovers. Log it, keep the loop alive.
+  try{
+    let el=(now-last)/1000; last=now;
+    if(el<0)el=0; if(el>0.12)el=0.12;                                  // returning from a stall never bursts the sim
+    if(document.hidden||isPortrait()){ acc=0; }                        // hidden tab / rotate overlay = PAUSED, not dying off-screen
+    else { acc+=el; let n=0;
+      while(acc>=STEP&&n<8){ update(STEP); acc-=STEP; n++; } }
+    render();
+  }catch(e){ console.error(e); }
   if(document.hidden)setTimeout(()=>frame(performance.now()),200); else requestAnimationFrame(frame);
 }
 frame(performance.now());
