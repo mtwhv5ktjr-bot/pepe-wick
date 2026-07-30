@@ -1454,7 +1454,8 @@ function enterAddress(){
   if(a!==null)verifyWatch(a);
 }
 /* WAY 3 — no wallet in this browser (mobile Safari/Chrome): open the game inside the wallet's own browser */
-function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/pepe-zero.vercel.app","_blank"); }catch(e){} }
+const SHARE_URL="pepe-zero.vercel.app";   // canonical PUBLIC url shown in menu footer + share texts — one-line swap when games.wick.pics goes public
+function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/"+location.host+location.pathname.replace(/index\.html$/,""),"_blank"); }catch(e){} } // deep-link back to whichever mirror is being played
 /* restore cached verification on boot (background-refresh watch lookups) */
 (function restoreNft(){ try{
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
@@ -3509,15 +3510,19 @@ function drawMenu(t){
   menuBtn(W/2+162,346,88,30,"GET GUNS",()=>{try{window.open("https://wick-arsenal.vercel.app","_blank");}catch(e){}},"#ffd75e");
   menuBtn(W/2-250,381,88,26,"⌖ ADDRESS",enterAddress,"#9fe6ff","bold 11px Verdana");                    // way 2: watch mode
   menuBtn(W/2+162,381,88,26,"❓ GUIDE",()=>{state="guide";},"#7cf9a5","bold 11px Verdana");
-  g.font="bold 10px Verdana"; g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
-  g.fillText(gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ +20% holo":"")+(ownedGunTypes.length?"  ·  Q swaps in-game":""),W/2,398);
+  let statTxt=gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ +20% holo":"")+(ownedGunTypes.length?"  ·  Q swaps in-game":"");
   g.font="bold 10px Verdana";
-  if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,412); }
-  else { g.fillStyle="#4a5566"; g.fillText("hold WICK ARSENAL gun NFTs? WALLET to sign in, or ⌖ ADDRESS to watch — see ❓ GUIDE",W/2,412); }
+  if(g.measureText(statTxt).width>296){ g.font="bold 9px Verdana";                 // long holo lines must fit BETWEEN the ⌖/❓ side buttons
+    if(g.measureText(statTxt).width>300)statTxt=statTxt.replace("  ·  Q swaps in-game",""); }
+  g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
+  g.fillText(statTxt,W/2,398);
+  g.font="bold 10px Verdana";
+  if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,418); }
+  else { g.fillStyle="#4a5566"; g.fillText("own gun NFTs?  WALLET sign-in · ⌖ ADDRESS watch-only · ❓ GUIDE",W/2,418); }
   // hero
-  drawHero(W/2-30,470,1.35,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
+  drawHero(W/2-238,470,1.35,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});  // off-center: the bottom text column stays clear
   let done=false; try{ done=localStorage.getItem("pw_done")==="1"; }catch(e){}
-  if(done){ drawDog(W/2+40,470,-1,{}); g.font="bold 10px Verdana"; g.fillStyle="#e8b04a"; g.textAlign="center"; g.fillText("BISCUIT — SAFE ✓",W/2+46,428); }
+  if(done){ drawDog(W/2-168,470,-1,{}); g.font="bold 10px Verdana"; g.fillStyle="#e8b04a"; g.textAlign="center"; g.fillText("BISCUIT — SAFE ✓",W/2-166,434); }
   g.font="bold 10px Verdana"; g.textAlign="center"; g.fillStyle="#3f4a5c";
   g.fillText("UTILITY FOR $WICK ON PULSECHAIN  ·  NFT ARSENAL LIVE  ·  SIGNED WORLD LEADERBOARD",W/2,H-14);
   const v=g.createRadialGradient(W/2,H/2,H*0.5,W/2,H/2,H*0.95);
@@ -3557,7 +3562,7 @@ function drawScoreCard(){
   if(done)drawDog(W/2+46,452,-1,{});
   if(bountyActive()){ g.font="900 14px Verdana"; g.fillStyle="#7cf9a5";
     g.fillText("🏆 48H BOUNTY LIVE — TOP SCORE WINS 10,000 $WICK",W/2,490); }
-  g.font="900 15px Verdana"; g.fillStyle="#ff5f7a"; g.fillText("play free  →  pepe-zero.vercel.app",W/2,H-34);
+  g.font="900 15px Verdana"; g.fillStyle="#ff5f7a"; g.fillText("play free  →  "+SHARE_URL,W/2,H-34);
   g.font="bold 10px Verdana"; g.fillStyle="#5a6478"; g.fillText("$WICK ON PULSECHAIN  ·  NFT ARSENAL  ·  wick.pics",W/2,H-14);
   g.restore();
   PAL=savedPAL;   // don't leak the card's base palette into the live district
@@ -3568,8 +3573,8 @@ function shareScore(){
   try{ const a=document.createElement("a"); a.href=url; a.download="pepe-wick-score.png"; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
   const s=gauntlet?Math.floor(lvScore):totalScore();
   const txt=gauntlet
-    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → pepe-zero.vercel.app"
-    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → pepe-zero.vercel.app";
+    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → "+SHARE_URL
+    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → "+SHARE_URL;
   try{ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank"); }catch(e){}
   lbMsg="📸 card saved — attach it to your post!";
 }
