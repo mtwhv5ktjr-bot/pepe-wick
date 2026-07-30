@@ -23,11 +23,41 @@
   @media (orientation:portrait) and (pointer:coarse){
     canvas{opacity:0.06}
     #rot{display:flex;position:fixed;inset:0;flex-direction:column;align-items:center;justify-content:center;
-      background:#070a14;color:#e8f0ff;font:600 18px/1.5 Verdana,sans-serif;text-align:center;padding:24px;z-index:9;gap:18px}
+      background:#070a14;color:#e8f0ff;font:600 18px/1.5 Verdana,sans-serif;text-align:center;padding:24px;z-index:80;gap:18px}
     #rot .ic{font-size:56px;animation:spin 2.4s ease-in-out infinite}
     #rot b{color:#7cf9a5}
+    /* the rotate screen used to be a dead end — a holder coming back from their
+       wallet app in portrait saw only this. Now guns can be unlocked right here. */
+    #rot #rotUnlock{font:700 15px Verdana,sans-serif;color:#07120b;background:#7cf9a5;border:none;
+      border-radius:11px;padding:15px 22px;margin-top:6px}
+    #rot .sm{font-size:12px;color:#7c8798;margin-top:-8px}
   }
   @keyframes spin{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+
+  /* ---- gun unlock sheet (works portrait AND landscape, above the rotate screen) ---- */
+  /* above the rotate screen (80) and the floating ARCADE / GET GUNS cards (60) */
+  #wsheet{display:none;position:fixed;inset:0;z-index:100;background:rgba(3,6,14,.9);
+    align-items:center;justify-content:center;padding:14px;overflow:auto;
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  #wsheet.on{display:flex}
+  #wsheet .box{width:min(420px,100%);background:linear-gradient(180deg,#121a2b,#0a0e18);
+    border:2px solid #7cf9a5;border-radius:15px;padding:18px 16px 14px;position:relative;
+    font-family:Verdana,sans-serif;box-shadow:0 0 40px rgba(124,249,165,.22)}
+  #wsheet h2{margin:0 0 6px;font-size:16px;letter-spacing:1px;color:#7cf9a5}
+  #wsheet p{margin:0 0 12px;font-size:12.5px;line-height:1.65;color:#b9c4d4}
+  #wsheet .fine{margin:11px 0 0;font-size:11px;color:#6b7688}
+  #wsheet .fine b{color:#9fe6ff}
+  #wsheet input{width:100%;box-sizing:border-box;font:600 15px 'Courier New',monospace;
+    color:#e8f0ff;background:#070b14;border:1px solid #2c3a4e;border-radius:9px;padding:14px 12px}
+  #wsheet input:focus{outline:none;border-color:#7cf9a5}
+  #wsheet .btns{display:flex;gap:9px;margin-top:10px}
+  #wsheet button{flex:1;font:700 14px Verdana,sans-serif;border:none;border-radius:10px;padding:14px 10px;
+    color:#cfe0f5;background:#1b2536}
+  #wsheet button.go{color:#07120b;background:#7cf9a5}
+  #wsheet #wsX{position:absolute;top:6px;right:8px;flex:none;width:36px;padding:6px;
+    font-size:20px;background:none;color:#7c8798}
+  #wsMsg{min-height:17px;margin-top:9px;font-size:12px;color:#9fe6ff;line-height:1.5}
+  #wsMsg.bad{color:#ff9d9d}
 
   /* ---- ARCADE back-link (page-level, hidden during play like GET GUNS) ---- */
   #arcadeBack{
@@ -73,7 +103,29 @@
      one here just meant two clicks to reach the same menu. -->
 <a id="arcadeBack" href="/">🕹 ARCADE</a>
 <a id="getguns" href="https://games.wick.pics/arsenal/"><img src="/tabula-rasa.png" alt="TABULA RASA — platinum holo 1/1"><span>🔫 GET GUNS</span><small>WICK ARSENAL · TABULA RASA 1/1</small></a>
-<div id="rot"><div class="ic">📱</div><div>Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b></div></div>
+<div id="rot"><div class="ic">📱</div><div>Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b></div>
+  <button id="rotUnlock" type="button">🔫 UNLOCK MY GUNS</button>
+  <div class="sm">you can do this in portrait — rotate after</div></div>
+
+<!-- Gun unlock sheet. A real DOM overlay, NOT window.prompt(): in-app browsers
+     (Telegram, Instagram) block prompt outright, so the escape hatch we point
+     holders at would silently do nothing. Sits above the rotate screen so it works
+     in portrait, which is how people actually hold a phone to paste. -->
+<div id="wsheet">
+  <div class="box">
+    <button id="wsX" type="button" aria-label="Close">×</button>
+    <h2>UNLOCK YOUR GUNS</h2>
+    <p>Paste the wallet holding your WICK ARSENAL guns. They unlock instantly — no wallet app, no signing.</p>
+    <input id="wsIn" type="text" inputmode="text" autocomplete="off" autocapitalize="off"
+           spellcheck="false" placeholder="0x…" aria-label="Wallet address">
+    <div class="btns">
+      <button id="wsPaste" type="button">📋 PASTE</button>
+      <button id="wsGo" type="button" class="go">UNLOCK</button>
+    </div>
+    <div id="wsMsg"></div>
+    <p class="fine">Watch mode shows your guns and lets you play them. To post a score you'll still connect the wallet itself — easiest on <b>mint.wick.pics</b>, then tap PLAY WITH MY GUNS.</p>
+  </div>
+</div>
 <script>
 "use strict";
 /* GET GUNS card: only on the pre-game screens. Hidden the instant a run starts and
@@ -1485,6 +1537,10 @@ async function getEth(){                       // one provider for connect + eve
   return wcProvider;
 }
 let walletAddr=null, ownedGunTypes=[], loadoutType=null, walletStatus="", walletBusy=false, watchMode=false;
+/* Hand-off from mint.wick.pics: ?w=0x… unlocks guns with no wallet app at all.
+   Connecting is easy on a normal portrait page and awful inside a landscape-locked
+   canvas game, so we let the mint site do it and carry the result over. */
+const URL_WALLET=(/[?&#]w=(0x[a-fA-F0-9]{40})/.exec(location.search+location.hash)||[])[1]||null;
 // Telegram / Instagram / Facebook / X in-app webviews: no injected wallet, and the
 // deeplink out to a wallet app rarely makes it back. Watch mode is the way in here.
 const INAPP=/Telegram|Instagram|FBAN|FBAV|Twitter|Line\/|MicroMessenger/i.test(navigator.userAgent)
@@ -1570,9 +1626,50 @@ async function rpcGunsOf(addr){
   for(let i=0;i<tLen;i++){ const v=word(tOff+1+i); if(isFinite(v))types.push(v); }
   return [...new Set(types)];
 }
+/* window.prompt() is blocked outright in Telegram/Instagram webviews and is miserable
+   to paste into on a phone in landscape — so this is a real DOM sheet instead. */
 function enterAddress(){
-  const a=prompt("WATCH MODE — paste the wallet address that holds your WICK ARSENAL guns.\nGuns unlock instantly; connect the real wallet later to submit scores:", "");
-  if(a!==null)verifyWatch(a);
+  const s=document.getElementById("wsheet"); if(!s){ const a=prompt("Wallet address:",""); if(a!==null)verifyWatch(a); return; }
+  const inp=document.getElementById("wsIn"), msg=document.getElementById("wsMsg");
+  msg.textContent=""; msg.className="";
+  if(walletAddr||lastWatchAddr) inp.value=walletAddr||lastWatchAddr;
+  s.classList.add("on");
+  setTimeout(()=>{ try{ inp.focus(); }catch(e){} },50);
+}
+function closeAddress(){ const s=document.getElementById("wsheet"); if(s)s.classList.remove("on"); }
+let lastWatchAddr=null;
+try{ lastWatchAddr=(JSON.parse(localStorage.getItem("pw_nft")||"null")||{}).addr||null; }catch(e){}
+
+(function wireSheet(){
+  const s=document.getElementById("wsheet"); if(!s)return;
+  const inp=document.getElementById("wsIn"), msg=document.getElementById("wsMsg");
+  const say=(t,bad)=>{ msg.textContent=t; msg.className=bad?"bad":""; };
+  async function go(){
+    const a=(inp.value||"").trim();
+    if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ say("That doesn't look like a wallet address — it should start 0x and be 42 characters.",true); return; }
+    say("Looking up your guns on-chain…");
+    await verifyWatch(a);
+    if(ownedGunTypes.length){ lastWatchAddr=a; say("✓ "+ownedGunTypes.length+" gun"+(ownedGunTypes.length>1?"s":"")+" unlocked — close this and pick one under LOADOUT.");
+      setTimeout(closeAddress,1400); }
+    else say(walletStatus||"No WICK ARSENAL guns at that address.",true);
+  }
+  document.getElementById("wsGo").addEventListener("click",go);
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } });
+  document.getElementById("wsPaste").addEventListener("click",async()=>{
+    try{ const t=await navigator.clipboard.readText(); if(t){ inp.value=t.trim(); say(""); } else say("Clipboard is empty — long-press the field and paste.",true); }
+    catch(e){ say("This browser won't share the clipboard — long-press the field and paste.",true); }
+  });
+  document.getElementById("wsX").addEventListener("click",closeAddress);
+  s.addEventListener("click",e=>{ if(e.target===s)closeAddress(); });
+  const ru=document.getElementById("rotUnlock"); if(ru)ru.addEventListener("click",enterAddress);
+  // keystrokes in the sheet must never reach the game (Enter would launch a level)
+  ["keydown","keyup","keypress"].forEach(t=>s.addEventListener(t,e=>e.stopPropagation()));
+})();
+
+// resolved at parse time so restoreNft (below) can see it and stand down
+if(URL_WALLET){
+  try{ history.replaceState(null,"",location.pathname); }catch(e){}   // don't leave the address in the URL bar
+  setTimeout(()=>verifyWatch(URL_WALLET),300);
 }
 /* WAY 3 — no wallet in this browser (mobile Safari/Chrome): open the game inside the wallet's own browser */
 const SHARE_URL="games.wick.pics";   // arcade hall at the root; this game sits at /play/ (either lands people right)
@@ -1595,6 +1692,8 @@ async function refreshGuns(addr, watch){
    The old code only re-checked watch sessions, so a signed holder who connected
    before the reveal stayed sealed for 24h. */
 (function restoreNft(){ try{
+  if(URL_WALLET)return;              // a ?w= hand-off names the wallet explicitly — the
+                                     // stale cache must not race in and overwrite it 2.5s later
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
   if(!c||!c.types||!c.types.length)return;
   const sealed=c.types.every(t=>!t);                                          // cache from before the reveal
