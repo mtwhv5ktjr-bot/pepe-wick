@@ -329,9 +329,9 @@ const GUNDEFS={
   3:{name:"KIMBER BREACHER",tip:38.6,line:-19.5,grip:25.5,rps:2,dmg:9,spread:0.1,pellets:6,auto:false,spd:1150},
   4:{name:"TTI MARKSMAN",tip:42,line:-18.7,grip:27,rps:2.6,dmg:34,spread:0.002,pellets:1,auto:false,pierce:2,spd:1850},
   5:{name:"EXCOMMUNICADO",tip:36.6,line:-19,grip:23,rps:9,dmg:15,spread:0.022,pellets:1,auto:true,spd:1450},
-  6:{name:"TANGENT",tip:42.5,line:-19.3,grip:24,rps:6.5,dmg:26,spread:0.01,pellets:3,fan:0.55,auto:true,spd:1500,tang:true} // honorary 1/1: tri-arc AR-15 — 3 rounds fan out every shot
+  6:{name:"TANGENTIAL REAPER",tip:42.5,line:-19.3,grip:24,rps:6.5,dmg:26,spread:0.01,pellets:3,fan:0.55,auto:true,spd:1500,tang:true} // honorary 1/1: tri-arc AR-15 — 3 rounds fan out every shot
 };
-const HOLO_NAMES={11:"GOLD STANDARD",12:"THE IMPOSSIBLE",13:"HIGH TABLE",14:"TABULA RASA",15:"BABA YAGA",16:"TANGENT"};
+const HOLO_NAMES={11:"GOLD STANDARD",12:"THE IMPOSSIBLE",13:"HIGH TABLE",14:"TABULA RASA",15:"BABA YAGA",16:"TANGENTIAL REAPER"};
 function gunRole(sp){
   if(sp.tang)return "tri-arc storm rifle";
   if(sp.pellets>1)return sp.pellets+"-pellet shotgun";
