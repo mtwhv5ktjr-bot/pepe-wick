@@ -1654,6 +1654,8 @@ async function submitScore(){
   const s=gauntlet?Math.floor(lvScore):Math.floor(totalScore());
   const mode=gauntlet?"gauntlet":"pepe-wick", lvNo=gauntlet?gWave:lvIdx+1;
   if(s<=0){ lbMsg="no score yet"; return; }
+  // holders-only board — say so here rather than making them sign for a 403
+  if(!ownedGunTypes.length){ lbMsg="holders only — mint a gun at mint.wick.pics to enter"; return; }
   lbBusy=true; lbMsg="sign the score in your wallet…";
   try{
     const msg="WICK score\naddress:"+walletAddr+"\nscore:"+s+"\nmode:"+mode+"\nts:"+Date.now();   // mode is SIGNED — no cross-mode replay
@@ -3648,7 +3650,7 @@ function drawMenu(t){
   BTNS.length=0;
   menuBackdrop(t);
   if(bountyActive()){ g.save(); g.textAlign="center"; g.font="900 12px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 PRIZE BOARD LIVE — 1st 50 · 2nd 35 · 3rd 15 USDC · ends in "+fmtDur(prizeLeft()),W/2,26); g.restore(); }
+    g.fillText("🏆 PRIZE BOARD — 1st 50 · 2nd 35 · 3rd 15 USDC · NFT HOLDERS ONLY · ends in "+fmtDur(prizeLeft()),W/2,26); g.restore(); }
   // title
   g.save(); g.textAlign="center";
   g.font="italic 13px Georgia,serif"; g.fillStyle="#e8b04a";
@@ -3739,7 +3741,7 @@ function drawScoreCard(){
   drawHero(W/2-(done?32:0),452,1.55,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   if(done)drawDog(W/2+46,452,-1,{});
   if(bountyActive()){ g.font="900 14px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 PRIZE BOARD — TOP 3 WIN 50 / 35 / 15 USDC",W/2,490); }
+    g.fillText("🏆 PRIZE BOARD — TOP 3 HOLDERS WIN 50 / 35 / 15 USDC",W/2,490); }
   g.font="900 15px Verdana"; g.fillStyle="#ff5f7a"; g.fillText("play free  →  "+SHARE_URL,W/2,H-34);
   g.font="bold 10px Verdana"; g.fillStyle="#5a6478"; g.fillText("$WICK ON PULSECHAIN  ·  NFT ARSENAL  ·  wick.pics",W/2,H-14);
   g.restore();
@@ -3751,8 +3753,8 @@ function shareScore(){
   try{ const a=document.createElement("a"); a.href=url; a.download="pepe-wick-score.png"; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
   const s=gauntlet?Math.floor(lvScore):totalScore();
   const txt=gauntlet
-    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top 3 on the board win 50/35/15 USDC. ":"")+"play → "+SHARE_URL
-    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top 3 on the board win 50/35/15 USDC. ":"")+"play → "+SHARE_URL;
+    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top 3 NFT holders win 50/35/15 USDC. ":"")+"play → "+SHARE_URL
+    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top 3 NFT holders win 50/35/15 USDC. ":"")+"play → "+SHARE_URL;
   try{ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank"); }catch(e){}
   lbMsg="📸 card saved — attach it to your post!";
 }
