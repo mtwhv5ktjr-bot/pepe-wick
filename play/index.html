@@ -103,9 +103,9 @@
      one here just meant two clicks to reach the same menu. -->
 <a id="arcadeBack" href="/">🕹 ARCADE</a>
 <a id="getguns" href="https://games.wick.pics/arsenal/"><img src="/tabula-rasa.png" alt="TABULA RASA — platinum holo 1/1"><span>🔫 GET GUNS</span><small>WICK ARSENAL · TABULA RASA 1/1</small></a>
-<div id="rot"><div class="ic">📱</div><div>Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b></div>
+<div id="rot"><div class="ic">📱</div><div id="rotTxt">Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b></div>
   <button id="rotUnlock" type="button">🔫 UNLOCK MY GUNS</button>
-  <div class="sm">you can do this in portrait — rotate after</div></div>
+  <div class="sm" id="rotSm">you can do this in portrait — rotate after</div></div>
 
 <!-- Gun unlock sheet. A real DOM overlay, NOT window.prompt(): in-app browsers
      (Telegram, Instagram) block prompt outright, so the escape hatch we point
@@ -1582,6 +1582,19 @@ async function connectWallet(){
   }catch(e){ walletStatus=(e&&(e.message||e.code))?("error: "+(e.shortMessage||e.message||e.code)):"connect cancelled"; }
   walletBusy=false;
 }
+/* The rotate screen doubles as the post-login screen: once guns are in, it should
+   say "you're done — just turn the phone", not keep nagging about landscape. */
+function syncRotMsg(){
+  const t=document.getElementById("rotTxt"), b=document.getElementById("rotUnlock"), s=document.getElementById("rotSm");
+  if(!t)return;
+  if(ownedGunTypes.length){
+    t.innerHTML="✓ <b>"+ownedGunTypes.length+" gun"+(ownedGunTypes.length>1?"s":"")+" loaded</b><br>Just turn your phone sideways to play";
+    if(b)b.style.display="none"; if(s)s.style.display="none";
+  } else {
+    t.innerHTML="Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b>";
+    if(b)b.style.display=""; if(s)s.style.display="";
+  }
+}
 /* apply verified guns + remember them (24h cache) so returning players stay unlocked */
 function applyGuns(types, addr, watch){
   types=Array.isArray(types)?types.filter(n=>typeof n==="number"&&isFinite(n)):[];   // poisoned cache can't half-apply
@@ -1593,6 +1606,7 @@ function applyGuns(types, addr, watch){
     ? (watch?"👁 watch: ":"✓ ")+types.length+" gun"+(types.length>1?"s":"")+" unlocked"+(watch?" — connect to submit scores":"")
     : (watch?"👁 watching — no WICK guns at that address":"✓ connected — no WICK guns in wallet");
   try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,watch:!!watch,ts:Date.now()})); }catch(e){}
+  syncRotMsg();
   if(types.length)SFX.unlock();
 }
 /* WAY 2 — WATCH MODE: paste any address, no wallet app needed (API lookup, on-chain RPC fallback) */
@@ -1649,8 +1663,10 @@ try{ lastWatchAddr=(JSON.parse(localStorage.getItem("pw_nft")||"null")||{}).addr
     if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ say("That doesn't look like a wallet address — it should start 0x and be 42 characters.",true); return; }
     say("Looking up your guns on-chain…");
     await verifyWatch(a);
-    if(ownedGunTypes.length){ lastWatchAddr=a; say("✓ "+ownedGunTypes.length+" gun"+(ownedGunTypes.length>1?"s":"")+" unlocked — close this and pick one under LOADOUT.");
-      setTimeout(closeAddress,1400); }
+    if(ownedGunTypes.length){ lastWatchAddr=a;
+      const portrait=matchMedia("(orientation:portrait)").matches;
+      say("✓ "+ownedGunTypes.length+" gun"+(ownedGunTypes.length>1?"s":"")+" unlocked — "+(portrait?"just turn your phone sideways to play.":"pick one under LOADOUT."));
+      setTimeout(closeAddress,1600); }
     else say(walletStatus||"No WICK ARSENAL guns at that address.",true);
   }
   document.getElementById("wsGo").addEventListener("click",go);
@@ -2745,7 +2761,7 @@ cv.addEventListener("pointermove",e=>{ const p=ptr(e); mouse.x=p.x; mouse.y=p.y;
 cv.addEventListener("pointerdown",e=>{ audio(); const p=ptr(e); mouse.x=p.x; mouse.y=p.y;
   if(state==="play"){
     if(MOBILE){
-      if(p.x>W-190&&p.y<58&&ownedGunTypes.length){ cycleLoadout();   // tap the gun name (top-right) to swap NFT guns
+      if(p.x>W-210&&p.y<78&&ownedGunTypes.length){ cycleLoadout();   // the swap BUTTON top-right (zone matches the drawn 192×50 pill + slack)
         floats.push({x:P.x,y:P.y-56,txt:"⇄ "+specFor(loadoutType).name,t:1,size:12,c:"#ffd75e"}); return; }
       if(!tiltOn && p.x<W*0.44 && movePid===null){                    // left zone: plant the virtual stick
         activePtr[e.pointerId]={kind:"move",ax:p.x,ay:p.y,dx:0}; movePid=e.pointerId; return; }
@@ -3488,10 +3504,26 @@ function render(){
   if(state==="ending")drawEnding();
 }
 function drawHUD(t){
-  g.font="900 13px Verdana"; g.textAlign="left"; g.fillStyle="#7cf9a5";
-  g.fillText(gauntlet?("THE GAUNTLET · WAVE "+gWave):lvl.name,14,24);
-  if(bountyActive()){ g.save(); g.textAlign="center"; g.font="900 10px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 PRIZE BOARD — "+fmtDur(prizeLeft())+" left",W/2,15); g.restore(); }
+  // MOBILE: half the HUD, twice the readability. One name line, hearts, and a single
+  // combined stat line on the left; the whole right corner belongs to the swap button.
+  // The desktop layout put ☠ kills at W-118 — INSIDE the swap box — hence the clutter.
+  g.font=MOBILE?"900 11px Verdana":"900 13px Verdana"; g.textAlign="left"; g.fillStyle="#7cf9a5";
+  g.fillText(gauntlet?("THE GAUNTLET · WAVE "+gWave):(MOBILE?lvl.name.replace(/^(\d+) — (THE )?/,"$1 · "):lvl.name),14,24);
+  if(!MOBILE&&bountyActive()){ g.save(); g.textAlign="center"; g.font="900 10px Verdana"; g.fillStyle="#7cf9a5";
+    g.fillText("🏆 PRIZE BOARD — "+fmtDur(prizeLeft())+" left",W/2,15); g.restore(); }   // phones: menu/board only — mid-run it's noise
+  const la=gauntlet?0:enemies.reduce((n,e)=>n+(e.dead?0:1),0);
+  if(MOBILE){
+    for(let i=0;i<P.maxhp;i++){
+      g.fillStyle=i<P.hp?"#ff3355":"rgba(255,255,255,0.12)";
+      const hx=16+i*18, hy=36;
+      g.beginPath();
+      g.moveTo(hx,hy+3); g.bezierCurveTo(hx-6,hy-3,hx-6,hy+4,hx,hy+9);
+      g.bezierCurveTo(hx+6,hy+4,hx+6,hy-3,hx,hy+3); g.fill();
+    }
+    g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
+    const stat=lvScore.toLocaleString()+" PTS   ☠×"+lvKills+(gauntlet?"":("   "+(la?(la+" LEFT"):"CLEAR ✓ → DOOR")));
+    g.fillText(stat,14,62);
+  } else {
   g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
   g.fillText(lvTime.toFixed(1)+"s",14,42);
   g.fillStyle="#ffd75e"; g.fillText(lvScore.toLocaleString()+" PTS",70,42);
@@ -3504,9 +3536,10 @@ function drawHUD(t){
   }
   g.font="900 13px Verdana"; g.textAlign="left"; g.fillStyle="#ff6b7a";
   g.fillText("☠ ×"+lvKills,W-118,27);
-  if(!gauntlet){ const la=enemies.reduce((n,e)=>n+(e.dead?0:1),0);
-    g.font="900 11px Verdana"; g.fillStyle=la?"#ffb15e":"#7cf9a5";
-    g.fillText(la?(la+" LEFT"):"CLEAR ✓ → DOOR",W-118,74);
+  }
+  if(!gauntlet){
+    if(!MOBILE){ g.font="900 11px Verdana"; g.fillStyle=la?"#ffb15e":"#7cf9a5";
+    g.fillText(la?(la+" LEFT"):"CLEAR ✓ → DOOR",W-118,74); }
     // tracker: last stragglers get an edge arrow so backtracking never means wandering
     if(la>0&&la<=4){ const nr=enemies.filter(e=>!e.dead).sort((a,b)=>Math.abs(a.x-P.x)-Math.abs(b.x-P.x))[0];
       if(nr){ const sx=nr.x-camX;
@@ -3516,17 +3549,28 @@ function drawHUD(t){
           g.font="bold 10px Verdana"; g.fillText(dist+"px",ax,H/2+16); g.restore(); g.textAlign="left"; } } }
   }
   const sp=specFor(loadoutType);
-  // on phones the gun name IS the swap button — outline the tap zone so it reads as one
   if(MOBILE&&ownedGunTypes.length){
-    g.save(); g.strokeStyle="rgba(124,249,165,0.45)"; g.lineWidth=1.4;
-    g.fillStyle="rgba(8,14,22,0.45)"; rr(W-190,26,176,40,8); g.fill(); g.stroke(); g.restore();
-  }
+    // a real BUTTON, not a labelled whisper: filled, bordered, arrows, and a x/y
+    // counter so "I think I can change guns" becomes "I'm on gun 2 of 4"
+    g.save();
+    g.fillStyle="rgba(8,16,26,0.78)"; g.strokeStyle="#7cf9a5"; g.lineWidth=2;
+    rr(W-206,20,192,50,10); g.fill(); g.stroke();
+    g.textAlign="center";
+    g.fillStyle=sp.holo?"hsl("+(performance.now()/12%360)+",90%,65%)":"#eef4ff";
+    g.font="900 12px Verdana"; g.fillText(sp.name,W-110,40);
+    g.fillStyle="#7cf9a5"; g.font="900 10px Verdana";
+    g.fillText("⇄ TAP TO SWAP · "+loadoutPos(),W-110,58);
+    g.font="900 14px Verdana"; g.globalAlpha=0.6+0.35*Math.sin(t*3);
+    g.fillText("◀",W-196,48); g.fillText("▶",W-24,48);
+    g.restore(); g.textAlign="right";
+  } else {
   g.textAlign="right";
   g.fillStyle=sp.holo?"hsl("+(performance.now()/12%360)+",90%,65%)":"#cfd6e0";
   g.font="900 11px Verdana"; g.fillText(sp.name,W-14,46);
   if(ownedGunTypes.length){ g.font="bold 9px Verdana";
-    g.fillStyle=MOBILE?"rgba(124,249,165,0.8)":"rgba(160,175,200,0.55)";
-    g.fillText(MOBILE?"⇄ TAP TO SWAP GUN":"Q — swap",W-14,60); }
+    g.fillStyle="rgba(160,175,200,0.55)";
+    g.fillText("Q — swap",W-14,60); }
+  }
   if(combo>1){ g.font="900 22px Verdana"; g.textAlign="center";
     g.lineWidth=4; g.strokeStyle="rgba(0,0,0,0.75)"; g.strokeText(combo+"×",W/2,46);
     g.fillStyle=combo>=5?"#ffd75e":"#fff"; g.fillText(combo+"×",W/2,46);
