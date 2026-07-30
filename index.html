@@ -319,13 +319,15 @@ function drawGunInHand(type,kick,holo){
    vector hero to these the moment hero_walk.png loads; missing files fall back gracefully.
    Tune frame counts / fps / HEROSCALE below if a sheet differs. */
 const HERO_SHEETS={
-  walk:{file:"hero_walk.png",n:6,fps:12}, shoot:{file:"hero_shoot.png",n:6,fps:16},
-  idle:{file:"hero_idle.png",n:6,fps:8}, jump:{file:"hero_jump.png",n:6,fps:9},
-  runshoot:{file:"hero_runshoot.png",n:6,fps:14},            // (2) walk-and-fire (optional)
+  // .webp = PRE-KEYED (real alpha baked offline by the exact keyWhite pipeline) → loader skips runtime keying.
+  // Drop-in raw sheets as .png and the old flood-fill/defringe path still handles them.
+  walk:{file:"hero_walk.webp",n:6,fps:12}, shoot:{file:"hero_shoot.webp",n:6,fps:16},
+  idle:{file:"hero_idle.webp",n:6,fps:8}, jump:{file:"hero_jump.webp",n:6,fps:9},
+  runshoot:{file:"hero_runshoot.webp",n:6,fps:14},            // (2) walk-and-fire (optional)
   // (4) per-gun-class sheets (gun baked into the pose) — selected by equipped Arsenal gun:
-  pistol_stand:{file:"hero_pistol_stand.png",n:6,fps:8}, pistol_run:{file:"hero_pistol_run.png",n:6,fps:12},
-  rifle_stand:{file:"hero_rifle_stand.png",n:6,fps:8},  rifle_run:{file:"hero_rifle_run.png",n:6,fps:12},
-  pistol_jump:{file:"hero_pistol_jump.png",n:6,fps:9},  rifle_jump:{file:"hero_rifle_jump.png",n:6,fps:9}
+  pistol_stand:{file:"hero_pistol_stand.webp",n:6,fps:8}, pistol_run:{file:"hero_pistol_run.webp",n:6,fps:12},
+  rifle_stand:{file:"hero_rifle_stand.webp",n:6,fps:8},  rifle_run:{file:"hero_rifle_run.webp",n:6,fps:12},
+  pistol_jump:{file:"hero_pistol_jump.webp",n:6,fps:9},  rifle_jump:{file:"hero_rifle_jump.webp",n:6,fps:9}
 };
 let HEROSCALE=1.0; const heroImg={};
 const STRIDE_PX=13;   // ground px per run-cycle frame (6f cycle ≈ 78px) — matches feet to travel, no ice-skating
@@ -402,8 +404,10 @@ function contentBoxFrames(canvas,n){ // per-FRAME boxes — stops jump frames sh
       out.push(bot>top?{top,bot,ch:bot-top}:null); }
     return out; }catch(e){ return null; }
 }
+function rawCanvas(im){ const c=document.createElement("canvas"); c.width=im.naturalWidth; c.height=im.naturalHeight;
+  c.getContext("2d").drawImage(im,0,0); return c; }   // pre-keyed sheet: pixels are final, just need a readable canvas
 for(const k in HERO_SHEETS){ (function(k){ const cf=HERO_SHEETS[k], im=new Image();
-  im.onload=function(){ const c=keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
+  im.onload=function(){ const c=/\.webp$/i.test(cf.file)?rawCanvas(im):keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
     const hd=(c.getContext&&/pistol|rifle/.test(k))?handAnchors(c,cf.n):null;   // grip sheets: find the hand per frame + native facing
     const fr=c.getContext?contentBoxFrames(c,cf.n):null;
     const chs=fr?fr.filter(Boolean).map(b=>b.ch).sort((a,b)=>a-b):[];
