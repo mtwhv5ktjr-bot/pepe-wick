@@ -406,8 +406,18 @@ function contentBoxFrames(canvas,n){ // per-FRAME boxes — stops jump frames sh
 }
 function rawCanvas(im){ const c=document.createElement("canvas"); c.width=im.naturalWidth; c.height=im.naturalHeight;
   c.getContext("2d").drawImage(im,0,0); return c; }   // pre-keyed sheet: pixels are final, just need a readable canvas
+// Precomputed at build time by the exact contentBoxV/contentBoxFrames/handAnchors pipeline (fr=[top,bot,ch], hand=[hx,hy]).
+// Skips every per-load getImageData scan (~430ms on mid phones). Delete a sheet's entry to fall back to live scanning.
+const HERO_META={"walk":{"top":113,"bot":441,"ch":328,"dirR":0,"fr":[[113,441,328],[113,440,327],[113,440,327],[113,441,328],[113,441,328],[113,440,327]],"hand":null},"shoot":{"top":111,"bot":438,"ch":327,"dirR":0,"fr":[[111,438,327],[111,438,327],[111,438,327],[111,438,327],[111,438,327],[111,438,327]],"hand":null},"idle":{"top":131,"bot":423,"ch":292,"dirR":0,"fr":[[131,422,291],[131,422,291],[131,423,292],[131,423,292],[131,423,292],[131,422,291]],"hand":null},"jump":{"top":86,"bot":473,"ch":317,"dirR":0,"fr":[[184,471,287],[141,458,317],[88,428,340],[86,355,269],[133,462,329],[214,473,259]],"hand":null},"runshoot":{"top":131,"bot":423,"ch":290,"dirR":0,"fr":[[132,422,290],[131,414,283],[131,423,292],[131,420,289],[131,403,272],[131,423,292]],"hand":null},"pistol_stand":{"top":131,"bot":423,"ch":292,"dirR":1,"fr":[[131,423,292],[131,422,291],[131,423,292],[131,422,291],[131,423,292],[131,422,291]],"hand":[[197.7,244.1],[195.2,242.6],[187.3,243.6],[180.8,238.5],[163.4,242.4],[146.1,244.1]]},"pistol_run":{"top":131,"bot":420,"ch":285,"dirR":1,"fr":[[131,417,286],[131,416,285],[131,416,285],[131,420,289],[131,416,285],[131,416,285]],"hand":[[195.9,244.1],[195.5,242.3],[181.4,244.9],[169.8,243.8],[159.6,245.2],[147.2,243.7]]},"rifle_stand":{"top":131,"bot":423,"ch":292,"dirR":1,"fr":[[131,423,292],[131,422,291],[131,423,292],[131,423,292],[131,423,292],[131,422,291]],"hand":[[203.9,254.3],[201.4,253.7],[189.8,257.4],[178.2,255.3],[166.8,256.2],[150.8,257]]},"rifle_run":{"top":131,"bot":420,"ch":288,"dirR":1,"fr":[[131,420,289],[131,418,287],[131,419,288],[131,417,286],[131,419,288],[131,420,289]],"hand":[[203.4,235.8],[203.4,234.7],[205,234.1],[202.9,233.6],[193.6,233.7],[181.2,233.6]]},"pistol_jump":{"top":117,"bot":430,"ch":283,"dirR":1,"fr":[[183,430,247],[151,426,275],[131,420,289],[117,400,283],[132,429,297],[157,430,273]],"hand":[[197.6,288.4],[190.9,256.5],[183.8,235.8],[176,220.4],[210.3,315.4],[149,261.9]]},"rifle_jump":{"top":121,"bot":520,"ch":271,"dirR":1,"fr":[[202,421,219],[154,420,266],[131,411,280],[121,520,399],[152,423,271],[163,424,261]],"hand":[[195.1,301.7],[189.7,258.6],[196.5,231.7],[199.6,218.2],[159.8,260.7],[164,268.4]]}};
 for(const k in HERO_SHEETS){ (function(k){ const cf=HERO_SHEETS[k], im=new Image();
-  im.onload=function(){ const c=/\.webp$/i.test(cf.file)?rawCanvas(im):keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
+  im.onload=function(){
+    const M=HERO_META[k];
+    if(M&&/\.webp$/i.test(cf.file)){                     // pre-keyed + prebaked boxes: zero pixel scans, draw the Image directly
+      heroImg[k]={c:im,n:cf.n,fps:cf.fps,top:M.top,bot:M.bot,ch:M.ch,
+        fr:M.fr?M.fr.map(b=>b?{top:b[0],bot:b[1],ch:b[2]}:null):null,
+        hand:M.hand?M.hand.map(p=>p?{hx:p[0],hy:p[1]}:null):null,dirR:!!M.dirR};
+      return; }
+    const c=/\.webp$/i.test(cf.file)?rawCanvas(im):keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
     const hd=(c.getContext&&/pistol|rifle/.test(k))?handAnchors(c,cf.n):null;   // grip sheets: find the hand per frame + native facing
     const fr=c.getContext?contentBoxFrames(c,cf.n):null;
     const chs=fr?fr.filter(Boolean).map(b=>b.ch).sort((a,b)=>a-b):[];
@@ -1454,7 +1464,7 @@ function enterAddress(){
   if(a!==null)verifyWatch(a);
 }
 /* WAY 3 — no wallet in this browser (mobile Safari/Chrome): open the game inside the wallet's own browser */
-const SHARE_URL="pepe-zero.vercel.app";   // canonical PUBLIC url shown in menu footer + share texts — one-line swap when games.wick.pics goes public
+const SHARE_URL="games.wick.pics";   // canonical PUBLIC url shown in menu footer + share texts (the domain serves this repo directly)
 function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/"+location.host+location.pathname.replace(/index\.html$/,""),"_blank"); }catch(e){} } // deep-link back to whichever mirror is being played
 /* restore cached verification on boot (background-refresh watch lookups) */
 (function restoreNft(){ try{
