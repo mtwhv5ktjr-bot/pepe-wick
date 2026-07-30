@@ -328,10 +328,12 @@ const GUNDEFS={
   2:{name:"CONTINENTAL VECTOR",tip:33,line:-19.1,grip:22,rps:13,dmg:8,spread:0.05,pellets:1,auto:true,spd:1250},
   3:{name:"KIMBER BREACHER",tip:38.6,line:-19.5,grip:25.5,rps:2,dmg:9,spread:0.1,pellets:6,auto:false,spd:1150},
   4:{name:"TTI MARKSMAN",tip:42,line:-18.7,grip:27,rps:2.6,dmg:34,spread:0.002,pellets:1,auto:false,pierce:2,spd:1850},
-  5:{name:"EXCOMMUNICADO",tip:36.6,line:-19,grip:23,rps:9,dmg:15,spread:0.022,pellets:1,auto:true,spd:1450}
+  5:{name:"EXCOMMUNICADO",tip:36.6,line:-19,grip:23,rps:9,dmg:15,spread:0.022,pellets:1,auto:true,spd:1450},
+  6:{name:"TANGENT",tip:42.5,line:-19.3,grip:24,rps:6.5,dmg:26,spread:0.01,pellets:3,fan:0.55,auto:true,spd:1500,tang:true} // honorary 1/1: tri-arc AR-15 — 3 rounds fan out every shot
 };
-const HOLO_NAMES={11:"GOLD STANDARD",12:"THE IMPOSSIBLE",13:"HIGH TABLE",14:"TABULA RASA",15:"BABA YAGA"};
+const HOLO_NAMES={11:"GOLD STANDARD",12:"THE IMPOSSIBLE",13:"HIGH TABLE",14:"TABULA RASA",15:"BABA YAGA",16:"TANGENT"};
 function gunRole(sp){
+  if(sp.tang)return "tri-arc storm rifle";
   if(sp.pellets>1)return sp.pellets+"-pellet shotgun";
   if(sp.pierce)return "piercing DMR";
   if(sp.auto)return sp.rps>=11?"full-auto SMG":"full-auto rifle";
@@ -391,6 +393,31 @@ function drawGunInHand(type,kick,holo){
     g.fillStyle=mk(-17.4,4.4,dark1,dark2); rr(15.2,-17.3,3.1,4.2,1.2); g.fill();
     g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.35;
     g.fillStyle="#aebdf5"; rr(21.6,-19.3,17.6,0.8,0.4); g.fill(); g.restore();
+  } else if(bt===6){                    // TANGENT — honorary 1/1: green AR-15, tri-prong flash hider
+    const gh=115+Math.sin(performance.now()/260)*22;             // holo shimmer locked to the green band
+    const g1="hsl("+gh+",82%,52%)", g2="hsl("+(gh+18)+",85%,28%)";
+    g.fillStyle=gv(0,-21.5,4.6,g1,g2);                           // adjustable stock
+    g.beginPath(); g.moveTo(6.2,-21.7); g.lineTo(12.4,-21.3); g.lineTo(12.4,-16.7); g.lineTo(7.2,-17.5); g.closePath(); g.fill();
+    g.fillStyle=gv(0,-21.5,4.8,g1,g2); rr(12,-21.5,10.8,4.7,1.4); g.fill();          // receiver
+    g.fillStyle=gv(0,-24.1,2.2,g1,g2); rr(13.2,-24.1,9.4,2.3,1); g.fill();           // flat-top rail
+    g.fillStyle=gv(0,-23.9,1.8,"#0d2416","#08160d"); rr(14.4,-23.8,1.2,1.8,0.5); g.fill();
+    g.fillStyle=gv(0,-23.9,1.8,"#0d2416","#08160d"); rr(17.2,-23.8,1.2,1.8,0.5); g.fill();
+    g.fillStyle=gv(0,-23.9,1.8,"#0d2416","#08160d"); rr(20,-23.8,1.2,1.8,0.5); g.fill();
+    g.fillStyle=gv(0,-20.8,3.2,"#17402a","#0b2114"); rr(22.6,-20.8,10.6,3.2,1.2); g.fill(); // vented handguard
+    g.fillStyle=gv(0,-20.2,2,"#0d2416","#08160d"); rr(24,-20.1,2,1,0.5); g.fill();
+    g.fillStyle=gv(0,-20.2,2,"#0d2416","#08160d"); rr(27.4,-20.1,2,1,0.5); g.fill();
+    g.fillStyle=gv(0,-20.2,2,"#0d2416","#08160d"); rr(30.8,-20.1,2,1,0.5); g.fill();
+    g.fillStyle=gv(0,-19.9,1.7,g1,g2); rr(33,-19.9,6.4,1.7,0.8); g.fill();            // barrel
+    g.fillStyle=gv(0,-23.2,1.4,g1,g2); rr(33.8,-23.1,1.4,3.4,0.6); g.fill();          // front sight post
+    g.strokeStyle="#7cf9a5"; g.lineWidth=1.3; g.beginPath();                          // tri-prong flash hider (the tri-arc)
+    g.moveTo(39.4,-19.1); g.lineTo(42.4,-19.1);
+    g.moveTo(39.4,-20.1); g.lineTo(42,-21.3);
+    g.moveTo(39.4,-18.1); g.lineTo(42,-16.9); g.stroke();
+    g.save(); g.translate(19.6,-16.8); g.rotate(0.42);                                // curved magazine
+    g.fillStyle=gv(0,0,6.4,"#17402a","#0b2114"); rr(0,0,3.5,6.3,1.3); g.fill(); g.restore();
+    g.fillStyle=gv(0,-16.9,4.4,"#17402a","#0b2114"); rr(14.7,-16.8,3,4.4,1.2); g.fill(); // pistol grip
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.5;
+    g.fillStyle="#7cf9a5"; rr(12.6,-21.3,20.6,0.9,0.45); g.fill(); g.restore();       // green edge light
   } else {
     g.fillStyle=mk(-21,3.6,dark1,dark2); rr(7.6,-20.9,5.7,3.5,1.5); g.fill();
     g.fillStyle=mk(-21.4,4.6,steel1,steel2); rr(12.6,-21.3,12.8,4.5,1.6); g.fill();
@@ -533,7 +560,7 @@ for(const k in HERO_SHEETS){ (function(k){ const cf=HERO_SHEETS[k], im=new Image
   im.onerror=function(){}; im.src=cf.file; })(k); }
 const HERO_SHEET_KEYS=["walk","idle","shoot","jump","runshoot","pistol_stand","pistol_run","rifle_stand","rifle_run"];
 function heroReady(){ return HERO_SHEET_KEYS.some(k=>heroImg[k]); }  // any sheet present → sprite mode on
-function gunCls(gt){ const bt=gt>10?gt-10:gt; return (bt>=2&&bt<=5)?"rifle":"pistol"; }   // 0-1 pistol, 2-5 rifle/MG
+function gunCls(gt){ const bt=gt>10?gt-10:gt; return (bt>=2)?"rifle":"pistol"; }   // 0-1 pistol, 2+ rifle/MG (6 = TANGENT AR-15)
 function heroBase(pose,firing){ if(firing&&pose==="run")return "runshoot"; if(firing)return "shoot"; if(pose==="run")return "walk"; if(pose==="jump")return "jump"; return "idle"; }
 function heroPick(pose,firing,gunType){
   const moving=(pose==="run"), cls=gunCls(gunType||0);
@@ -2130,8 +2157,8 @@ function fireGun(){
   if(!MOBILE)shells.push({x:P.x+P.face*8,y:tipy+3,vx:-P.face*rand(60,130),vy:rand(-200,-130),rot:rand(0,6),vrot:rand(-14,14),t:rand(0.8,1.2)}); // casings are desktop garnish — auto-fire phones skip them
   const n=sp.pellets||1;
   for(let i=0;i<n;i++){
-    const spr=(Math.random()-0.5)*2*sp.spread+(n>1?(i-(n-1)/2)*0.05:0);
-    pbullets.push({x:tipx,y:tipy,vx:P.face*sp.spd*Math.cos(spr),vy:sp.spd*Math.sin(spr),dmg:sp.dmg,pierce:sp.pierce||0,holo:!!sp.holo,life:0.7});
+    const spr=(Math.random()-0.5)*2*sp.spread+(n>1?(i-(n-1)/2)*(sp.fan||0.05):0);   // fan = wide fixed arc (TANGENT tri-arc)
+    pbullets.push({x:tipx,y:tipy,vx:P.face*sp.spd*Math.cos(spr),vy:sp.spd*Math.sin(spr),dmg:sp.dmg,pierce:sp.pierce||0,holo:!!sp.holo,tang:!!sp.tang,life:0.7});
   }
   shake=Math.max(shake,0.05+(n>1?0.1:0));
 }
@@ -3254,8 +3281,8 @@ function render(){
     g.restore(); }
   for(const b of pbullets){
     g.save(); g.globalCompositeOperation="lighter";
-    g.strokeStyle=b.holo?"hsl("+((performance.now()/4+b.x)%360)+",95%,70%)":"rgba(255,238,180,0.55)";
-    g.lineWidth=4.2;
+    g.strokeStyle=b.tang?"#7cf9a5":b.holo?"hsl("+((performance.now()/4+b.x)%360)+",95%,70%)":"rgba(255,238,180,0.55)";
+    g.lineWidth=b.tang?5.2:4.2;
     g.beginPath(); g.moveTo(b.x,b.y); g.lineTo(b.x-b.vx*0.015,b.y-b.vy*0.015); g.stroke();
     g.strokeStyle=b.holo?"#fff":"rgba(255,248,220,0.95)"; g.lineWidth=1.8;
     g.beginPath(); g.moveTo(b.x,b.y); g.lineTo(b.x-b.vx*0.011,b.y-b.vy*0.011); g.stroke();
@@ -3273,6 +3300,12 @@ function render(){
     const hopts={t,face:P.face,pose:P.grounded?(Math.abs(P.vx)>40?"run":"idle"):"jump",
       gunType:loadoutType||0,holo:loadoutType>10,muzzle:P.muzzle>0?0.55:0,phase:t*11,squash:P.squash||0,dist:P.stride||0};
     drawHero(P.x,P.y,1.15,hopts);
+    if(loadoutType===16){                                   // the TANGENT carries his name above the wearer
+      g.save(); g.textAlign="center"; g.font="900 10px Verdana";
+      g.shadowColor="#7cf9a5"; g.shadowBlur=12; g.fillStyle="#7cf9a5";
+      g.fillText("TANGENT",P.x,P.y-84+Math.sin(t*2.2)*2);
+      g.restore();
+    }
   }
   // particles + floats
   for(const p of parts){
