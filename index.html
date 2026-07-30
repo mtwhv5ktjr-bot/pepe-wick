@@ -140,8 +140,18 @@
     e.stopImmediatePropagation(); e.preventDefault(); dismiss();   // the coin keypress must not leak into the menu (Enter would start a level)
   },true);
 })();
-setInterval(function(){ const b=document.getElementById("getguns");   // GET GUNS floats over menus/screens, never over live gameplay
-  if(b)b.classList.toggle("hide",typeof state!=="undefined"&&state==="play"); },300);
+/* GET GUNS card: only on the pre-game screens. Hidden the instant a run starts and
+   stays hidden through the clear/death/gauntlet-over/ending screens — a run isn't
+   over just because you finished a level. Driven from render() so there's no lag. */
+const GUNS_BTN_SCREENS={menu:1,board:1,guide:1};
+let gunsBtnShown=null;
+function syncGunsBtn(){
+  const want = typeof state!=="undefined" && !!GUNS_BTN_SCREENS[state];
+  if(want===gunsBtnShown)return;                       // only touch the DOM on a real change
+  gunsBtnShown=want;
+  const b=document.getElementById("getguns");
+  if(b)b.classList.toggle("hide",!want);
+}
 /* ============================================================
    PEPE WICK — a 2D contract, Mario-school.
    The approved aesthetic: no line work, gradient moonlight,
@@ -3014,6 +3024,7 @@ function drawFogBank(y, h, drift, mul){ // graded volumetric fog sitting BETWEEN
 }
 function render(){
   const t=performance.now()/1000;
+  syncGunsBtn();   // the floating GET GUNS card belongs on menus only, never over gameplay
   g.setTransform(RES,0,0,RES,0,0);
   BTNS.length=0;   // every frame starts clean — screens re-push their own buttons (kills stale invisible-button clicks)
   if(!launched()){ PAL=BASE_PAL; musKey=0; drawLaunch(t); return; }
