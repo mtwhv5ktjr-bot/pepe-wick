@@ -1490,6 +1490,25 @@ const NFT_VERIFY_URL="https://wick-arsenal.vercel.app/api/verify";
 const LB_URL="https://wick-arsenal.vercel.app/api/leaderboard";
 const GUNS_ADDR="0x0000000000000000000000000000000000000000";        // WickGuns — patched at contract deploy
 const PULSE_RPC="https://rpc.pulsechain.com";
+/* Reown (WalletConnect) — projectId is a PUBLIC client identifier, safe to ship.
+   Empty string = injected-wallet-only behavior (the pre-Reown flow). */
+const REOWN_ID="02101ae7f77b3ea70f50919779025201";
+let wcProvider=null;
+async function getEth(){                       // one provider for connect + every signature
+  if(window.ethereum)return window.ethereum;
+  if(!REOWN_ID)return null;
+  if(wcProvider)return wcProvider;
+  const {EthereumProvider}=await import("https://esm.sh/@walletconnect/ethereum-provider@2");
+  wcProvider=await EthereumProvider.init({
+    projectId:REOWN_ID,
+    chains:[369], optionalChains:[369],
+    rpcMap:{369:PULSE_RPC},
+    showQrModal:true,
+    metadata:{name:"PEPE WICK",description:"Get the dog back. $WICK utility game on PulseChain.",
+      url:"https://games.wick.pics",icons:["https://games.wick.pics/icon-192.png"]}
+  });
+  return wcProvider;
+}
 let walletAddr=null, ownedGunTypes=[], loadoutType=null, walletStatus="", walletBusy=false, watchMode=false;
 function fetchT(url,opts,ms){ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms||12000);
   return fetch(url,Object.assign({},opts||{},{signal:c.signal})).finally(()=>clearTimeout(t)); }  // nothing may hang the UI forever
@@ -1506,9 +1525,11 @@ function boardLabel(e){ return (e&&e.name&&e.name.trim()) ? e.name : ((e&&e.a||e
 async function connectWallet(){
   if(walletBusy)return; walletBusy=true; walletStatus="connecting…";
   try{
-    const eth=window.ethereum;
+    const eth=await getEth();
     if(!eth){ walletStatus="no wallet — install MetaMask/Rabby"; walletBusy=false; return; }
-    const accts=await eth.request({method:"eth_requestAccounts"});
+    let accts;
+    if(eth===window.ethereum){ accts=await eth.request({method:"eth_requestAccounts"}); }
+    else { walletStatus="approve in your wallet…"; accts=await eth.enable(); }   // Reown modal: QR on desktop, wallet-picker deeplink on phones
     const addr=accts[0]; walletAddr=addr;
     walletStatus="sign to prove ownership…";
     const msg="PEPE WICK login\naddress:"+addr+"\nnonce:"+Math.random().toString(36).slice(2)+"\nts:"+Date.now();
@@ -1601,14 +1622,15 @@ function totalScore(){ let s=0; for(let i=0;i<LEVELS.length;i++){ const b=best["
 async function submitScore(){
   if(lbBusy)return;
   if(!walletAddr){ lbMsg="connect a wallet on the menu first"; return; }
-  if(!window.ethereum){ lbMsg="no wallet available"; return; }
+  const seth=window.ethereum||wcProvider;
+  if(!seth){ lbMsg="no wallet available"; return; }
   const s=gauntlet?Math.floor(lvScore):Math.floor(totalScore());
   const mode=gauntlet?"gauntlet":"pepe-wick", lvNo=gauntlet?gWave:lvIdx+1;
   if(s<=0){ lbMsg="no score yet"; return; }
   lbBusy=true; lbMsg="sign the score in your wallet…";
   try{
     const msg="WICK score\naddress:"+walletAddr+"\nscore:"+s+"\nmode:"+mode+"\nts:"+Date.now();   // mode is SIGNED — no cross-mode replay
-    const sig=await window.ethereum.request({method:"personal_sign",params:[msg,walletAddr]});
+    const sig=await seth.request({method:"personal_sign",params:[msg,walletAddr]});
     lbMsg="submitting…";
     const r=await fetchT(LB_URL,{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({address:walletAddr,name:playerName,score:s,level:lvNo,mode,message:msg,signature:sig})});
@@ -3622,7 +3644,7 @@ function drawMenu(t){
   const sp=specFor(loadoutType);
   g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf"; g.fillText("LOADOUT",W/2,338);
   menuBtn(W/2-150,346,300,30,(sp.holo?"✦ ":"")+sp.name+(loadoutType==null?" (default)":""),cycleLoadout,sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
-  const noEth=MOBILE&&!window.ethereum;
+  const noEth=MOBILE&&!window.ethereum&&!REOWN_ID;                 // with Reown, its modal handles phones — no raw deeplink needed
   menuBtn(W/2-250,346,88,30,noEth?"🦊 WALLET":"WALLET",noEth?openInWalletApp:connectWallet,"#7fd0ff");   // way 1 (or way 3 deep-link on phones without a wallet)
   menuBtn(W/2+162,346,88,30,"GET GUNS",()=>{try{window.open("https://wick-arsenal.vercel.app","_blank");}catch(e){}},"#ffd75e");
   menuBtn(W/2-250,381,88,26,"⌖ ADDRESS",enterAddress,"#9fe6ff","bold 11px Verdana");                    // way 2: watch mode
