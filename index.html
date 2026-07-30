@@ -2693,7 +2693,7 @@ addEventListener("pointerup",endPtr);
 addEventListener("pointercancel",endPtr);
 
 /* ---------- render ---------- */
-/* ---------- launch gate + 48h bounty ---------- */
+/* ---------- launch gate + leaderboard prize board ---------- */
 const LAUNCH_TS=Date.UTC(2026,6,20,12,0,0); // Mon Jul 20 2026, 08:00 America/New_York (EDT = UTC-4)
 const BOUNTY_MS=48*3600*1000;
 function launched(){ return Date.now()>=LAUNCH_TS||/[?&]live/.test(location.search); }
@@ -2924,7 +2924,7 @@ function drawLaunch(t){
   const left=LAUNCH_TS-Date.now();
   g.font="900 50px Verdana"; g.fillStyle="#fff";
   g.shadowColor="#7cf9a5"; g.shadowBlur=18; g.fillText(fmtDur(left),W/2,242); g.shadowBlur=0;
-  const cards=[["10 CONTRACTS","the full campaign","#cfd6e0"],["ARSENAL MINT","1,000,000 PLS / gun","#ffd75e"],["48H BOUNTY","top score wins 10,000 WICK","#7cf9a5"]];
+  const cards=[["10 CONTRACTS","the full campaign","#cfd6e0"],["ARSENAL MINT","1,000,000 PLS / case","#ffd75e"],["PRIZE BOARD","top 3 win 50/35/15 USDC","#7cf9a5"]];
   for(let i=0;i<3;i++){ const cx=W/2+(i-1)*252, cy=322;
     g.fillStyle="rgba(20,26,42,0.62)"; rr(cx-118,cy-30,236,60,10); g.fill();
     g.globalAlpha=0.5; g.strokeStyle=cards[i][2]; g.lineWidth=1.4; rr(cx-118,cy-30,236,60,10); g.stroke(); g.globalAlpha=1;
