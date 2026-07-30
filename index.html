@@ -2697,7 +2697,13 @@ addEventListener("pointercancel",endPtr);
 const LAUNCH_TS=Date.UTC(2026,6,20,12,0,0); // Mon Jul 20 2026, 08:00 America/New_York (EDT = UTC-4)
 const BOUNTY_MS=48*3600*1000;
 function launched(){ return Date.now()>=LAUNCH_TS||/[?&]live/.test(location.search); }
-function bountyActive(){ return launched()&&Date.now()<LAUNCH_TS+BOUNTY_MS; }
+/* LEADERBOARD PRIZE — top 3 wallet-signed scores when the clock runs out.
+   Only signed submissions count (watch mode can't submit), and every payout is
+   reviewed by hand before it's sent. */
+const PRIZE_END=Date.UTC(2026,7,6,12,0,0);   // Thu Aug 6 2026, 12:00 UTC
+const PRIZES=["50 USDC","35 USDC","15 USDC"];
+function bountyActive(){ return launched()&&Date.now()<PRIZE_END; }
+function prizeLeft(){ return PRIZE_END-Date.now(); }
 function fmtDur(ms){ if(ms<0)ms=0; let s=Math.floor(ms/1000); const d=Math.floor(s/86400); s-=d*86400;
   const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60; const p=n=>String(n).padStart(2,"0");
   return (d>0?d+"d ":"")+p(h)+":"+p(m)+":"+p(s); }
@@ -3407,7 +3413,7 @@ function drawHUD(t){
   g.font="900 13px Verdana"; g.textAlign="left"; g.fillStyle="#7cf9a5";
   g.fillText(gauntlet?("THE GAUNTLET · WAVE "+gWave):lvl.name,14,24);
   if(bountyActive()){ g.save(); g.textAlign="center"; g.font="900 10px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 BOUNTY "+fmtDur(LAUNCH_TS+BOUNTY_MS-Date.now())+" left",W/2,15); g.restore(); }
+    g.fillText("🏆 PRIZE BOARD — "+fmtDur(prizeLeft())+" left",W/2,15); g.restore(); }
   g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
   g.fillText(lvTime.toFixed(1)+"s",14,42);
   g.fillStyle="#ffd75e"; g.fillText(lvScore.toLocaleString()+" PTS",70,42);
@@ -3522,7 +3528,7 @@ function drawGover(){
   g.font="900 14px Verdana"; g.fillStyle=rec?"#7cf9a5":"#8fa3bf";
   g.fillText(rec?"★ NEW PERSONAL BEST ★":"personal best  "+gBest.toLocaleString(),W/2,292);
   if(bountyActive()){ g.font="bold 12px Verdana"; g.fillStyle="#ffd75e";
-    g.fillText("🏆 submit to enter the 48h bounty — "+fmtDur(LAUNCH_TS+BOUNTY_MS-Date.now())+" left",W/2,320); }
+    g.fillText("🏆 submit to enter the prize board — "+fmtDur(prizeLeft())+" left",W/2,320); }
   BTNS.length=0;
   if(deadT>0.4){
     menuBtn(W/2-266,352,150,36,"↻ RUN AGAIN",()=>startGauntlet(),"#7cf9a5");
@@ -3642,7 +3648,7 @@ function drawMenu(t){
   BTNS.length=0;
   menuBackdrop(t);
   if(bountyActive()){ g.save(); g.textAlign="center"; g.font="900 12px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 48H BOUNTY LIVE — TOP SCORE WINS 10,000 WICK · ends in "+fmtDur(LAUNCH_TS+BOUNTY_MS-Date.now()),W/2,26); g.restore(); }
+    g.fillText("🏆 PRIZE BOARD LIVE — 1st 50 · 2nd 35 · 3rd 15 USDC · ends in "+fmtDur(prizeLeft()),W/2,26); g.restore(); }
   // title
   g.save(); g.textAlign="center";
   g.font="italic 13px Georgia,serif"; g.fillStyle="#e8b04a";
@@ -3733,7 +3739,7 @@ function drawScoreCard(){
   drawHero(W/2-(done?32:0),452,1.55,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   if(done)drawDog(W/2+46,452,-1,{});
   if(bountyActive()){ g.font="900 14px Verdana"; g.fillStyle="#7cf9a5";
-    g.fillText("🏆 48H BOUNTY LIVE — TOP SCORE WINS 10,000 $WICK",W/2,490); }
+    g.fillText("🏆 PRIZE BOARD — TOP 3 WIN 50 / 35 / 15 USDC",W/2,490); }
   g.font="900 15px Verdana"; g.fillStyle="#ff5f7a"; g.fillText("play free  →  "+SHARE_URL,W/2,H-34);
   g.font="bold 10px Verdana"; g.fillStyle="#5a6478"; g.fillText("$WICK ON PULSECHAIN  ·  NFT ARSENAL  ·  wick.pics",W/2,H-14);
   g.restore();
@@ -3745,8 +3751,8 @@ function shareScore(){
   try{ const a=document.createElement("a"); a.href=url; a.download="pepe-wick-score.png"; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
   const s=gauntlet?Math.floor(lvScore):totalScore();
   const txt=gauntlet
-    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → "+SHARE_URL
-    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top score in 48h wins 10,000 $WICK. ":"")+"play → "+SHARE_URL;
+    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top 3 on the board win 50/35/15 USDC. ":"")+"play → "+SHARE_URL
+    : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top 3 on the board win 50/35/15 USDC. ":"")+"play → "+SHARE_URL;
   try{ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank"); }catch(e){}
   lbMsg="📸 card saved — attach it to your post!";
 }
