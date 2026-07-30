@@ -1631,13 +1631,30 @@ function enterAddress(){
 /* WAY 3 — no wallet in this browser (mobile Safari/Chrome): open the game inside the wallet's own browser */
 const SHARE_URL="games.wick.pics";   // canonical PUBLIC url shown in menu footer + share texts (the domain serves this repo directly)
 function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/"+location.host+location.pathname.replace(/index\.html$/,""),"_blank"); }catch(e){} } // deep-link back to whichever mirror is being played
-/* restore cached verification on boot (background-refresh watch lookups) */
+/* Re-read an address's gun types and re-apply WITHOUT changing its signed/watch
+   status. Needed after the on-chain reveal: a cache written pre-reveal holds
+   type 0 (sealed) and would otherwise keep a holder on the default sidearm. */
+async function refreshGuns(addr, watch){
+  if(!addr)return;
+  let types=null;
+  try{ const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const d=await r.json();
+       if(r.ok&&d.ok)types=[...new Set((d.guns||[]).map(x=>x.type))]; }catch(e){}
+  if(types===null){ try{ types=await rpcGunsOf(addr); }catch(e){ return; } }   // chain fallback; on total failure keep what we have
+  if(!types.length)return;                                                    // never silently revoke guns on a bad read
+  const before=ownedGunTypes.join(",");
+  applyGuns(types, addr, watch);
+  if(before!==types.join(",")&&types.some(t=>t>0)) floats.push({x:W/2,y:120,txt:"GUNS REVEALED — "+specFor(loadoutType).name,t:2.2,size:13,c:"#ffd75e"});
+}
+/* restore cached verification on boot, then ALWAYS re-check in the background.
+   The old code only re-checked watch sessions, so a signed holder who connected
+   before the reveal stayed sealed for 24h. */
 (function restoreNft(){ try{
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
-  if(c&&c.types&&c.types.length&&Date.now()-c.ts<24*3600*1000){
-    applyGuns(c.types, c.addr, c.watch);
-    if(c.watch)setTimeout(()=>verifyWatch(c.addr),2500);                   // silent re-check keeps it honest
-  } }catch(e){} })();
+  if(!c||!c.types||!c.types.length)return;
+  const sealed=c.types.every(t=>!t);                                          // cache from before the reveal
+  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch); // show something instantly
+  setTimeout(()=>refreshGuns(c.addr, c.watch), sealed?300:2500);               // sealed caches refresh straight away
+  }catch(e){} })();
 function cycleLoadout(){
   const opts=[null,...ownedGunTypes];
   let i=opts.indexOf(loadoutType); i=(i+1)%opts.length;
