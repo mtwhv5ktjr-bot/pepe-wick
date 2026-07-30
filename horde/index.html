@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEPE WICK vs HORDE — coming soon</title>
+<meta name="description" content="PEPE WICK vs HORDE — coming soon to Arcade Alley. The next chapter of the PEPE WICK arcade on PulseChain.">
+<meta name="theme-color" content="#0a0a12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230a0a12'/%3E%3Ctext x='50' y='72' font-size='58' text-anchor='middle'%3E%F0%9F%95%B9%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --neon-cyan:#05d9e8;
+    --pepe-green:#7cf9a5;
+    --neon-pink:#ff2a6d;
+    --display:'Press Start 2P', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+
+  body{
+    min-height:100vh; min-height:100dvh;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(255,42,109,.07) 0%, transparent 52%),
+      linear-gradient(180deg,#0a0a12 0%,#12121f 44%,#0d0d18 100%);
+    display:flex; align-items:center; justify-content:center;
+    padding:1.5rem;
+    font-family:var(--display);
+    color:#e0e0e0;
+  }
+  body::before{
+    content:''; position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
+    pointer-events:none; z-index:100; opacity:.4;
+  }
+
+  .cab{width:min(720px,100%);position:relative;z-index:5}
+
+  .marquee{
+    min-height:52px; padding:8px 10px;
+    background:linear-gradient(180deg,#111,#222);
+    border:3px solid #333; border-bottom:none; border-radius:6px 6px 0 0;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .marquee span{
+    font-size:clamp(.6rem,2.4vw,.85rem); letter-spacing:2px; line-height:1.7;
+    color:var(--pepe-green);
+    text-shadow:0 0 8px currentColor,0 0 20px currentColor;
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  .marquee b{color:var(--neon-pink);text-shadow:0 0 8px currentColor,0 0 20px currentColor}
+
+  .bezel{
+    background:linear-gradient(180deg,#1f1f1f,#151515);
+    padding:14px 12px 12px;
+    border:4px solid #2a2a2a; border-top:none; border-radius:0 0 8px 8px;
+    box-shadow:inset 0 0 20px rgba(0,0,0,.9),0 8px 28px rgba(255,42,109,.10);
+  }
+
+  .screen{
+    position:relative; border-radius:4px; overflow:hidden;
+    background:radial-gradient(ellipse at 50% 45%, #17111d 0%, #05070d 78%);
+    min-height:220px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .screen img{display:block;width:100%;height:auto;animation:attract 7s ease-in-out infinite}
+  .screen::before{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,.5) 100%);
+    pointer-events:none;
+  }
+  .screen::after{
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.18) 3px,rgba(0,0,0,.18) 5px);
+    pointer-events:none;
+  }
+  .tag{position:absolute;left:0;right:0;bottom:9%;text-align:center;pointer-events:none}
+  .tag b{
+    display:inline-block; font-weight:400;
+    font-size:clamp(.9rem,3.4vw,1.6rem); letter-spacing:4px;
+    color:#fff; background:rgba(6,8,14,.55);
+    border:2px solid var(--pepe-green); border-radius:6px; padding:.55em .9em;
+    text-shadow:0 0 10px var(--pepe-green),0 0 26px var(--pepe-green);
+    box-shadow:0 0 18px rgba(124,249,165,.35), inset 0 0 14px rgba(124,249,165,.12);
+    animation:flicker 5.2s linear infinite;
+  }
+
+  .sub{margin-top:.95rem;text-align:center;font-size:.52rem;letter-spacing:2px;color:#48515e;line-height:2}
+  .sub em{font-style:normal;color:var(--neon-cyan);animation:pulse 2.6s ease-in-out infinite}
+
+  .foot{margin-top:1.1rem;text-align:center;font-size:.44rem;letter-spacing:2px;color:#48515e;line-height:2.2}
+  .foot a{color:#5f6b7a;text-decoration:none;border-bottom:1px solid #2a323c}
+  .foot a:hover,.foot a:focus-visible{color:var(--neon-cyan);border-bottom-color:var(--neon-cyan)}
+
+  @keyframes pulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.88;filter:brightness(1.28)}}
+  @keyframes attract{0%,100%{filter:brightness(.96) saturate(1)}50%{filter:brightness(1.06) saturate(1.08)}}
+  @keyframes flicker{0%,7%,9%,100%{opacity:1}8%{opacity:.55}62%,64%{opacity:1}63%{opacity:.75}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="cab">
+  <div class="marquee"><span>PEPE WICK <b>vs</b> HORDE</span></div>
+  <div class="bezel">
+    <div class="screen">
+      <img src="soon-art.jpg" alt="PEPE WICK vs HORDE key art">
+      <div class="tag"><b>COMING SOON</b></div>
+    </div>
+    <p class="sub">CABINET THREE · <em>POWERING UP…</em></p>
+  </div>
+  <p class="foot">
+    <a href="/arcade/">← BACK TO ARCADE ALLEY</a>
+    &nbsp;·&nbsp; <a href="https://games.wick.pics/">PLAY PEPE WICK</a>
+    &nbsp;·&nbsp; <a href="https://mint.wick.pics/">WICK ARSENAL</a>
+  </p>
+</div>
+
+</body>
+</html>
