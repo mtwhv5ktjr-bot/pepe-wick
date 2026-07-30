@@ -3300,10 +3300,10 @@ function render(){
     const hopts={t,face:P.face,pose:P.grounded?(Math.abs(P.vx)>40?"run":"idle"):"jump",
       gunType:loadoutType||0,holo:loadoutType>10,muzzle:P.muzzle>0?0.55:0,phase:t*11,squash:P.squash||0,dist:P.stride||0};
     drawHero(P.x,P.y,1.15,hopts);
-    if(loadoutType===16){                                   // the TANGENT carries his name above the wearer
+    if(loadoutType===16){                                   // the Reaper announces itself above the wearer
       g.save(); g.textAlign="center"; g.font="900 10px Verdana";
       g.shadowColor="#7cf9a5"; g.shadowBlur=12; g.fillStyle="#7cf9a5";
-      g.fillText("TANGENT",P.x,P.y-84+Math.sin(t*2.2)*2);
+      g.fillText("TANGENTIAL REAPER",P.x,P.y-84+Math.sin(t*2.2)*2);
       g.restore();
     }
   }
