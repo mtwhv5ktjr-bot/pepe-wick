@@ -74,13 +74,14 @@
     background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.2) 3px,rgba(0,0,0,.2) 5px);
     pointer-events:none;
   }
-  #coin .scr img{width:31%; height:auto; image-rendering:auto; filter:drop-shadow(0 0 16px rgba(124,249,165,.5))}
+  #coin .scr img{width:42%; height:auto; image-rendering:auto; filter:drop-shadow(0 0 18px rgba(124,249,165,.55))}
   #coin .ins{
     font-size:clamp(.75rem,3.2vw,1.05rem); letter-spacing:3px; color:#ffd75e;
     text-shadow:0 0 10px rgba(255,215,94,.8),0 0 26px rgba(255,215,94,.5);
     animation:coinBlink 1.15s steps(2,start) infinite;
   }
-  #coin .go{font-size:.5rem; letter-spacing:2px; color:#05d9e8; animation:coinPulse 2.6s ease-in-out infinite}
+  #coin .go{font-size:.62rem; letter-spacing:3px; color:#ffd75e;
+    text-shadow:0 0 10px rgba(255,215,94,.7); animation:coinBlink 1.15s steps(2,start) infinite}
   #coin .ft{margin-top:.9rem; text-align:center; font-size:.42rem; letter-spacing:2px; color:#48515e; line-height:2}
   @keyframes coinPulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.86;filter:brightness(1.3)}}
   @keyframes coinBlink{0%,55%{opacity:1}56%,100%{opacity:.18}}
@@ -116,7 +117,6 @@
     <div class="bz">
       <div class="scr">
         <img src="face.webp" alt="">
-        <div class="ins">INSERT COIN</div>
         <div class="go">TAP · CLICK · ANY KEY</div>
       </div>
       <p class="ft">A PEPE WICK STORY · $WICK ON PULSECHAIN<br>games.wick.pics</p>
