@@ -1485,6 +1485,10 @@ async function getEth(){                       // one provider for connect + eve
   return wcProvider;
 }
 let walletAddr=null, ownedGunTypes=[], loadoutType=null, walletStatus="", walletBusy=false, watchMode=false;
+// Telegram / Instagram / Facebook / X in-app webviews: no injected wallet, and the
+// deeplink out to a wallet app rarely makes it back. Watch mode is the way in here.
+const INAPP=/Telegram|Instagram|FBAN|FBAV|Twitter|Line\/|MicroMessenger/i.test(navigator.userAgent)
+  ||!!window.TelegramWebviewProxy||/[?&]inapp/.test(location.search);   // ?inapp mirrors the ?mobile test override
 function fetchT(url,opts,ms){ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms||12000);
   return fetch(url,Object.assign({},opts||{},{signal:c.signal})).finally(()=>clearTimeout(t)); }  // nothing may hang the UI forever
 let lbTop=null, lbFetchT=0, lbMsg="", lbBusy=false;
@@ -1500,6 +1504,10 @@ function boardLabel(e){ return (e&&e.name&&e.name.trim()) ? e.name : ((e&&e.a||e
 async function connectWallet(){
   if(walletBusy)return; walletBusy=true; walletStatus="connecting…";
   try{
+    // bail BEFORE getEth() — that lazily downloads the WalletConnect bundle, which is
+    // 8s of "connecting…" spent on a bridge that can't come back to an in-app webview
+    if(INAPP&&!window.ethereum){
+      walletStatus="in-app browser — use ⌖ ADDRESS, or open in Chrome/Safari"; walletBusy=false; return; }
     const eth=await getEth();
     if(!eth){ walletStatus="no wallet — install MetaMask/Rabby"; walletBusy=false; return; }
     let accts;
@@ -3682,6 +3690,15 @@ function drawMenu(t){
   g.font="bold 10px Verdana";
   if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,418); }
   else { g.fillStyle="#4a5566"; g.fillText("own gun NFTs?  press CONNECT to load them · ⌖ ADDRESS watch-only · ❓ GUIDE",W/2,418); }
+  // In Telegram/Instagram/X's built-in browser the wallet bridge usually can't come
+  // back to the page, and storage is its own sandbox — so a wallet you connected in
+  // Chrome simply isn't here. Holders were hitting this and thinking guns were broken.
+  if(INAPP&&!ownedGunTypes.length){
+    g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
+    g.fillText("IN-APP BROWSER — wallet connect often fails here.",W/2,434);
+    g.fillStyle="#9fe6ff";
+    g.fillText("Tap ⌖ ADDRESS and paste your wallet, or open this page in Chrome/Safari.",W/2,448);
+  }
   // hero
   drawHero(W/2-238,470,1.35,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});  // off-center: the bottom text column stays clear
   let done=false; try{ done=localStorage.getItem("pw_done")==="1"; }catch(e){}
