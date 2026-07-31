@@ -363,6 +363,7 @@ const MODDEFS={
 let ownedModTypes=[];                                  // distinct types held, from verify/rpc
 const MOD_SLOTS=3;
 let modCfg={};                                         // gunType -> [modTypes] chosen in the GUNSMITH
+let gsSel=0;                                           // gunsmith: which slot the picker fills next
 try{ const c=JSON.parse(localStorage.getItem("pw_modcfg")||"{}"); if(c&&typeof c==="object"&&!Array.isArray(c))modCfg=c; }catch(e){}
 function saveModCfg(){ try{ localStorage.setItem("pw_modcfg",JSON.stringify(modCfg)); }catch(e){} }
 function activeModsFor(gunType){
@@ -4149,31 +4150,48 @@ function drawGunsmith(t){
   }
   g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#9fe6ff";
   g.fillText("ATTACHMENTS"+(custom?"  ·  CUSTOM BUILD":"  ·  AUTO (3 rarest)"),560,100);
+  // ---- 3 slots: TAP A SLOT to select it, then pick the attachment below ----
+  const setSel=(arr)=>{ modCfg[key]=arr.filter(v=>v!=null); saveModCfg(); SFX.coin(2); };
   for(let i2=0;i2<MOD_SLOTS;i2++){
     const cur=sel[i2], m=cur!=null?MODDEFS[cur]:null;
-    const label=m?("⊕ "+m.name):"+ EMPTY SLOT";
-    const yb=112+i2*74;
-    menuBtn(560,yb,340,44,"",()=>{
-      // cycle this slot: empty → each owned type not used elsewhere → empty
-      const others=sel.filter((v,k)=>k!==i2&&v!=null);
-      const opts=[null,...owned.filter(x=>!others.includes(x))];
-      const at=opts.indexOf(cur);
-      const nxt=opts[(at+1)%opts.length];
-      const out=sel.slice(); out[i2]=nxt;
-      modCfg[key]=out.filter(v=>v!=null); saveModCfg(); SFX.coin(2);
-    });
+    const yb=112+i2*56;
+    menuBtn(560,yb,340,46,"",()=>{ gsSel=i2; SFX.coin(1); });
+    if(gsSel===i2){ g.save(); g.strokeStyle="#7cf9a5"; g.lineWidth=2.5; rr(560,yb,340,46,8); g.stroke(); g.restore(); }
     g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle=m?"#e8f0ff":"#4a5566";
-    g.fillText(label,574,yb+19);
-    g.font="bold 10px Verdana"; g.fillStyle=m?"#9fe6ff":"#3f4a5c";
-    g.fillText(m?({1:"spread ×0.35 — laser accuracy",2:"+15% damage",3:"+15% fire rate",4:"+30% bullet speed, +5% dmg",5:"+1 pierce",6:"+1 projectile per shot"})[cur]:(owned.length?"tap to fit an attachment":"mint mods to fill this"),574,yb+35);
+    g.fillText("SLOT "+(i2+1)+":  "+(m?("⊕ "+m.name):"— empty —"),574,yb+20);
+    g.font="bold 9px Verdana"; g.fillStyle=m?"#9fe6ff":"#3f4a5c";
+    g.fillText(m?({1:"spread ×0.35 — laser accuracy",2:"+15% damage",3:"+15% fire rate",4:"+30% bullet speed, +5% dmg",5:"+1 pierce",6:"+1 projectile per shot"})[cur]:"tap, then pick an attachment below",574,yb+36);
   }
-  const y4=112+MOD_SLOTS*74;
-  if(custom)menuBtn(560,y4,164,26,"↺ RESET TO AUTO",()=>{ delete modCfg[key]; saveModCfg(); SFX.coin(1); },"#8fa3bf","bold 10px Verdana");
-  if(!owned.length){ g.textAlign="left"; g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
-    g.fillText("No mods yet — WICK MODS is a FREE mint (3 per gun you hold)",560,y4+46);
-    menuBtn(560,y4+56,164,26,"🧩 GET MODS",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e","bold 10px Verdana");
-  } else { g.textAlign="left"; g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
-    g.fillText("you own: "+owned.map(x=>MODDEFS[x].tag).join(" · "),560,y4+46); }
+  const y4=112+MOD_SLOTS*56+12;
+  // ---- the picker: your attachments as chips — tap one to fit the selected slot ----
+  if(owned.length){
+    g.textAlign="left"; g.font="900 10px Verdana"; g.fillStyle="#8fa3bf";
+    g.fillText("TAP TO FIT → SLOT "+(gsSel+1),560,y4+8);
+    const MODCOL={1:"#7fd0ff",2:"#ff9d9d",3:"#ffd75e",4:"#c8ffe0",5:"#b26bff",6:"#ff6b3d"};
+    const chips=[...owned,null];                                   // null = the EMPTY chip
+    chips.forEach((ct,k)=>{
+      const cx2=560+(k%3)*116, cy2=y4+16+Math.floor(k/3)*36;
+      const inSlot=ct!=null&&sel.includes(ct);
+      menuBtn(cx2,cy2,110,30,ct!=null?MODDEFS[ct].tag:"✖ EMPTY",()=>{
+        const out=sel.slice();
+        if(ct!=null){ const dup=out.indexOf(ct); if(dup>=0&&dup!==gsSel)out[dup]=null; }   // distinct: moving a fitted mod vacates its old slot
+        out[gsSel]=ct;
+        setSel(out);
+        gsSel=(gsSel+1)%MOD_SLOTS;                                 // flow: fit, auto-advance to the next slot
+      },ct!=null?MODCOL[ct]:"#8fa3bf","900 11px Verdana");
+      if(inSlot){ g.save(); g.strokeStyle=MODCOL[ct]; g.lineWidth=2; rr(cx2,cy2,110,30,8); g.stroke();
+        g.font="900 8px Verdana"; g.textAlign="right"; g.fillStyle=MODCOL[ct]; g.fillText("●",cx2+104,cy2+11); g.restore(); g.textAlign="left"; }
+    });
+    const rowsUsed=Math.ceil((chips.length)/3);
+    if(custom)menuBtn(560,y4+16+rowsUsed*36+6,164,26,"↺ RESET TO AUTO",()=>{ delete modCfg[key]; saveModCfg(); SFX.coin(1); },"#8fa3bf","bold 10px Verdana");
+    g.textAlign="left"; g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
+    g.fillText("no holding cap — buy more mods on mint.wick.pics",560,y4+16+rowsUsed*36+52);
+  } else {
+    g.textAlign="left"; g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
+    g.fillText("No mods yet — FREE mint, 3 per gun you hold",560,y4+12);
+    g.fillStyle="#8fa3bf"; g.fillText("(and no holding cap — buy more on the market)",560,y4+28);
+    menuBtn(560,y4+38,164,26,"🧩 GET MODS",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e","bold 10px Verdana");
+  }
 
   g.textAlign="center";
   menuBtn(W-200,H-52,140,30,"✓ DONE",()=>{ state="menu"; },"#7cf9a5");   // right side — the stat grid owns the bottom-left
