@@ -366,8 +366,9 @@ let modCfg={};                                         // gunType -> [modTypes] 
 try{ const c=JSON.parse(localStorage.getItem("pw_modcfg")||"{}"); if(c&&typeof c==="object"&&!Array.isArray(c))modCfg=c; }catch(e){}
 function saveModCfg(){ try{ localStorage.setItem("pw_modcfg",JSON.stringify(modCfg)); }catch(e){} }
 function activeModsFor(gunType){
+  if(gunType==null)return [];                          // the free SIDEARM stays factory — attachments are NFT-gun utility
   const ownedSet=[...new Set(ownedModTypes)].filter(t=>MODDEFS[t]);
-  const sel=modCfg[gunType==null?"d":gunType];
+  const sel=modCfg[gunType];
   if(Array.isArray(sel)){                              // a GUNSMITH build — honour it, but only mods still owned
     const out=[...new Set(sel)].filter(t=>ownedSet.includes(t)).slice(0,MOD_SLOTS);
     return out;                                        // an explicit empty build means NAKED gun, on purpose
@@ -386,7 +387,7 @@ function baseSpecFor(type){
    composition so we build the object once per (gun, mods) combo, not per frame */
 let _specKey="", _specVal=null;
 function specFor(type){
-  const am=activeMods();
+  const am=activeModsFor(type);   // the TYPE's mods, not the equipped gun's — callers pass arbitrary types
   if(!am.length)return baseSpecFor(type);
   const key=type+"|"+am.join(",");
   if(key===_specKey)return _specVal;
@@ -3973,7 +3974,7 @@ function drawMenu(t){
     menuBtn(RX+14,PY+30,RW-28,30,(sp.holo?"✦ ":"")+sp.name+(loadoutType==null?" (default)":""),()=>cycleLoadout(1),sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
   }
   g.font="bold 10px Verdana"; g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
-  g.fillText(gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ holo":"")+(multi?"  ·  "+loadoutPos():""),rc,PY+78);
+  g.fillText(gunRole(baseSpecFor(loadoutType))+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ holo":"")+(multi?"  ·  "+loadoutPos():""),rc,PY+78);   // role = the BASE gun; mods change numbers, not what it is
   if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
     g.fillText("⊕ "+sp.mods.map(m=>MODDEFS[m].name).join(" + "),rc,PY+93); }
   if(ownedGunTypes.length||ownedModTypes.length)
@@ -3998,10 +3999,11 @@ function drawMenu(t){
   if(!MOBILE){ g.font="bold 10px Verdana"; g.textAlign="center"; g.fillStyle="#5f6b7c";
     g.fillText("A/D move · SPACE jump · CLICK fire · Q swap gun",W/2+230,BY+18); g.restore(); }
 
-  // ---- hero, bottom-left, clear of everything ----
-  drawHero(120,H-28,1.15,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
+  // ---- hero: FEET ON THE STREET (backdrop ground is y=470 — anywhere lower reads
+  // as skiing the railing), tucked left of the PLAY panel ----
+  drawHero(46,470,1.05,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   let done=false; try{ done=localStorage.getItem("pw_done")==="1"; }catch(e){}
-  if(done){ drawDog(190,H-28,-1,{}); g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#e8b04a"; g.fillText("BISCUIT ✓",192,H-96); }
+  if(done){ drawDog(84,470,1,{}); g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#e8b04a"; g.fillText("BISCUIT ✓",66,478); }
   g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#3f4a5c";
   g.fillText("UTILITY FOR $WICK ON PULSECHAIN · NFT ARSENAL + FREE MODS LIVE · SIGNED WORLD LEADERBOARD",W/2,H-10);
   const v=g.createRadialGradient(W/2,H/2,H*0.5,W/2,H/2,H*0.95);
@@ -4103,7 +4105,21 @@ function drawGunsmith(t){
     if(up){ g.font="bold 9px Verdana"; g.fillStyle="#4a5566"; g.fillText("was "+r[1],rx+62,ry+17); g.font="bold 11px Verdana"; }
   });
 
-  // ---- the 3 slots ----
+  // ---- the 3 slots (NFT guns only — the free sidearm has no rails to bolt onto) ----
+  if(loadoutType==null){
+    g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#66707f";
+    g.fillText("ATTACHMENTS",560,100);
+    g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
+    g.fillText("The default SIDEARM doesn't take attachments.",560,130);
+    g.fillText("Equip a WICK Arsenal gun (◀ ▶) to use your mods.",560,150);
+    if(!ownedGunTypes.length){ g.fillStyle="#ffd75e";
+      g.fillText("No guns yet — grab one on the marketplace:",560,184);
+      menuBtn(560,196,180,30,"🔫 GET A GUN",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e","900 11px Verdana"); }
+    g.textAlign="center";
+    menuBtn(W-200,H-52,140,30,"✓ DONE",()=>{ state="menu"; },"#7cf9a5");
+    g.font="bold 9px Verdana"; g.fillStyle="#3f4a5c"; g.fillText("builds save instantly · ESC also exits",W-130,H-10);
+    return;
+  }
   g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#9fe6ff";
   g.fillText("ATTACHMENTS"+(custom?"  ·  CUSTOM BUILD":"  ·  AUTO (3 rarest)"),560,100);
   for(let i2=0;i2<MOD_SLOTS;i2++){
