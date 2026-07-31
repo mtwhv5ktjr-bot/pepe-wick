@@ -2156,7 +2156,7 @@ function newPlayer(x){
 const HPMAP={goon:28,heavy:90,blade:20,shield:60,marksman:22,bomber:26,hound:14,zero:200,butcher:440};
 function mkEnemy(e){ const t=e.t,x=e.x,y=e.y||GY; return {t,x,y,hp:HPMAP[t]||28,maxhp:HPMAP[t]||28,face:e.face||-1,dead:false,cd:rand(0.8,1.6),tel:0,muzzle:0,walk:Math.random()*7,px:x,dir:-1,patrol:(y&&y!==GY)?34:70,fuse:0,block:0,phase:1,summoned:0}; }
 function startLevel(i,keepDeaths){
-  releaseAllInput();   // a fresh level starts from rest — held keys/touches must not carry across the transition
+  releaseAllInput(); paused=false;   // a fresh level starts from rest — held keys/touches must not carry across the transition
   gauntlet=false;
   lvIdx=i; lvl=LEVELS[i]; applyTheme(i);
   P=newPlayer(120); camX=0; checkpointX=120;
@@ -2185,7 +2185,7 @@ function startLevel(i,keepDeaths){
   state="play";
 }
 function respawnLevel(){ /* death → last checkpoint, world progress kept */
-  releaseAllInput();
+  releaseAllInput(); paused=false;
   deathsThisRun++; campDeaths++;
   const cx=checkpointX;
   P=newPlayer(cx); P.ifr=1.6;
@@ -2201,7 +2201,7 @@ function respawnLevel(){ /* death → last checkpoint, world progress kept */
 /* ---------- endless gauntlet ---------- */
 let preGLvIdx=0;
 function startGauntlet(){
-  releaseAllInput();
+  releaseAllInput(); paused=false;
   if(!gauntlet)preGLvIdx=lvIdx;         // remember the campaign selection ONCE — RUN AGAIN must not overwrite it with 0
   gauntlet=true; lvIdx=0; lvl=GAUNTLET_LV; applyTheme(0);
   P=newPlayer(GAUNTLET_LV.len/2); camX=Math.max(0,P.x-W/2); checkpointX=P.x;
@@ -2342,7 +2342,27 @@ function groundAt(x,y){
 }
 
 /* ---------- combat ---------- */
+let paused=false;
+/* ⏸ PAUSE — freezes the sim AND the level clock (lvTime only ticks in update).
+   ESC or the mobile ⏸ toggles it; the overlay owns all input while up. */
+function drawPause(){
+  BTNS.length=0;
+  g.save(); g.setTransform(RES,0,0,RES,0,0);
+  g.fillStyle="rgba(3,6,14,0.72)"; g.fillRect(0,0,W,H);
+  g.textAlign="center";
+  g.font="900 44px Verdana"; g.fillStyle="#e8f0ff";
+  g.fillText("⏸ PAUSED",W/2,H/2-70);
+  g.font="bold 11px Verdana"; g.fillStyle="#66707f";
+  g.fillText("the clock is stopped — breathe",W/2,H/2-44);
+  menuBtn(W/2-110,H/2-16,220,42,"► RESUME",()=>{ paused=false; },"#7cf9a5","900 15px Verdana");
+  menuBtn(W/2-110,H/2+36,220,34,musicOn?"♪ MUSIC ON":"♪ MUSIC OFF",()=>{musicOn=!musicOn;try{localStorage.setItem("pw_music",musicOn?"1":"0");}catch(e){}},musicOn?"#7cf9a5":"#66707f","bold 12px Verdana");
+  menuBtn(W/2-110,H/2+80,220,34,"✖ QUIT TO MENU",()=>{ paused=false; state="menu"; },"#ff9d9d","bold 12px Verdana");
+  g.font="bold 10px Verdana"; g.fillStyle="#4a5566";
+  g.fillText("ESC resumes",W/2,H/2+138);
+  g.restore();
+}
 function fireGun(){
+  if(paused)return;                                  // no shots from behind the curtain
   const sp=specFor(loadoutType);
   if(P.cool>0||P.dead)return;
   P.cool=1/sp.rps; P.muzzle=0.06; tutFired=true;
@@ -2816,6 +2836,8 @@ addEventListener("keydown",e=>{ if(e.repeat)return;
   { const ws=document.getElementById("wsheet"); if(ws&&ws.classList.contains("on"))return; }
   keys.add(e.code); audio();
   if(state==="play"){
+    if(e.code==="Escape"){ paused=!paused; releaseAllInput(); SFX.coin(paused?1:3); return; }
+    if(paused){ if(e.code==="Enter"){ paused=false; } return; }       // the overlay owns the keyboard
     if(e.code==="KeyW"||e.code==="ArrowUp"||e.code==="Space"){ e.preventDefault(); P.jbuf=0.16; P.jumpHeld=true; }
     if(e.code==="KeyS"||e.code==="ArrowDown")P.dropT=0.24;
     if(e.code==="KeyJ"||e.code==="KeyX"){ keyFiring=true; fireGun(); } // optional keyboard fire; primary is mouse
@@ -2879,7 +2901,9 @@ cv.addEventListener("pointermove",e=>{ const p=ptr(e); mouse.x=p.x; mouse.y=p.y;
 });
 cv.addEventListener("pointerdown",e=>{ audio(); const p=ptr(e); mouse.x=p.x; mouse.y=p.y;
   if(state==="play"){
+    if(paused){ for(const b of BTNS){ if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h){ b.fn(); break; } } return; }   // pause overlay owns taps
     if(MOBILE){
+      if(p.x>=W/2-26&&p.x<=W/2+26&&p.y<34){ paused=true; releaseAllInput(); SFX.coin(1); return; }   // ⏸ tap target, top-center
       if(p.x>W-210&&p.y<78&&ownedGunTypes.length){ cycleLoadout();   // the swap BUTTON top-right (zone matches the drawn 192×50 pill + slack)
         floats.push({x:P.x,y:P.y-56,txt:"⇄ "+specFor(loadoutType).name,t:1,size:12,c:"#ffd75e"}); return; }
       if(!tiltOn && p.x<W*0.44 && movePid===null){                    // left zone: plant the virtual stick
@@ -3684,6 +3708,9 @@ function drawHUD(t){
           g.font="900 20px Verdana"; g.fillStyle="#ffb15e"; g.fillText(right?"▶":"◀",ax,H/2);
           g.font="bold 10px Verdana"; g.fillText(dist+"px",ax,H/2+16); g.restore(); g.textAlign="left"; } } }
   }
+  if(MOBILE){ g.save(); g.fillStyle="rgba(8,14,22,0.55)"; g.strokeStyle="rgba(160,175,200,0.5)"; g.lineWidth=1.2;
+    rr(W/2-24,6,48,24,7); g.fill(); g.stroke();
+    g.fillStyle="#cfd6e0"; g.font="900 12px Verdana"; g.textAlign="center"; g.fillText("⏸",W/2,23); g.textAlign="left"; g.restore(); }
   const sp=specFor(loadoutType);
   if(MOBILE&&ownedGunTypes.length){
     // a real BUTTON, not a labelled whisper: filled, bordered, arrows, and a x/y
@@ -4277,10 +4304,11 @@ function frame(now){
   try{
     let el=(now-last)/1000; last=now;
     if(el<0)el=0; if(el>0.12)el=0.12;                                  // returning from a stall never bursts the sim
-    if(document.hidden||isPortrait()){ acc=0; }                        // hidden tab / rotate overlay = PAUSED, not dying off-screen
+    if(document.hidden||isPortrait()||paused){ acc=0; }                // hidden tab / rotate overlay / ESC-pause = frozen, not dying off-screen
     else { acc+=el; let n=0;
       while(acc>=STEP&&n<8){ update(STEP); acc-=STEP; n++; } }
     render();
+    if(paused&&state==="play")drawPause();
   }catch(e){ console.error(e); }
   if(document.hidden)setTimeout(()=>frame(performance.now()),200); else requestAnimationFrame(frame);
 }
