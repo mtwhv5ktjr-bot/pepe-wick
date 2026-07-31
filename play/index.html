@@ -133,7 +133,7 @@
 /* GET GUNS card: only on the pre-game screens. Hidden the instant a run starts and
    stays hidden through the clear/death/gauntlet-over/ending screens — a run isn't
    over just because you finished a level. Driven from render() so there's no lag. */
-const GUNS_BTN_SCREENS={menu:1,guide:1};   // NOT the board — the card was covering the very scores the prize contest exists to show
+const GUNS_BTN_SCREENS={menu:1,guide:1};   // NOT the board (covers scores) and NOT the gunsmith (covers the slot column)
 let gunsBtnShown=null;
 function syncGunsBtn(){
   const want = typeof state!=="undefined" && !!GUNS_BTN_SCREENS[state];
@@ -349,8 +349,9 @@ function gunRole(sp){
   return "semi-auto sidearm";
 }
 /* ---- WICK MODS: free-mint attachments. Each maps to a REAL GUNDEFS field —
-   the same honesty rule as the gun cards. 2 slots; duplicates don't stack;
-   the two rarest distinct types you own are auto-equipped. ---- */
+   the same honesty rule as the gun cards. 3 slots per gun; duplicates don't
+   stack. Default: your 3 rarest distinct types auto-equip. The 🔧 GUNSMITH
+   screen saves a custom build PER GUN (pw_modcfg). ---- */
 const MODDEFS={
   1:{name:"LASER SIGHT",   tag:"LASER",  apply:s=>{ s.spread*=0.35; }},
   2:{name:"HOLLOW POINTS", tag:"HP+",    apply:s=>{ s.dmg=Math.round(s.dmg*1.15); }},
@@ -360,9 +361,20 @@ const MODDEFS={
   6:{name:"DRAGON'S BREATH",tag:"DRAGON",apply:s=>{ s.pellets=(s.pellets||1)+1; }},
 };
 let ownedModTypes=[];                                  // distinct types held, from verify/rpc
-function activeMods(){                                 // the 2 best distinct (6 = rarest)
-  return [...new Set(ownedModTypes)].filter(t=>MODDEFS[t]).sort((a,b)=>b-a).slice(0,2);
+const MOD_SLOTS=3;
+let modCfg={};                                         // gunType -> [modTypes] chosen in the GUNSMITH
+try{ const c=JSON.parse(localStorage.getItem("pw_modcfg")||"{}"); if(c&&typeof c==="object"&&!Array.isArray(c))modCfg=c; }catch(e){}
+function saveModCfg(){ try{ localStorage.setItem("pw_modcfg",JSON.stringify(modCfg)); }catch(e){} }
+function activeModsFor(gunType){
+  const ownedSet=[...new Set(ownedModTypes)].filter(t=>MODDEFS[t]);
+  const sel=modCfg[gunType==null?"d":gunType];
+  if(Array.isArray(sel)){                              // a GUNSMITH build — honour it, but only mods still owned
+    const out=[...new Set(sel)].filter(t=>ownedSet.includes(t)).slice(0,MOD_SLOTS);
+    return out;                                        // an explicit empty build means NAKED gun, on purpose
+  }
+  return ownedSet.sort((a,b)=>b-a).slice(0,MOD_SLOTS); // default: the 3 rarest auto-equip
 }
+function activeMods(){ return activeModsFor(loadoutType); }
 function baseSpecFor(type){
   if(type==null)return GUNDEFS[0];
   if(GUNDEFS[type])return GUNDEFS[type];
@@ -2818,6 +2830,7 @@ addEventListener("keydown",e=>{ if(e.repeat)return;
   else if(state==="gover"&&e.code==="Escape"){ gauntlet=false; lvIdx=preGLvIdx; state="menu"; }
   else if(state==="board"&&e.code==="Escape")state="menu";
   else if(state==="guide"&&(e.code==="Escape"||e.code==="Enter"))state="menu";
+  else if(state==="gunsmith"&&e.code==="Escape")state="menu";
 });
 addEventListener("keyup",e=>{ keys.delete(e.code);
   if(e.code==="KeyW"||e.code==="ArrowUp"||e.code==="Space"){ if(P){ P.jumpHeld=false; if(P.vy<-160)P.vy*=0.5; } }
@@ -3218,6 +3231,7 @@ function render(){
   if(state==="menu"){ PAL=BASE_PAL; musKey=0; drawMenu(t); return; }
   if(state==="board"){ PAL=BASE_PAL; musKey=0; drawBoard(); return; }
   if(state==="guide"){ PAL=BASE_PAL; musKey=0; drawGuide(); return; }
+  if(state==="gunsmith"){ PAL=BASE_PAL; musKey=0; drawGunsmith(t); return; }
   const shx=(Math.random()-0.5)*shake*13, shy=(Math.random()-0.5)*shake*9;
   // sky
   const sky=g.createLinearGradient(0,0,0,H*0.8);
@@ -3949,6 +3963,8 @@ function drawMenu(t){
   menuBtn(W/2+162,346,88,30,"GET GUNS",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e");
   menuBtn(W/2-250,381,88,26,"⌖ ADDRESS",enterAddress,"#9fe6ff","bold 11px Verdana");                    // way 2: watch mode
   menuBtn(W/2+162,381,88,26,"❓ GUIDE",()=>{state="guide";},"#7cf9a5","bold 11px Verdana");
+  if(ownedGunTypes.length||ownedModTypes.length)                                                        // the builder only matters once you own something
+    menuBtn(W/2-60,381,120,26,"🔧 GUNSMITH",()=>{state="gunsmith";},"#9fe6ff","bold 11px Verdana");
   let statTxt=gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ +20% holo":"")+(ownedGunTypes.length?(MOBILE?"  ·  tap gun name in-game to swap":"  ·  Q swaps in-game"):"");
   g.font="bold 10px Verdana";
   if(g.measureText(statTxt).width>296){ g.font="bold 9px Verdana";                 // long holo lines must fit BETWEEN the ⌖/❓ side buttons
@@ -3956,7 +3972,7 @@ function drawMenu(t){
   g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
   g.fillText(statTxt,W/2,398);
   if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
-    g.fillText("⊕ MODS: "+sp.mods.map(m=>MODDEFS[m].name).join(" + ")+"  (auto-equipped, 2 slots)",W/2,409); }
+    g.fillText("⊕ MODS: "+sp.mods.map(m=>MODDEFS[m].name).join(" + ")+"  ·  🔧 GUNSMITH to customize",W/2,409); }
   g.font="bold 10px Verdana";
   if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,418); }
   else { g.fillStyle="#4a5566"; g.fillText("own gun NFTs?  press CONNECT to load them · ⌖ ADDRESS watch-only · ❓ GUIDE",W/2,418); }
@@ -4028,6 +4044,85 @@ function shareScore(){
   try{ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank"); }catch(e){}
   lbMsg="📸 card saved — attach it to your post!";
 }
+/* ---------- 🔧 GUNSMITH — CoD-style per-gun mod builder ----------
+   Pick a gun, fill its 3 slots from the mod NFTs you own, watch the stats move.
+   Builds persist per gun (pw_modcfg); guns without a build auto-equip the 3
+   rarest. An explicitly emptied build means a naked gun — that's respected. */
+function drawGunsmith(t){
+  BTNS.length=0;
+  menuBackdrop(t);
+  g.fillStyle="rgba(4,7,14,0.78)"; g.fillRect(0,0,W,H);
+  g.textAlign="center";
+  g.font="900 26px Verdana"; g.fillStyle="#7cf9a5"; g.fillText("🔧 GUNSMITH",W/2,44);
+  g.font="bold 10px Verdana"; g.fillStyle="#66707f";
+  g.fillText("3 slots per gun · builds save per gun · duplicates don't stack",W/2,62);
+
+  const key=loadoutType==null?"d":loadoutType;
+  const owned=[...new Set(ownedModTypes)].filter(x=>MODDEFS[x]);
+  const custom=Array.isArray(modCfg[key]);
+  const sel=custom?[...modCfg[key]].slice(0,MOD_SLOTS):activeModsFor(loadoutType).slice();
+  while(sel.length<MOD_SLOTS)sel.push(null);
+
+  // ---- the gun: big hero render + cycle (shares the menu's loadout picker state) ----
+  const sp=specFor(loadoutType), base=baseSpecFor(loadoutType);
+  menuBtn(60,86,30,30,"◀",()=>cycleLoadout(-1),"#e8e8ea","900 13px Verdana");
+  g.font="900 14px Verdana"; g.fillStyle=sp.holo?"#ffd75e":"#e8f0ff";
+  g.fillText((sp.holo?"✦ ":"")+baseSpecFor(loadoutType).name,250,106);
+  menuBtn(410,86,30,30,"▶",()=>cycleLoadout(1),"#e8e8ea","900 13px Verdana");
+  drawHero(250,388,2.0,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*3)>0.75)?0.4:0});
+  if(sel.includes(1)){ // laser preview on the big render
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.4+0.12*Math.sin(t*9);
+    const lg2=g.createLinearGradient(315,334,660,334); lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
+    g.strokeStyle=lg2; g.lineWidth=2; g.beginPath(); g.moveTo(315,334); g.lineTo(660,334); g.stroke(); g.restore();
+  }
+
+  // ---- stats: base → final, deltas lit green ----
+  const acc=s=>Math.max(0,Math.round(100-(s.spread*1800)));           // spread → a 0-100 accuracy feel
+  const rows=[["DAMAGE",base.dmg,sp.dmg],["FIRE RATE",+base.rps.toFixed(1),+sp.rps.toFixed(1)],
+              ["ACCURACY",acc(base),acc(sp)],["VELOCITY",Math.round(base.spd),Math.round(sp.spd)],
+              ["PIERCE",base.pierce||0,sp.pierce||0],["PROJECTILES",base.pellets||1,sp.pellets||1]];
+  g.font="bold 11px Verdana";
+  rows.forEach((r,i)=>{ const y=440+0; const rx=60+(i%3)*150, ry=452+Math.floor(i/3)*38;
+    g.textAlign="left"; g.fillStyle="#66707f"; g.fillText(r[0],rx,ry);
+    const up=r[2]>r[1];
+    g.font="900 15px Verdana"; g.fillStyle=up?"#7cf9a5":"#cfd6e0";
+    g.fillText(String(r[2])+(up?" ▲":""),rx,ry+17); g.font="bold 11px Verdana";
+    if(up){ g.font="bold 9px Verdana"; g.fillStyle="#4a5566"; g.fillText("was "+r[1],rx+62,ry+17); g.font="bold 11px Verdana"; }
+  });
+
+  // ---- the 3 slots ----
+  g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#9fe6ff";
+  g.fillText("ATTACHMENTS"+(custom?"  ·  CUSTOM BUILD":"  ·  AUTO (3 rarest)"),560,100);
+  for(let i2=0;i2<MOD_SLOTS;i2++){
+    const cur=sel[i2], m=cur!=null?MODDEFS[cur]:null;
+    const label=m?("⊕ "+m.name):"+ EMPTY SLOT";
+    const yb=112+i2*74;
+    menuBtn(560,yb,340,44,"",()=>{
+      // cycle this slot: empty → each owned type not used elsewhere → empty
+      const others=sel.filter((v,k)=>k!==i2&&v!=null);
+      const opts=[null,...owned.filter(x=>!others.includes(x))];
+      const at=opts.indexOf(cur);
+      const nxt=opts[(at+1)%opts.length];
+      const out=sel.slice(); out[i2]=nxt;
+      modCfg[key]=out.filter(v=>v!=null); saveModCfg(); SFX.coin(2);
+    });
+    g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle=m?"#e8f0ff":"#4a5566";
+    g.fillText(label,574,yb+19);
+    g.font="bold 10px Verdana"; g.fillStyle=m?"#9fe6ff":"#3f4a5c";
+    g.fillText(m?({1:"spread ×0.35 — laser accuracy",2:"+15% damage",3:"+15% fire rate",4:"+30% bullet speed, +5% dmg",5:"+1 pierce",6:"+1 projectile per shot"})[cur]:(owned.length?"tap to fit an attachment":"mint mods to fill this"),574,yb+35);
+  }
+  const y4=112+MOD_SLOTS*74;
+  if(custom)menuBtn(560,y4,164,26,"↺ RESET TO AUTO",()=>{ delete modCfg[key]; saveModCfg(); SFX.coin(1); },"#8fa3bf","bold 10px Verdana");
+  if(!owned.length){ g.textAlign="left"; g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
+    g.fillText("No mods yet — WICK MODS is a FREE mint (3 per gun you hold)",560,y4+46);
+    menuBtn(560,y4+56,164,26,"🧩 GET MODS",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e","bold 10px Verdana");
+  } else { g.textAlign="left"; g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
+    g.fillText("you own: "+owned.map(x=>MODDEFS[x].tag).join(" · "),560,y4+46); }
+
+  g.textAlign="center";
+  menuBtn(W-200,H-52,140,30,"✓ DONE",()=>{ state="menu"; },"#7cf9a5");   // right side — the stat grid owns the bottom-left
+  g.font="bold 9px Verdana"; g.fillStyle="#3f4a5c"; g.fillText("builds save instantly · ESC also exits",W-130,H-10);
+}
 function drawGuide(){
   const t=performance.now()/1000;
   menuBackdrop(t);
@@ -4070,7 +4165,7 @@ function drawGuide(){
   line(R2,z,"Any gun: real firepower · CONNECTED holders: 4th ♥"); z+=lh;
   line(R2,z,"Holo 1/1 (6 exist): +20% damage, rainbow gun"); z+=lh;
   line(R2,z,"⊕ WICK MODS (free mint): attachments bolt onto"); z+=lh;
-  line(R2,z,"your gun — 2 slots, best two auto-equip"); z+=lh+8;
+  line(R2,z,"your gun — 3 slots · build per-gun loadouts in 🔧 GUNSMITH"); z+=lh+8;
   head(R2,z,"🏆 LEADERBOARD"); z+=lh;
   line(R2,z,"Scores are signed by your wallet — connect via"); z+=lh;
   line(R2,z,"CONNECT, then SUBMIT on the ending/gauntlet screen."); z+=lh;
