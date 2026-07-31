@@ -2442,7 +2442,16 @@ let dailyRun=false, dailyDone=false, dailySavedLoadout=null;
    ghost. Story mode only — dailies and the gauntlet stay ghost-free. */
 const GFPS=10;
 let ghostRec=[], ghostPlay=null;
+let ghostsOn=(()=>{ try{ return localStorage.getItem("pw_ghosts")!=="0"; }catch(e){ return true; } })();
 function ghostActive(){ return state==="play"&&!gauntlet&&!dailyRun; }
+/* the daily races the 👑 WORLD ghost — the current #1 run of today's contract */
+function fetchWorldGhost(){
+  const day=dayStr();
+  fetchT(LB_URL+"?ghost=daily-"+day).then(r=>r.json()).then(j=>{
+    if(j&&j.ok&&j.ghost&&Array.isArray(j.ghost.pts)&&j.ghost.pts.length>3&&dailyRun&&dayStr()===day)
+      ghostPlay={score:j.ghost.score||0,pts:j.ghost.pts,world:true,name:(j.ghost.name||"").slice(0,14)};
+  }).catch(()=>{});
+}
 function loadGhost(i){ try{ const gh=JSON.parse(localStorage.getItem("pw_ghost_l"+i)||"null");
   ghostPlay=(gh&&Array.isArray(gh.pts)&&gh.pts.length>3)?gh:null; }catch(e){ ghostPlay=null; } }
 function saveGhost(i,score){
@@ -2451,7 +2460,7 @@ function saveGhost(i,score){
   ghostPlay=null;                                     // next run races the NEW ghost
 }
 function drawGhost(){
-  if(!ghostPlay||!ghostActive()||introT>1.2)return;
+  if(!ghostPlay||!ghostsOn||state!=="play"||gauntlet||introT>1.2)return;   // dailies allowed: their ghost is the world #1
   const idx=lvTime*GFPS, i0=Math.min(ghostPlay.pts.length-1,Math.floor(idx));
   const i1=Math.min(ghostPlay.pts.length-1,i0+1), fr2=idx-i0;
   const a=ghostPlay.pts[i0], b=ghostPlay.pts[i1];
@@ -2459,8 +2468,9 @@ function drawGhost(){
   if(gx<camX-60||gx>camX+W+60)return;
   g.save(); g.globalAlpha=0.26;
   drawHero(gx,gy,1.15,{t:lvTime,face:gf,pose:"idle",gunType:0,muzzle:0});
-  g.globalAlpha=0.5; g.font="900 9px Verdana"; g.textAlign="center"; g.fillStyle="#9fe6ff";
-  g.fillText("👻 "+(ghostPlay.score||0).toLocaleString(),gx,gy-64);
+  g.globalAlpha=ghostPlay.world?0.75:0.5; g.font="900 9px Verdana"; g.textAlign="center";
+  g.fillStyle=ghostPlay.world?"#ffd75e":"#9fe6ff";
+  g.fillText((ghostPlay.world?("👑 "+(ghostPlay.name||"WORLD #1")+" "):"👻 ")+(ghostPlay.score||0).toLocaleString(),gx,gy-64);
   g.restore();
 }
 function dayStr(){ const d=new Date(); return String(d.getUTCFullYear())+String(d.getUTCMonth()+1).padStart(2,"0")+String(d.getUTCDate()).padStart(2,"0"); }
@@ -2482,17 +2492,27 @@ function dailyInfo(){
 }
 function dailyState(){ try{ const s=JSON.parse(localStorage.getItem("pw_daily")||"null");
   return (s&&s.d===dayStr())?s:null; }catch(e){ return null; } }
+function dailyStreak(){ try{ return JSON.parse(localStorage.getItem("pw_streak")||"null")||{last:"",n:0}; }catch(e){ return {last:"",n:0}; } }
 function startDaily(){
   if(dailyState())return;                              // one attempt — the lock is the point
   const D=dailyInfo();
+  // 🔥 streak: consecutive UTC days with an attempt
+  try{ const st=dailyStreak(), today=dayStr();
+    const y=new Date(Date.now()-86400000), yd=String(y.getUTCFullYear())+String(y.getUTCMonth()+1).padStart(2,"0")+String(y.getUTCDate()).padStart(2,"0");
+    const n=st.last===yd?st.n+1:1;
+    localStorage.setItem("pw_streak",JSON.stringify({last:today,n}));
+    if(n>=2)setTimeout(()=>floats.push({x:P.x,y:P.y-120,txt:"🔥 "+n+"-DAY STREAK",t:2,size:13,c:"#ff9d5e"}),600);
+  }catch(e){}
   dailySavedLoadout=loadoutType;
   startLevel(D.lv,false);
   dailyRun=true; loadoutType=D.gun; _specKey="";
+  ghostPlay=null; fetchWorldGhost();                   // 👑 race today's #1, not your story ghost
   floats.push({x:P.x,y:P.y-100,txt:"📅 DAILY CONTRACT — ONE ATTEMPT",t:2.4,size:14,c:"#ffd75e"});
 }
 function finishDaily(score){
   if(!dailyRun)return;
-  try{ localStorage.setItem("pw_daily",JSON.stringify({d:dayStr(),score:Math.floor(score),sub:false})); }catch(e){}
+  try{ localStorage.setItem("pw_daily",JSON.stringify({d:dayStr(),score:Math.floor(score),sub:false,
+    pts:ghostRec.slice(0,6000)})); }catch(e){}         // the run's recording rides along — it becomes the world ghost if it takes #1
   loadoutType=dailySavedLoadout; _specKey="";
   dailyRun=false;
 }
@@ -2509,7 +2529,8 @@ async function submitDaily(){
     const msg="WICK score\naddress:"+walletAddr+"\nscore:"+s+"\nmode:"+mode+"\nts:"+Date.now();
     const sig=await seth.request({method:"personal_sign",params:[msg,walletAddr]});
     const r=await fetchT(LB_URL,{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({address:walletAddr,name:playerName,score:s,level:dailyInfo().lv+1,mode,message:msg,signature:sig})});
+      body:JSON.stringify({address:walletAddr,name:playerName,score:s,level:dailyInfo().lv+1,mode,message:msg,signature:sig,
+        ghost:Array.isArray(st.pts)&&st.pts.length>=8?st.pts:undefined})});   // 👑 #1 runs become the world ghost
     const j=await r.json();
     if(j.ok){ walletStatus="📅 daily submitted — rank #"+j.rank+" today"; st.sub=true;
       try{ localStorage.setItem("pw_daily",JSON.stringify(st)); }catch(e){} SFX.unlock(); }
@@ -2530,9 +2551,10 @@ function drawPause(){
   g.fillText("the clock is stopped — breathe",W/2,H/2-44);
   menuBtn(W/2-110,H/2-16,220,42,"► RESUME",()=>{ paused=false; },"#7cf9a5","900 15px Verdana");
   menuBtn(W/2-110,H/2+36,220,34,musicOn?"♪ MUSIC ON":"♪ MUSIC OFF",()=>{musicOn=!musicOn;try{localStorage.setItem("pw_music",musicOn?"1":"0");}catch(e){}},musicOn?"#7cf9a5":"#66707f","bold 12px Verdana");
-  menuBtn(W/2-110,H/2+80,220,34,"✖ QUIT TO MENU",()=>{ paused=false; state="menu"; },"#ff9d9d","bold 12px Verdana");
+  menuBtn(W/2-110,H/2+80,220,34,ghostsOn?"👻 GHOSTS ON":"👻 GHOSTS OFF",()=>{ghostsOn=!ghostsOn;try{localStorage.setItem("pw_ghosts",ghostsOn?"1":"0");}catch(e){}},ghostsOn?"#9fe6ff":"#66707f","bold 12px Verdana");
+  menuBtn(W/2-110,H/2+124,220,34,"✖ QUIT TO MENU",()=>{ paused=false; state="menu"; },"#ff9d9d","bold 12px Verdana");
   g.font="bold 10px Verdana"; g.fillStyle="#4a5566";
-  g.fillText("ESC resumes",W/2,H/2+138);
+  g.fillText("ESC resumes",W/2,H/2+182);
   g.restore();
 }
 function fireGun(){
@@ -2656,8 +2678,8 @@ function update(dt){
   if(state!=="play")return;
   if(hitstop>0){ hitstop-=dt; return; }
   lvTime+=dt; introT=Math.max(0,introT-dt);
-  if(ghostActive()&&ghostRec.length<lvTime*GFPS&&ghostRec.length<6000&&P&&!P.dead)
-    ghostRec.push([Math.round(P.x),Math.round(P.y),P.face]);           // 👻 10Hz breadcrumb trail
+  if(state==="play"&&!gauntlet&&ghostRec.length<lvTime*GFPS&&ghostRec.length<6000&&P&&!P.dead)
+    ghostRec.push([Math.round(P.x),Math.round(P.y),P.face]);           // 👻 10Hz breadcrumb trail (dailies record too — the #1 becomes the world ghost)
   // "★ NEW BEST" fires the moment you pass your old mark — mid-run, when it feels earned
   if(!newBestShown){
     const mark=gauntlet?gBest:runPrevBest;
@@ -4186,9 +4208,9 @@ function drawMenu(t){
   menuBtn(lc-46,PY+142,88,34,"⚔ GAUNTLET",()=>startGauntlet(),"#ff9d5e","900 10px Verdana");
   menuBtn(lc+48,PY+142,92,34,"🏆 BOARD",()=>{lbDaily=false;state="board";lbMsg="";fetchBoard(true);},"#ffd75e","900 11px Verdana");
   g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
-  { const D=dailyInfo();
-    g.fillText(!dst?("today: L"+(D.lv+1)+" · "+baseSpecFor(D.gun).name+" + "+D.mods.map(m=>MODDEFS[m].tag).join("+")+" · ONE attempt")
-      :(dst.sub?"daily submitted — new contract 00:00 UTC":"daily done — tap 📅 to submit to today's board"),lc,PY+196); }
+  { const D=dailyInfo(), stk=dailyStreak(), fire=(stk.n>=2&&stk.last===dayStr())?("  🔥 "+stk.n+"-day streak"):"";
+    g.fillText((!dst?("today: L"+(D.lv+1)+" · "+baseSpecFor(D.gun).name+" + "+D.mods.map(m=>MODDEFS[m].tag).join("+")+" · ONE attempt")
+      :(dst.sub?"daily submitted — new contract 00:00 UTC":"daily done — tap 📅 to submit to today's board"))+fire,lc,PY+196); }
 
   // ================= RIGHT: ARSENAL =================
   const RX=496, RW=372;
@@ -4252,7 +4274,7 @@ function drawScoreCard(){
   const gaunt=gauntlet;
   g.save(); g.textAlign="center";
   g.font="italic 13px Georgia,serif"; g.fillStyle="#e8b04a";
-  g.fillText(gaunt?"T H E   G A U N T L E T":"A   P E P E   W I C K   S T O R Y",W/2,54);
+  g.fillText(gaunt?(bossRush?"B O S S   R U S H":"T H E   G A U N T L E T"):"A   P E P E   W I C K   S T O R Y",W/2,54);
   g.shadowColor=gaunt?"#ff8a5a":"#7cf9a5"; g.shadowBlur=24;
   g.font="900 58px Verdana"; const tg=g.createLinearGradient(0,72,0,128);
   if(gaunt){ tg.addColorStop(0,"#ffffff"); tg.addColorStop(0.6,"#ffd0a0"); tg.addColorStop(1,"#ff7a3c"); }
