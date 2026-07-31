@@ -235,7 +235,7 @@ const SFX={
 };
 /* music — noir synthwave loop */
 let musicOn=true; try{ musicOn=localStorage.getItem("pw_music")!=="0"; }catch(e){}
-let musStep=0, musNext=0, musKey=0, musBoss=0;
+let musStep=0, musNext=0, musKey=0, musBoss=0, musMood=0;
 const MPENT=[0,3,5,7,10];
 function musicTick(){
   const a=AC; if(!a||!musicOn||document.hidden)return;
@@ -248,11 +248,24 @@ function musicTick(){
   while(musNext<a.currentTime+0.3){
     const t=musNext, step=musStep%8, bar=(musStep>>3)%8;
     const root=[55,55,49,43.65,55,55,65.4,49][bar]*tr;
+    if(musMood===2){                                                      // COLD: half-time, low drones, sparse — freezer country
+      if(step===0){ blip(108*tr,32*tr,"sine",0.3,0.26,t); blip(root,root,"sawtooth",0.045,0.6,t); }
+      if(step===4)bang(0.05,0.05,4200,0,t);
+      if(step===6)blip(root*1.189,root*1.189,"triangle",0.032,0.42,t);    // minor color, hangs in the air
+      if(step%4===2)bang(0.016,0.03,6600,0,t);
+    } else if(musMood===1){                                               // NEON: double-time hats, brighter arps — bazaar energy
+      if(step===0)blip(118*tr,40*tr,"sine",0.28,0.18,t);
+      if(step===4){ blip(112*tr,36*tr,"sine",0.22,0.14,t); bang(0.06,0.045,5200,0,t); }
+      bang(0.018,0.02,8200,0,t);                                          // hats on every 8th
+      if(step%2===0){ const f=root*2*(step===6?1.335:1); blip(f,f,"sawtooth",0.055,0.2,t); }
+      if(step%2===1){ const f2=440*tr*Math.pow(2,MPENT[musStep%5]/12); blip(f2,f2*1.002,"triangle",0.03,0.18,t); }
+    } else {                                                              // STREET groove — the original
     if(step===0)blip(115*tr,38*tr,"sine",0.3,0.2,t);
     if(step===4){ blip(112*tr,36*tr,"sine",0.2,0.16,t); bang(0.06,0.05,5000,0,t); }
     if(step%2===0)bang(0.025,0.03,7000,0,t);
     if(step%2===0){ const f=root*2*(step===6?1.498:1); blip(f,f,"sawtooth",0.05,0.24,t); }
     if(bar%2===1&&step%2===1){ const f=220*tr*Math.pow(2,MPENT[(musStep>>1)%5]/12); blip(f,f*1.001,"triangle",0.028,0.3,t); }
+    }
     // boss layer: driving 16th hats, a minor-3rd tension drone, and a heavier kick — all fade with bi
     if(bi>0.02){
       if(step%2===1)bang(0.02*bi,0.02,8500,0,t);                          // off-beat hats → double-time feel
@@ -291,7 +304,11 @@ const THEMES=[
   {weather:"ash",    pal:{skyTop:"#120507",skyBot:"#2c0c10",horizon:"#4a141a",far:"#1c0608",mid:"#240a0c",midLit:"#ff6b6b",farLit:"#ff4d4d",lamp:"#ff6b5a",sign:"#ff3d4d",accent:"#ff5555",fog:"rgba(140,30,30,0.16)"}},
 ];
 const MUSKEY=[0,2,-2,3,5,-3,2,-4,1,-5]; // per-district musical transpose (semitones)
-function applyTheme(i){ const th=THEMES[i]; PAL={...BASE_PAL, ...((th&&th.pal)||{})}; curWeather=(th&&th.weather)||"rain"; musKey=MUSKEY[((i%MUSKEY.length)+MUSKEY.length)%MUSKEY.length]||0; }
+// per-district MOOD: 0 = street groove · 1 = neon double-time · 2 = cold half-time
+const MUSMOOD=[0,0,2,0,1,1,0,2,2,2];    // lilypad/glass groove · continental dark · bazaar+aqueduct neon · freezer→killing floor cold
+function applyTheme(i){ const th=THEMES[i]; PAL={...BASE_PAL, ...((th&&th.pal)||{})}; curWeather=(th&&th.weather)||"rain";
+  musKey=MUSKEY[((i%MUSKEY.length)+MUSKEY.length)%MUSKEY.length]||0;
+  musMood=MUSMOOD[((i%MUSMOOD.length)+MUSMOOD.length)%MUSMOOD.length]||0; }
 function drawWeather(t){
   const w=curWeather;
   const rain=al=>{ g.save(); g.strokeStyle="rgba(150,190,240,"+al+")"; g.lineWidth=1; g.beginPath();
@@ -1590,6 +1607,53 @@ async function getEth(){                       // one provider for connect + eve
 }
 let walletAddr=null, ownedGunTypes=[], loadoutType=null, walletStatus="", walletBusy=false, watchMode=false;
 let nftGen=0;   // bumped by applyGuns — stale timers compare against it before touching the session
+/* ---- menu MARKET TICKER: live sales + burns scrolling under the panels.
+   Reads event logs straight off PulseChain (g4mm4 serves logs; the public
+   node returns silent empties). Fetched once per 5 min, fails to nothing. ---- */
+const MKT_ADDR="0x1457C17A7132fCbCb2034337368050563DeD91e3", MODSMKT_ADDR="0xDDb963D1bb874d4ac5697550F513568c657E977E";
+const T_SOLD="0x23f50d55776d8003622a982ade45a6c7f083116c8dbbcd980f59942f440badb1";
+const T_OFFACC="0x537afea1137614386dde2e3f3f603a09e8ba6fbcd0a9d59b286a6f7e5fc93848";
+const T_MINTED="0xdcb23284f3935b5557998e99dcc286e29744c5000723d99eecd5d6f5694f6e11";
+let tickerTxt=null, tickerBusy=false, tickerAt=0;
+const TICKER_RPC="https://rpc-pulsechain.g4mm4.io";
+async function rpcJson(method,params){ const r=await fetchT(TICKER_RPC,{method:"POST",headers:{"content-type":"application/json"},
+  body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})}); const j=await r.json(); return j.result; }
+async function fetchTicker(){
+  if(tickerBusy||(tickerTxt&&performance.now()-tickerAt<300000))return;
+  tickerBusy=true;
+  try{
+    const head=parseInt(await rpcJson("eth_blockNumber",[]),16);
+    const from="0x"+Math.max(0,head-60000).toString(16);          // ~7 days of blocks
+    const logs=async(addr,topic)=>(await rpcJson("eth_getLogs",[{address:addr,fromBlock:from,toBlock:"latest",topics:[topic]}]))||[];
+    const [gs,go,ms,mm]=await Promise.all([
+      logs(MKT_ADDR,T_SOLD), logs(MKT_ADDR,T_OFFACC),
+      /^0x0{40}$/.test(MODS_ADDR)?[]:logs(MODSMKT_ADDR,T_SOLD),
+      /^0x0{40}$/.test(MODS_ADDR)?[]:logs(MODS_ADDR,T_MINTED),
+    ]);
+    const pls=hex=>Math.round(Number(BigInt(hex))/1e18);
+    const items=[];
+    for(const l of gs)items.push({b:parseInt(l.blockNumber,16),s:"🔫 GUN #"+parseInt(l.topics[1],16)+" SOLD · "+pls(l.data).toLocaleString()+" PLS · "+Math.round(pls(l.data)*0.15).toLocaleString()+" BURNED"});
+    for(const l of go)items.push({b:parseInt(l.blockNumber,16),s:"🔫 GUN #"+parseInt(l.topics[2],16)+" SOLD (offer) · "+pls("0x"+l.data.slice(66,130)).toLocaleString()+" PLS"});
+    for(const l of ms)items.push({b:parseInt(l.blockNumber,16),s:"🧩 MOD #"+parseInt(l.topics[1],16)+" SOLD · "+pls(l.data).toLocaleString()+" PLS · "+Math.round(pls(l.data)*0.5).toLocaleString()+" BURNED"});
+    items.sort((a,b)=>b.b-a.b);
+    const parts2=items.slice(0,8).map(i=>i.s);
+    if(mm.length)parts2.push("🧩 "+mm.length+"/300 FREE MODS CLAIMED — 3 PER GUN · mint.wick.pics");
+    tickerTxt=parts2.length?parts2.join("      ·      "):null;
+    tickerAt=performance.now();
+  }catch(e){ /* ticker is garnish — never an error surface */ }
+  tickerBusy=false;
+}
+function drawTicker(t){
+  if(!tickerTxt){ fetchTicker(); return; }
+  fetchTicker();                                        // refresh check is self-throttled
+  g.save(); g.font="bold 11px Verdana"; g.textAlign="left";
+  const tw=g.measureText(tickerTxt).width+220;
+  const x=W-((t*46)%(tw+W));
+  g.fillStyle="rgba(124,249,165,0.8)";
+  g.fillText(tickerTxt,x,H-34);
+  g.fillText(tickerTxt,x+tw+W,H-34);                    // seamless wrap
+  g.restore(); g.textAlign="center";
+}
 /* Hand-off from mint.wick.pics: ?w=0x… unlocks guns with no wallet app at all.
    Connecting is easy on a normal portrait page and awful inside a landscape-locked
    canvas game, so we let the mint site do it and carry the result over. */
@@ -2158,6 +2222,7 @@ const HPMAP={goon:28,heavy:90,blade:20,shield:60,marksman:22,bomber:26,hound:14,
 function mkEnemy(e){ const t=e.t,x=e.x,y=e.y||GY; return {t,x,y,hp:HPMAP[t]||28,maxhp:HPMAP[t]||28,face:e.face||-1,dead:false,cd:rand(0.8,1.6),tel:0,muzzle:0,walk:Math.random()*7,px:x,dir:-1,patrol:(y&&y!==GY)?34:70,fuse:0,block:0,phase:1,summoned:0}; }
 function startLevel(i,keepDeaths){
   releaseAllInput(); paused=false;   // a fresh level starts from rest — held keys/touches must not carry across the transition
+  newBestShown=false; runPrevBest=(best["l"+i]&&best["l"+i].score)||0;   // the mark this run has to beat
   gauntlet=false;
   lvIdx=i; lvl=LEVELS[i]; applyTheme(i);
   P=newPlayer(120); camX=0; checkpointX=120;
@@ -2203,6 +2268,7 @@ function respawnLevel(){ /* death → last checkpoint, world progress kept */
 let preGLvIdx=0;
 function startGauntlet(){
   releaseAllInput(); paused=false;
+  newBestShown=false; runPrevBest=0;                                     // gauntlet compares against gBest live
   if(!gauntlet)preGLvIdx=lvIdx;         // remember the campaign selection ONCE — RUN AGAIN must not overwrite it with 0
   gauntlet=true; lvIdx=0; lvl=GAUNTLET_LV; applyTheme(0);
   P=newPlayer(GAUNTLET_LV.len/2); camX=Math.max(0,P.x-W/2); checkpointX=P.x;
@@ -2344,6 +2410,7 @@ function groundAt(x,y){
 
 /* ---------- combat ---------- */
 let paused=false;
+let newBestShown=false, runPrevBest=0;   // "★ NEW BEST" fires once per run
 /* ⏸ PAUSE — freezes the sim AND the level clock (lvTime only ticks in update).
    ESC or the mobile ⏸ toggles it; the overlay owns all input while up. */
 function drawPause(){
@@ -2389,7 +2456,10 @@ function fireGun(){
   }
   shake=Math.max(shake,0.05+(n>1?0.1:0));
 }
+/* haptics — phones only; short taps for kills, a thud for damage, a pattern for bosses */
+function buzz(p){ if(MOBILE&&navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
 function killEnemy(e,dx){
+  buzz(e.t==="butcher"||e.t==="zero"?[40,60,140]:e.t==="heavy"?25:12);
   e.dead=true; lvKills++;
   const BON={heavy:150,shield:120,marksman:90,bomber:60,hound:40,zero:900,butcher:2600};
   if(e.noReward){ /* suicide detonation: no score, no combo */ }
@@ -2445,7 +2515,7 @@ function poundShock(x){ // butcher ground-slam — jump to avoid
 function spawnGoon(x){ enemies.push({t:"goon",x:clamp(x,60,lvl.len-60),y:GY,hp:28,maxhp:28,face:-1,dead:false,cd:rand(0.6,1.2),tel:0,muzzle:0,walk:0,px:x,dir:-1,patrol:70,fuse:0,block:0,phase:1,summoned:1}); }
 function hurtPlayer(knock){
   if(P.dead||P.ifr>0||state!=="play")return;
-  P.hp--; P.ifr=1.2; combo=0;
+  P.hp--; P.ifr=1.2; combo=0; buzz(P.hp<=0?[90,50,160]:70);
   P.vx=(knock||-P.face)*260; P.vy=-240; P.grounded=false;
   shake=Math.max(shake,0.45); SFX.hurt();
   for(let i=0;i<8;i++)parts.push({x:P.x,y:P.y-18,vx:rand(-160,160),vy:rand(-220,30),t:rand(0.3,0.5),c:pick(["#6aa84f","#e8e8ea"]),r:rand(1.5,3),g:1});
@@ -2456,7 +2526,7 @@ function hurtPlayer(knock){
 }
 function pitFall(){
   if(P.dead)return;
-  P.hp--; SFX.hurt(); shake=0.5;
+  P.hp--; SFX.hurt(); shake=0.5; buzz(P.hp<=0?[90,50,160]:70);
   if(P.hp<=0){ P.dead=true; deadT=0; SFX.die(); if(gauntlet)endGauntlet(); else state="dead"; return; }
   P.x=checkpointX; P.y=GY-40; P.vx=0; P.vy=0; P.ifr=1.4;
 }
@@ -2480,6 +2550,13 @@ function update(dt){
   if(state!=="play")return;
   if(hitstop>0){ hitstop-=dt; return; }
   lvTime+=dt; introT=Math.max(0,introT-dt);
+  // "★ NEW BEST" fires the moment you pass your old mark — mid-run, when it feels earned
+  if(!newBestShown){
+    const mark=gauntlet?gBest:runPrevBest;
+    if(mark>0&&lvScore>mark){ newBestShown=true;
+      floats.push({x:P.x,y:P.y-92,txt:gauntlet?"★ NEW RECORD PACE":"★ NEW BEST",t:2,size:16,c:"#ffd75e"});
+      flash=Math.max(flash,0.3); SFX.unlock(); buzz([20,30,60]); }
+  }
   shake=Math.max(0,shake-dt*2.8); flash=Math.max(0,flash-dt*3.8);
   comboT-=dt; if(comboT<=0)combo=0;
   if(tutStep>=0)tutTick(dt);
@@ -4032,6 +4109,7 @@ function drawMenu(t){
   drawHero(46,470,1.05,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   let done=false; try{ done=localStorage.getItem("pw_done")==="1"; }catch(e){}
   if(done){ drawDog(84,470,1,{}); g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#e8b04a"; g.fillText("BISCUIT ✓",66,478); }
+  drawTicker(t);                                       // live sales + burns, scrolling
   g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#3f4a5c";
   g.fillText("UTILITY FOR $WICK ON PULSECHAIN · NFT ARSENAL + FREE MODS LIVE · SIGNED WORLD LEADERBOARD",W/2,H-10);
   const v=g.createRadialGradient(W/2,H/2,H*0.5,W/2,H/2,H*0.95);
