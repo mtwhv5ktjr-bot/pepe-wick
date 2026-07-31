@@ -1909,7 +1909,7 @@ async function submitScore(){
   const seth=window.ethereum||wcProvider;
   if(!seth){ lbMsg="no wallet available"; return; }
   const s=gauntlet?Math.floor(lvScore):Math.floor(totalScore());
-  const mode=gauntlet?"gauntlet":"pepe-wick", lvNo=gauntlet?gWave:lvIdx+1;
+  const mode=gauntlet?(bossRush?"bossrush":"gauntlet"):"pepe-wick", lvNo=gauntlet?gWave:lvIdx+1;
   if(s<=0){ lbMsg="no score yet"; return; }
   // holders-only board — say so here rather than making them sign for a 403
   if(!ownedGunTypes.length){ lbMsg="holders only — mint a gun at mint.wick.pics to enter"; return; }
@@ -2225,6 +2225,7 @@ function startLevel(i,keepDeaths){
   releaseAllInput(); paused=false;   // a fresh level starts from rest — held keys/touches must not carry across the transition
   newBestShown=false; runPrevBest=(best["l"+i]&&best["l"+i].score)||0;   // the mark this run has to beat
   dailyRun=false;
+  ghostRec=[]; loadGhost(i);                                             // 👻 arm the racer for this contract
   gauntlet=false;
   lvIdx=i; lvl=LEVELS[i]; applyTheme(i);
   P=newPlayer(120); camX=0; checkpointX=120;
@@ -2269,9 +2270,18 @@ function respawnLevel(){ /* death → last checkpoint, world progress kept */
 }
 /* ---------- endless gauntlet ---------- */
 let preGLvIdx=0;
+let bossRush=false, brWin=false, brBest=+((()=>{try{return localStorage.getItem("pw_brbest")}catch(e){return 0}})()||0);
+/* 👹 BOSS RUSH — the roster back to back, one life, own board lane */
+const BR_ROUNDS=[null,
+  [{t:"zero",delay:0.5}],
+  [{t:"zero",delay:0.5},{t:"hound",delay:1.2},{t:"hound",delay:1.8}],
+  [{t:"butcher",delay:0.6}],
+  [{t:"butcher",delay:0.6},{t:"zero",delay:1.6}]];
+function startBossRush(){ startGauntlet(); bossRush=true; brWin=false;
+  floats.push({x:P.x,y:P.y-100,txt:"👹 BOSS RUSH — 4 ROUNDS, ONE LIFE",t:2.4,size:14,c:"#ff9d5e"}); }
 function startGauntlet(){
   releaseAllInput(); paused=false;
-  newBestShown=false; runPrevBest=0; dailyRun=false;                     // gauntlet compares against gBest live
+  newBestShown=false; runPrevBest=0; dailyRun=false; bossRush=false; brWin=false;   // gauntlet compares against gBest live
   if(!gauntlet)preGLvIdx=lvIdx;         // remember the campaign selection ONCE — RUN AGAIN must not overwrite it with 0
   gauntlet=true; lvIdx=0; lvl=GAUNTLET_LV; applyTheme(0);
   P=newPlayer(GAUNTLET_LV.len/2); camX=Math.max(0,P.x-W/2); checkpointX=P.x;
@@ -2284,6 +2294,7 @@ function startGauntlet(){
   state="play";
 }
 function gWaveComp(n){ // returns array of {t,delay} spawn descriptors for wave n
+  if(bossRush)return (BR_ROUNDS[n]||[]).slice();
   const out=[]; let pool;
   if(n<3)      pool=["goon","goon","hound","goon"];
   else if(n<6) pool=["goon","hound","blade","heavy","goon"];
@@ -2300,7 +2311,7 @@ function nextWave(){
   gWave++;
   const comp=gWaveComp(gWave);
   gQueue=comp.map((c,i)=>({t:c.t, at:lvTime+0.2+c.delay, side:(i+gWave)%2?1:-1}));
-  gBanner=2.2; gBannerTxt=(gWave%10===0)?"WAVE "+gWave+" — THE BUTCHER":(gWave%5===0)?"WAVE "+gWave+" — ZERO":"WAVE "+gWave;
+  gBanner=2.2; gBannerTxt=bossRush?(["","ROUND 1 — ZERO","ROUND 2 — ZERO & THE PACK","ROUND 3 — THE BUTCHER","ROUND 4 — EVERYTHING AT ONCE"][gWave]||""):(gWave%10===0)?"WAVE "+gWave+" — THE BUTCHER":(gWave%5===0)?"WAVE "+gWave+" — ZERO":"WAVE "+gWave;
   SFX.tel();
 }
 function gauntletTick(dt){
@@ -2337,12 +2348,15 @@ function gauntletTick(dt){
       gRestT=gWave===0?0.6:1.6;
     }
     gRestT-=dt;
-    if(gRestT<=0) nextWave();
+    if(gRestT<=0){ if(bossRush&&gWave>=4){ brWin=true; lvScore+=5000;
+      floats.push({x:P.x,y:GY-160,txt:"RUSH CLEARED  +5000",t:2,size:16,c:"#7cf9a5"}); endGauntlet(); }
+      else nextWave(); }
   }
 }
 function endGauntlet(){
   gRestT=0; gQueue=[];
-  if(lvScore>gBest){ gBest=Math.floor(lvScore); try{ localStorage.setItem("pw_gbest",String(gBest)); }catch(e){} }
+  if(bossRush){ if(lvScore>brBest){ brBest=Math.floor(lvScore); try{ localStorage.setItem("pw_brbest",String(brBest)); }catch(e){} } }
+  else if(lvScore>gBest){ gBest=Math.floor(lvScore); try{ localStorage.setItem("pw_gbest",String(gBest)); }catch(e){} }
   lbMsg=""; state="gover"; deadT=0;
 }
 /* ---------- first-run tutorial ---------- */
@@ -2421,6 +2435,34 @@ let newBestShown=false, runPrevBest=0;   // "★ NEW BEST" fires once per run
    locked locally; scores go to their own daily board (mode "daily-YYYYMMDD"),
    fenced off from the prize board server-side. Campaign bests are untouched. */
 let dailyRun=false, dailyDone=false, dailySavedLoadout=null;
+
+/* ============ 👻 GHOST RACER ============
+   Your best CLEAR of each contract is recorded (10Hz positions) and races you
+   as a translucent Pepe. Beat its score on a clear and the new run becomes the
+   ghost. Story mode only — dailies and the gauntlet stay ghost-free. */
+const GFPS=10;
+let ghostRec=[], ghostPlay=null;
+function ghostActive(){ return state==="play"&&!gauntlet&&!dailyRun; }
+function loadGhost(i){ try{ const gh=JSON.parse(localStorage.getItem("pw_ghost_l"+i)||"null");
+  ghostPlay=(gh&&Array.isArray(gh.pts)&&gh.pts.length>3)?gh:null; }catch(e){ ghostPlay=null; } }
+function saveGhost(i,score){
+  if(ghostRec.length<8)return;
+  try{ localStorage.setItem("pw_ghost_l"+i,JSON.stringify({score:Math.floor(score),pts:ghostRec})); }catch(e){}
+  ghostPlay=null;                                     // next run races the NEW ghost
+}
+function drawGhost(){
+  if(!ghostPlay||!ghostActive()||introT>1.2)return;
+  const idx=lvTime*GFPS, i0=Math.min(ghostPlay.pts.length-1,Math.floor(idx));
+  const i1=Math.min(ghostPlay.pts.length-1,i0+1), fr2=idx-i0;
+  const a=ghostPlay.pts[i0], b=ghostPlay.pts[i1];
+  const gx=a[0]+(b[0]-a[0])*fr2, gy=a[1]+(b[1]-a[1])*fr2, gf=a[2]||1;
+  if(gx<camX-60||gx>camX+W+60)return;
+  g.save(); g.globalAlpha=0.26;
+  drawHero(gx,gy,1.15,{t:lvTime,face:gf,pose:"idle",gunType:0,muzzle:0});
+  g.globalAlpha=0.5; g.font="900 9px Verdana"; g.textAlign="center"; g.fillStyle="#9fe6ff";
+  g.fillText("👻 "+(ghostPlay.score||0).toLocaleString(),gx,gy-64);
+  g.restore();
+}
 function dayStr(){ const d=new Date(); return String(d.getUTCFullYear())+String(d.getUTCMonth()+1).padStart(2,"0")+String(d.getUTCDate()).padStart(2,"0"); }
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t2=Math.imul(a^a>>>15,1|a); t2=t2+Math.imul(t2^t2>>>7,61|t2)^t2; return ((t2^t2>>>14)>>>0)/4294967296; }; }
 let _dailyCache=null;
@@ -2614,6 +2656,8 @@ function update(dt){
   if(state!=="play")return;
   if(hitstop>0){ hitstop-=dt; return; }
   lvTime+=dt; introT=Math.max(0,introT-dt);
+  if(ghostActive()&&ghostRec.length<lvTime*GFPS&&ghostRec.length<6000&&P&&!P.dead)
+    ghostRec.push([Math.round(P.x),Math.round(P.y),P.face]);           // 👻 10Hz breadcrumb trail
   // "★ NEW BEST" fires the moment you pass your old mark — mid-run, when it feels earned
   if(!newBestShown){
     const mark=gauntlet?gBest:runPrevBest;
@@ -2960,6 +3004,8 @@ function onClear(){
   const r=(deathsThisRun===0&&lvTime<=rk.s*1.35)?"S":lvTime<=rk.a*1.35?"A":lvTime<=rk.b*1.35?"B":"C";   // full-clear runs take longer — clocks widened
   lvScore+={S:3000,A:1500,B:600,C:200}[r];
   if(wasDaily){ finishDaily(lvScore); dailyDone=true; }
+  else{ let old=null; try{ old=JSON.parse(localStorage.getItem("pw_ghost_l"+lvIdx)||"null"); }catch(e){}
+    if(!old||lvScore>(old.score||0))saveGhost(lvIdx,lvScore); }        // 👻 a better clear becomes the ghost
   const key="l"+lvIdx, b=best[key]||{};
   if(!wasDaily){
   if(!b.time||lvTime<b.time)b.time=+lvTime.toFixed(2);
@@ -2995,7 +3041,7 @@ addEventListener("keydown",e=>{ if(e.repeat)return;
   else if(state==="dead"&&(e.code==="Enter"||e.code==="KeyR"))
     respawnLevel();
   else if(state==="ending"&&e.code==="Enter"){ if(endT<4.6)endT=4.6; else state="menu"; }
-  else if(state==="gover"&&(e.code==="Enter"||e.code==="KeyR"))startGauntlet();
+  else if(state==="gover"&&(e.code==="Enter"||e.code==="KeyR")){ bossRush?startBossRush():startGauntlet(); }
   else if(state==="gover"&&e.code==="Escape"){ gauntlet=false; lvIdx=preGLvIdx; state="menu"; }
   else if(state==="board"&&e.code==="Escape")state="menu";
   else if(state==="guide"&&(e.code==="Escape"||e.code==="Enter"))state="menu";
@@ -3705,6 +3751,7 @@ function render(){
   if(!P.dead&&!(P.ifr>0&&Math.floor(performance.now()/80)%2===0)){
     const hopts={t,face:P.face,pose:P.grounded?(Math.abs(P.vx)>40?"run":"idle"):"jump",
       gunType:loadoutType||0,holo:loadoutType>10,muzzle:P.muzzle>0?0.55:0,phase:t*11,squash:P.squash||0,dist:P.stride||0};
+    drawGhost();
     drawHero(P.x,P.y,1.15,hopts);
     if(loadoutType===16){                                   // the Reaper announces itself above the wearer
       g.save(); g.textAlign="center"; g.font="900 10px Verdana";
@@ -3814,7 +3861,7 @@ function drawHUD(t){
   // combined stat line on the left; the whole right corner belongs to the swap button.
   // The desktop layout put ☠ kills at W-118 — INSIDE the swap box — hence the clutter.
   g.font=MOBILE?"900 11px Verdana":"900 13px Verdana"; g.textAlign="left"; g.fillStyle="#7cf9a5";
-  g.fillText(gauntlet?("THE GAUNTLET · WAVE "+gWave):(MOBILE?lvl.name.replace(/^(\d+) — (THE )?/,"$1 · "):lvl.name),14,24);
+  g.fillText(gauntlet?(bossRush?("👹 BOSS RUSH · ROUND "+Math.min(4,Math.max(1,gWave))+"/4"):("THE GAUNTLET · WAVE "+gWave)):(MOBILE?lvl.name.replace(/^(\d+) — (THE )?/,"$1 · "):lvl.name),14,24);
   if(!MOBILE&&bountyActive()){ g.save(); g.textAlign="center"; g.font="900 10px Verdana"; g.fillStyle="#7cf9a5";
     g.fillText("🏆 PRIZE BOARD — "+fmtDur(prizeLeft())+" left",W/2,15); g.restore(); }   // phones: menu/board only — mid-run it's noise
   const la=gauntlet?0:enemies.reduce((n,e)=>n+(e.dead?0:1),0);
@@ -3961,18 +4008,20 @@ function drawGover(){
   g.fillStyle="rgba(70,0,8,"+(a*0.5)+")"; g.fillRect(0,0,W,H);
   g.fillStyle="rgba(0,0,0,"+(a*0.72)+")"; g.fillRect(0,0,W,H);
   g.save(); g.globalAlpha=a; g.textAlign="center";
-  g.font="900 30px Verdana"; g.fillStyle="#ff6b7a"; g.fillText("GAUNTLET OVER",W/2,120);
-  g.font="900 20px Verdana"; g.fillStyle="#7cf9a5"; g.fillText("YOU REACHED WAVE "+gWave,W/2,158);
+  g.font="900 30px Verdana"; g.fillStyle=bossRush?(brWin?"#7cf9a5":"#ff9d5e"):"#ff6b7a";
+  g.fillText(bossRush?(brWin?"👹 RUSH CLEARED":"👹 RUSH OVER"):"GAUNTLET OVER",W/2,120);
+  g.font="900 20px Verdana"; g.fillStyle="#7cf9a5";
+  g.fillText(bossRush?(brWin?"ALL 4 ROUNDS DOWN":("FELL IN ROUND "+Math.max(1,gWave))):("YOU REACHED WAVE "+gWave),W/2,158);
   g.font="900 60px Verdana"; g.fillStyle="#ffd75e"; g.fillText(Math.floor(lvScore).toLocaleString(),W/2,232);
   g.font="bold 13px Verdana"; g.fillStyle="#cfd6e0"; g.fillText(lvKills+" kills   ·   "+lvTime.toFixed(0)+"s survived",W/2,262);
-  const rec=Math.floor(lvScore)>=gBest&&lvScore>0;
+  const rec=Math.floor(lvScore)>=(bossRush?brBest:gBest)&&lvScore>0;
   g.font="900 14px Verdana"; g.fillStyle=rec?"#7cf9a5":"#8fa3bf";
-  g.fillText(rec?"★ NEW PERSONAL BEST ★":"personal best  "+gBest.toLocaleString(),W/2,292);
+  g.fillText(rec?"★ NEW PERSONAL BEST ★":"personal best  "+(bossRush?brBest:gBest).toLocaleString(),W/2,292);
   if(bountyActive()){ g.font="bold 12px Verdana"; g.fillStyle="#ffd75e";
     g.fillText("🏆 submit to enter the prize board — "+fmtDur(prizeLeft())+" left",W/2,320); }
   BTNS.length=0;
   if(deadT>0.4){
-    menuBtn(W/2-266,352,150,36,"↻ RUN AGAIN",()=>startGauntlet(),"#7cf9a5");
+    menuBtn(W/2-266,352,150,36,"↻ RUN AGAIN",()=>{ bossRush?startBossRush():startGauntlet(); },"#7cf9a5");
     menuBtn(W/2-108,352,150,36,"📸 SHARE",()=>shareScore(),"#7cf9a5");
     menuBtn(W/2+50,352,150,36,lbBusy?"SIGNING…":"🏆 SUBMIT",()=>submitScore(),"#ffd75e");
     menuBtn(W/2-70,398,140,32,"MENU",()=>{gauntlet=false;lvIdx=preGLvIdx;state="menu";},"#fff");
@@ -4172,6 +4221,7 @@ function drawMenu(t){
 
   // ================= bottom bar =================
   const BY=H-96;
+  menuBtn(W/2-296,BY,112,28,"👹 BOSS RUSH",()=>startBossRush(),"#ff9d5e","bold 10px Verdana");
   menuBtn(W/2-176,BY,110,28,"❓ GUIDE",()=>{state="guide";},"#7cf9a5","bold 11px Verdana");
   menuBtn(W/2-58,BY,110,28,musicOn?"♪ MUSIC ON":"♪ MUSIC OFF",()=>{musicOn=!musicOn;try{localStorage.setItem("pw_music",musicOn?"1":"0");}catch(e){}},musicOn?"#7cf9a5":"#66707f","bold 11px Verdana");
   if(MOBILE)menuBtn(W/2+60,BY,116,28,"⛶ FULLSCREEN",goFullscreen,"#9fe6ff","bold 11px Verdana");
