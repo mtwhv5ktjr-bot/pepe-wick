@@ -3916,81 +3916,94 @@ function drawMenu(t){
   menuBackdrop(t);
   if(bountyActive()){ g.save(); g.textAlign="center"; g.font="900 12px Verdana"; g.fillStyle="#7cf9a5";
     g.fillText("🏆 PRIZE BOARD — 1st 50 · 2nd 35 · 3rd 15 USDC · NFT HOLDERS ONLY · ends in "+fmtDur(prizeLeft()),W/2,26); g.restore(); }
-  // title
+  if(fsMsgUntil>performance.now()){ g.font="bold 11px Verdana"; g.textAlign="center"; g.fillStyle="#9fe6ff"; g.fillText(fsMsg,W/2,44); }
+  // ---- title ----
   g.save(); g.textAlign="center";
   g.font="italic 13px Georgia,serif"; g.fillStyle="#e8b04a";
-  g.fillText("A   P E P E   W I C K   S T O R Y",W/2,84);
+  g.fillText("A   P E P E   W I C K   S T O R Y",W/2,72);
   g.shadowColor="#7cf9a5"; g.shadowBlur=26+Math.sin(t*3)*7;
-  g.font="900 74px Verdana";
-  const tg=g.createLinearGradient(0,100,0,180);
+  g.font="900 66px Verdana";
+  const tg=g.createLinearGradient(0,86,0,158);
   tg.addColorStop(0,"#ffffff"); tg.addColorStop(0.6,"#c8ecb2"); tg.addColorStop(1,"#5ecb46");
-  g.fillStyle=tg; g.fillText("PEPE WICK",W/2,164);
+  g.fillStyle=tg; g.fillText("PEPE WICK",W/2,142);
   g.shadowBlur=0;
-  g.font="bold 13px Verdana"; g.fillStyle="#ff5f7a";
-  g.fillText("GET THE DOG BACK.",W/2,192);
+  g.font="bold 12px Verdana"; g.fillStyle="#ff5f7a";
+  g.fillText("GET THE DOG BACK.",W/2,168);
   g.restore();
-  // level select
-  g.font="bold 12px Verdana"; g.textAlign="center"; g.fillStyle="#8fa3bf";
-  g.fillText("CONTRACT  "+(lvIdx+1)+" / "+LEVELS.length+"  —  "+LEVELS[lvIdx].name.split("— ")[1],W/2,238);
-  menuBtn(W/2-250,218,44,30,"◄",()=>{lvIdx=(lvIdx+LEVELS.length-1)%LEVELS.length;SFX.tel();});
-  menuBtn(W/2+206,218,44,30,"►",()=>{lvIdx=(lvIdx+1)%LEVELS.length;SFX.tel();});
+
+  // ---- panel chrome ----
+  const panel=(x,y,w2,h2,label,col)=>{
+    g.save();
+    g.fillStyle="rgba(8,14,24,0.55)"; rr(x,y,w2,h2,12); g.fill();
+    g.strokeStyle="rgba(124,249,165,0.22)"; g.lineWidth=1.5; rr(x,y,w2,h2,12); g.stroke();
+    g.font="900 11px Verdana"; g.textAlign="left"; g.fillStyle=col||"#66707f";
+    g.fillText(label,x+14,y+22);
+    g.restore(); g.textAlign="center";
+  };
+  const PY=196, PH=212;
+
+  // ================= LEFT: PLAY =================
+  const LX=92, LW=372;
+  panel(LX,PY,LW,PH,"PLAY","#7cf9a5");
+  const lc=LX+LW/2;
+  g.font="bold 11px Verdana"; g.fillStyle="#cfd6e0";
+  { let nm=(lvIdx+1)+"/"+LEVELS.length+" · "+LEVELS[lvIdx].name.split("— ")[1];
+    if(g.measureText(nm).width>LW-110)g.font="bold 10px Verdana";   // longest district names stay inside the arrows
+    g.fillText(nm,lc,PY+47); }
+  menuBtn(LX+14,PY+30,34,26,"◄",()=>{lvIdx=(lvIdx+LEVELS.length-1)%LEVELS.length;SFX.tel();});
+  menuBtn(LX+LW-48,PY+30,34,26,"►",()=>{lvIdx=(lvIdx+1)%LEVELS.length;SFX.tel();});
   const bk=best["l"+lvIdx];
-  if(bk){ g.font="bold 11px Verdana"; g.fillStyle="#5f6b7c"; g.fillText("best "+bk.time+"s · rank "+bk.rank,W/2,258); }
-  menuBtn(W/2-110,272,106,40,"► START",()=>startLevel(lvIdx),"#fff","900 15px Verdana");
-  menuBtn(W/2+4,272,106,40,"⚔ GAUNTLET",()=>startGauntlet(),"#ff9d5e","900 13px Verdana");
-  menuBtn(W/2-224,277,104,30,"🏆 BOARD",()=>{state="board";lbMsg="";fetchBoard(true);},"#ffd75e");
-  menuBtn(W/2+122,277,104,30,musicOn?"♪ ON":"♪ OFF",()=>{musicOn=!musicOn;try{localStorage.setItem("pw_music",musicOn?"1":"0");}catch(e){}},musicOn?"#7cf9a5":"#66707f");
-  if(MOBILE&&TILT_AVAIL)menuBtn(W/2+120,314,130,24,tiltOn?"⟲ TILT: ON":"⟲ TILT: OFF",toggleTilt,tiltOn?"#7cf9a5":"#66707f","bold 11px Verdana");
-  if(MOBILE)menuBtn(W/2-250,314,124,24,"⛶ FULLSCREEN",goFullscreen,"#9fe6ff","bold 11px Verdana");
-  if(fsMsgUntil>performance.now()){ g.font="bold 11px Verdana"; g.textAlign="center"; g.fillStyle="#9fe6ff";
-    g.fillText(fsMsg,W/2,54); }
-  if(!MOBILE){ g.font="bold 11px Verdana"; g.textAlign="center"; g.fillStyle="#66707f";
-    g.fillText("CONTROLS:  A / D  move   ·   SPACE or W  jump   ·   CLICK / mouse  fire   ·   stomp heads",W/2,320); }
-  // loadout
+  g.font="bold 10px Verdana"; g.fillStyle="#5f6b7c";
+  g.fillText(bk?("best "+bk.time+"s · rank "+bk.rank):"no clear yet — make it hurt",lc,PY+66);
+  menuBtn(lc-140,PY+80,280,52,"►  START",()=>startLevel(lvIdx),"#fff","900 18px Verdana");
+  menuBtn(lc-140,PY+142,135,34,"⚔ GAUNTLET",()=>startGauntlet(),"#ff9d5e","900 12px Verdana");
+  menuBtn(lc+5,PY+142,135,34,"🏆 BOARD",()=>{state="board";lbMsg="";fetchBoard(true);},"#ffd75e","900 12px Verdana");
+
+  // ================= RIGHT: ARSENAL =================
+  const RX=496, RW=372;
+  panel(RX,PY,RW,PH,"YOUR ARSENAL","#9fe6ff");
+  const rc=RX+RW/2;
   const sp=specFor(loadoutType);
-  const multi=ownedGunTypes.length>0;                               // arrows only matter once you own something
-  g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
-  g.fillText(multi?("LOADOUT   "+loadoutPos()):"LOADOUT",W/2,338);
-  if(multi){                                                        // ◀ / ▶ so you can PICK a gun, not blind-cycle to it
-    menuBtn(W/2-150,346,30,30,"◀",()=>cycleLoadout(-1),"#e8e8ea","900 13px Verdana");
-    menuBtn(W/2-116,346,232,30,(sp.holo?"✦ ":"")+sp.name+(loadoutType==null?" (default)":""),()=>cycleLoadout(1),sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
-    menuBtn(W/2+120,346,30,30,"▶",()=>cycleLoadout(1),"#e8e8ea","900 13px Verdana");
+  const multi=ownedGunTypes.length>0;
+  if(multi){
+    menuBtn(RX+14,PY+30,30,30,"◀",()=>cycleLoadout(-1),"#e8e8ea","900 13px Verdana");
+    menuBtn(RX+48,PY+30,RW-96,30,(sp.holo?"✦ ":"")+sp.name,()=>cycleLoadout(1),sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
+    menuBtn(RX+RW-44,PY+30,30,30,"▶",()=>cycleLoadout(1),"#e8e8ea","900 13px Verdana");
   } else {
-    menuBtn(W/2-150,346,300,30,(sp.holo?"✦ ":"")+sp.name+(loadoutType==null?" (default)":""),()=>cycleLoadout(1),sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
+    menuBtn(RX+14,PY+30,RW-28,30,(sp.holo?"✦ ":"")+sp.name+(loadoutType==null?" (default)":""),()=>cycleLoadout(1),sp.holo?"#ffd75e":"#e8e8ea","900 12px Verdana");
   }
-  const noEth=MOBILE&&!window.ethereum&&!REOWN_ID;                 // with Reown, its modal handles phones — no raw deeplink needed
-  menuBtn(W/2-250,346,88,30,walletStatus&&!watchMode&&walletAddr?"CONNECTED":"CONNECT",noEth?openInWalletApp:connectWallet,"#7fd0ff");   // way 1 (or way 3 deep-link on phones without a wallet)
-  menuBtn(W/2+162,346,88,30,"GET GUNS",()=>{try{window.open("https://mint.wick.pics","_blank");}catch(e){}},"#ffd75e");
-  menuBtn(W/2-250,381,88,26,"⌖ ADDRESS",enterAddress,"#9fe6ff","bold 11px Verdana");                    // way 2: watch mode
-  menuBtn(W/2+162,381,88,26,"❓ GUIDE",()=>{state="guide";},"#7cf9a5","bold 11px Verdana");
-  if(ownedGunTypes.length||ownedModTypes.length)                                                        // the builder only matters once you own something
-    menuBtn(W/2-60,381,120,26,"🔧 GUNSMITH",()=>{state="gunsmith";},"#9fe6ff","bold 11px Verdana");
-  let statTxt=gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ +20% holo":"")+(ownedGunTypes.length?(MOBILE?"  ·  tap gun name in-game to swap":"  ·  Q swaps in-game"):"");
-  g.font="bold 10px Verdana";
-  if(g.measureText(statTxt).width>296){ g.font="bold 9px Verdana";                 // long holo lines must fit BETWEEN the ⌖/❓ side buttons
-    if(g.measureText(statTxt).width>300)statTxt=statTxt.replace(/ {2}· {2}(Q swaps in-game|tap gun name in-game to swap)/,""); }
-  g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
-  g.fillText(statTxt,W/2,398);
+  g.font="bold 10px Verdana"; g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
+  g.fillText(gunRole(sp)+" · "+sp.dmg+" dmg · "+sp.rps.toFixed(1)+"/s"+(sp.holo?" · ✦ holo":"")+(multi?"  ·  "+loadoutPos():""),rc,PY+78);
   if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
-    g.fillText("⊕ MODS: "+sp.mods.map(m=>MODDEFS[m].name).join(" + ")+"  ·  🔧 GUNSMITH to customize",W/2,409); }
-  g.font="bold 10px Verdana";
-  if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,418); }
-  else { g.fillStyle="#4a5566"; g.fillText("own gun NFTs?  press CONNECT to load them · ⌖ ADDRESS watch-only · ❓ GUIDE",W/2,418); }
-  // In Telegram/Instagram/X's built-in browser the wallet bridge usually can't come
-  // back to the page, and storage is its own sandbox — so a wallet you connected in
-  // Chrome simply isn't here. Holders were hitting this and thinking guns were broken.
-  if(INAPP&&!ownedGunTypes.length){
-    g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
-    g.fillText("IN-APP BROWSER — wallet connect often fails here.",W/2,434);
-    g.fillStyle="#9fe6ff";
-    g.fillText("Tap ⌖ ADDRESS and paste your wallet, or open this page in Chrome/Safari.",W/2,448);
-  }
-  // hero
-  drawHero(W/2-238,470,1.35,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});  // off-center: the bottom text column stays clear
+    g.fillText("⊕ "+sp.mods.map(m=>MODDEFS[m].name).join(" + "),rc,PY+93); }
+  if(ownedGunTypes.length||ownedModTypes.length)
+    menuBtn(rc-140,PY+102,280,32,"🔧 GUNSMITH — build your loadout",()=>{state="gunsmith";},"#9fe6ff","900 12px Verdana");
+  const noEth=MOBILE&&!window.ethereum&&!REOWN_ID;
+  menuBtn(RX+14,PY+142,168,34,walletStatus&&!watchMode&&walletAddr?"✓ CONNECTED":"⚡ CONNECT",noEth?openInWalletApp:connectWallet,"#7fd0ff","900 12px Verdana");
+  menuBtn(RX+RW-182,PY+142,168,34,"⌖ ADDRESS",enterAddress,"#9fe6ff","900 12px Verdana");
+  g.font="bold 9px Verdana";
+  if(INAPP&&!ownedGunTypes.length){ g.fillStyle="#ffd75e";
+    g.fillText("in-app browser: use ⌖ ADDRESS, or open in Chrome/Safari",rc,PY+192); }
+  else if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff";
+    g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?" · +1 ♥":""),rc,PY+192); }
+  else { g.fillStyle="#4a5566"; g.fillText("NFT guns & free mods load here — mint.wick.pics",rc,PY+192); }
+
+  // ================= bottom bar =================
+  const BY=H-96;
+  menuBtn(W/2-176,BY,110,28,"❓ GUIDE",()=>{state="guide";},"#7cf9a5","bold 11px Verdana");
+  menuBtn(W/2-58,BY,110,28,musicOn?"♪ MUSIC ON":"♪ MUSIC OFF",()=>{musicOn=!musicOn;try{localStorage.setItem("pw_music",musicOn?"1":"0");}catch(e){}},musicOn?"#7cf9a5":"#66707f","bold 11px Verdana");
+  if(MOBILE)menuBtn(W/2+60,BY,116,28,"⛶ FULLSCREEN",goFullscreen,"#9fe6ff","bold 11px Verdana");
+  else g.save();
+  if(MOBILE&&TILT_AVAIL)menuBtn(W/2+184,BY,100,28,tiltOn?"⟲ TILT ON":"⟲ TILT OFF",toggleTilt,tiltOn?"#7cf9a5":"#66707f","bold 11px Verdana");
+  if(!MOBILE){ g.font="bold 10px Verdana"; g.textAlign="center"; g.fillStyle="#5f6b7c";
+    g.fillText("A/D move · SPACE jump · CLICK fire · Q swap gun",W/2+230,BY+18); g.restore(); }
+
+  // ---- hero, bottom-left, clear of everything ----
+  drawHero(120,H-28,1.15,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   let done=false; try{ done=localStorage.getItem("pw_done")==="1"; }catch(e){}
-  if(done){ drawDog(W/2-168,470,-1,{}); g.font="bold 10px Verdana"; g.fillStyle="#e8b04a"; g.textAlign="center"; g.fillText("BISCUIT — SAFE ✓",W/2-166,434); }
-  g.font="bold 10px Verdana"; g.textAlign="center"; g.fillStyle="#3f4a5c";
-  g.fillText("UTILITY FOR $WICK ON PULSECHAIN  ·  NFT ARSENAL LIVE  ·  SIGNED WORLD LEADERBOARD",W/2,H-14);
+  if(done){ drawDog(190,H-28,-1,{}); g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#e8b04a"; g.fillText("BISCUIT ✓",192,H-96); }
+  g.font="bold 9px Verdana"; g.textAlign="center"; g.fillStyle="#3f4a5c";
+  g.fillText("UTILITY FOR $WICK ON PULSECHAIN · NFT ARSENAL + FREE MODS LIVE · SIGNED WORLD LEADERBOARD",W/2,H-10);
   const v=g.createRadialGradient(W/2,H/2,H*0.5,W/2,H/2,H*0.95);
   v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,"rgba(2,4,10,0.42)");
   g.fillStyle=v; g.fillRect(0,0,W,H);
