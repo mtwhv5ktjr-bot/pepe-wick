@@ -348,12 +348,41 @@ function gunRole(sp){
   if(sp.rps>=8)return "rapid pistol";
   return "semi-auto sidearm";
 }
-function specFor(type){
+/* ---- WICK MODS: free-mint attachments. Each maps to a REAL GUNDEFS field —
+   the same honesty rule as the gun cards. 2 slots; duplicates don't stack;
+   the two rarest distinct types you own are auto-equipped. ---- */
+const MODDEFS={
+  1:{name:"LASER SIGHT",   tag:"LASER",  apply:s=>{ s.spread*=0.35; }},
+  2:{name:"HOLLOW POINTS", tag:"HP+",    apply:s=>{ s.dmg=Math.round(s.dmg*1.15); }},
+  3:{name:"HAIR TRIGGER",  tag:"RPS+",   apply:s=>{ s.rps*=1.15; }},
+  4:{name:"LONG BARREL",   tag:"BARREL", apply:s=>{ s.spd*=1.3; s.dmg=Math.round(s.dmg*1.05); }},
+  5:{name:"AP ROUNDS",     tag:"AP",     apply:s=>{ s.pierce=(s.pierce||0)+1; }},
+  6:{name:"DRAGON'S BREATH",tag:"DRAGON",apply:s=>{ s.pellets=(s.pellets||1)+1; }},
+};
+let ownedModTypes=[];                                  // distinct types held, from verify/rpc
+function activeMods(){                                 // the 2 best distinct (6 = rarest)
+  return [...new Set(ownedModTypes)].filter(t=>MODDEFS[t]).sort((a,b)=>b-a).slice(0,2);
+}
+function baseSpecFor(type){
   if(type==null)return GUNDEFS[0];
   if(GUNDEFS[type])return GUNDEFS[type];
   if(type>10&&GUNDEFS[type-10]){ const b=GUNDEFS[type-10];
     return Object.assign({},b,{dmg:Math.round(b.dmg*1.2),holo:true,name:HOLO_NAMES[type]||b.name}); }
   return GUNDEFS[0];
+}
+/* specFor is called every frame from the HUD and fire paths — memoise the mod
+   composition so we build the object once per (gun, mods) combo, not per frame */
+let _specKey="", _specVal=null;
+function specFor(type){
+  const am=activeMods();
+  if(!am.length)return baseSpecFor(type);
+  const key=type+"|"+am.join(",");
+  if(key===_specKey)return _specVal;
+  const s=Object.assign({},baseSpecFor(type));
+  for(const t of am)MODDEFS[t].apply(s);
+  s.mods=am;                                           // HUD shows what's bolted on
+  _specKey=key; _specVal=s;
+  return s;
 }
 function drawGunInHand(type,kick,holo){
   g.save(); g.translate(-kick,0);
@@ -1524,6 +1553,7 @@ function drawDoor(x,gy,t,open){
 const NFT_VERIFY_URL="https://wick-arsenal.vercel.app/api/verify";
 const LB_URL="https://wick-arsenal.vercel.app/api/leaderboard";
 const GUNS_ADDR="0x188848DdB42fA8Ca2EB05649c944e05dfA2158FD";        // WickGuns — LIVE on PulseChain 2026-07-30
+const MODS_ADDR="0x0000000000000000000000000000000000000000";        // WickMods (free-mint attachments) — paste after LAUNCH-MODS.cmd
 const PULSE_RPC="https://rpc.pulsechain.com";
 /* Reown (WalletConnect) — projectId is a PUBLIC client identifier, safe to ship.
    Empty string = injected-wallet-only behavior (the pre-Reown flow). */
@@ -1587,11 +1617,12 @@ async function connectWallet(){
     // verifies. The old personal_sign here bought nothing and cost a second
     // wallet app-switch on phones — the exact moment most players gave up.
     walletStatus="loading your guns…";
-    let types=null;
+    let types=null, mods=[];
     try{ const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const d=await r.json();
-         if(r.ok&&d.ok)types=[...new Set((d.guns||[]).map(x=>x.type))]; }catch(e){}
-    if(types===null)types=await rpcGunsOf(addr);       // API down → straight to PulseChain
-    applyGuns(types, addr, false);                     // signed-capable: submitScore re-signs anyway
+         if(r.ok&&d.ok){ types=[...new Set((d.guns||[]).map(x=>x.type))];
+                         mods=[...new Set((d.mods||[]).map(x=>x.type))]; } }catch(e){}
+    if(types===null){ types=await rpcGunsOf(addr); mods=await rpcModsOf(addr); }  // API down → straight to PulseChain
+    applyGuns(types, addr, false, false, mods);        // signed-capable: submitScore re-signs anyway
   }catch(e){ walletAddr=null; watchMode=false;         // never leave a half-"connected" session behind
     walletStatus=(e&&(e.message||e.code))?("error: "+(e.shortMessage||e.message||e.code)):"connect cancelled"; }
   walletBusy=false;
@@ -1609,9 +1640,12 @@ function syncRotMsg(){
     if(b)b.style.display=""; if(s)s.style.display="";
   }
 }
-/* apply verified guns + remember them (24h cache) so returning players stay unlocked */
-function applyGuns(types, addr, watch, quiet){
+/* apply verified guns + remember them (24h cache) so returning players stay unlocked.
+   mods (attachments) ride along as an optional 5th arg — same trust path as the guns */
+function applyGuns(types, addr, watch, quiet, mods){
   types=Array.isArray(types)?types.filter(n=>typeof n==="number"&&isFinite(n)):[];   // poisoned cache can't half-apply
+  ownedModTypes=Array.isArray(mods)?mods.filter(n=>typeof n==="number"&&isFinite(n)&&MODDEFS[n]):[];
+  _specKey="";                                        // gun+mod spec memo is stale the moment the loadout universe changes
   ownedGunTypes=types; watchMode=!!watch;
   if(!watch)walletAddr=addr; else walletAddr=null;                    // watch mode can't sign scores
   let saved=null, sawPref=false;
@@ -1622,7 +1656,7 @@ function applyGuns(types, addr, watch, quiet){
   walletStatus=types.length
     ? (watch?"👁 watch: ":"✓ ")+types.length+" gun"+(types.length>1?"s":"")+" unlocked"+(watch?" — connect to submit scores":"")
     : (watch?"👁 watching — no WICK guns at that address":"✓ connected — no WICK guns in wallet");
-  try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,watch:!!watch,ts:Date.now()})); }catch(e){}
+  try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,mods:ownedModTypes,watch:!!watch,ts:Date.now()})); }catch(e){}
   syncRotMsg();
   nftGen++;                                             // invalidates any pending boot-time cache refresh (see restoreNft)
   if(types.length&&!quiet)SFX.unlock();                 // quiet = boot-time restore: no gesture yet, don't birth a suspended AudioContext
@@ -1641,11 +1675,13 @@ async function verifyWatch(addrRaw){
   try{
     const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const data=await r.json();
     if(r.ok&&data.ok){ const types=[...new Set((data.guns||[]).map(x=>x.type))];
-      applyGuns(types, addr, true); walletBusy=false; return {addr,types}; }
+      const mods=[...new Set((data.mods||[]).map(x=>x.type))];
+      applyGuns(types, addr, true, false, mods); walletBusy=false; return {addr,types}; }
     if(/not configured/.test((data&&data.error)||"")){ walletStatus="⏳ guns contract goes live at mint — watch mode will work then"; walletBusy=false; return null; }
     throw new Error((data&&data.error)||"api-down");
   }catch(e){
-    try{ const types=await rpcGunsOf(addr); applyGuns(types, addr, true); applied={addr,types}; }   // independent path: straight to PulseChain
+    try{ const types=await rpcGunsOf(addr); const mods=await rpcModsOf(addr);
+      applyGuns(types, addr, true, false, mods); applied={addr,types}; }   // independent path: straight to PulseChain
     catch(e2){ walletStatus=ownedGunTypes.length?"👁 watch (cached — refresh failed)":"lookup failed — try again or use CONNECT"; }
   }
   walletBusy=false;
@@ -1663,6 +1699,22 @@ async function rpcGunsOf(addr){
   if(!isFinite(tOff)||!isFinite(tLen)||tLen>500)throw new Error("bad abi");  // malformed result must FAIL, not silently revoke guns
   for(let i=0;i<tLen;i++){ const v=word(tOff+1+i); if(isFinite(v))types.push(v); }
   return [...new Set(types)];
+}
+/* same shape for the attachments — but mods are a bonus, so failures return []
+   instead of throwing: a mods hiccup must never block gun verification */
+async function rpcModsOf(addr){
+  try{
+    if(/^0x0{40}$/.test(MODS_ADDR))return [];
+    const data="0x8d56809a"+addr.slice(2).toLowerCase().padStart(64,"0");   // modsOfOwner(address)
+    const r=await fetchT(PULSE_RPC,{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:MODS_ADDR,data},"latest"]})});
+    const j=await r.json(); if(!j.result||j.result==="0x")return [];
+    const hex=j.result.slice(2), word=i=>parseInt(hex.slice(i*64,i*64+64),16);
+    const tOff=word(1)/32, tLen=word(tOff), types=[];
+    if(!isFinite(tOff)||!isFinite(tLen)||tLen>500)return [];
+    for(let i=0;i<tLen;i++){ const v=word(tOff+1+i); if(isFinite(v))types.push(v); }
+    return [...new Set(types)];
+  }catch(e){ return []; }
 }
 /* window.prompt() is blocked outright in Telegram/Instagram webviews and is miserable
    to paste into on a phone in landscape — so this is a real DOM sheet instead. */
@@ -1723,15 +1775,16 @@ function openInWalletApp(){ try{ window.open("https://metamask.app.link/dapp/"+l
 async function refreshGuns(addr, watch){
   if(!addr)return;
   const gen=nftGen;                                   // if another wallet lands during our awaits, stand down
-  let types=null;
+  let types=null, mods=null;
   try{ const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const d=await r.json();
-       if(r.ok&&d.ok)types=[...new Set((d.guns||[]).map(x=>x.type))]; }catch(e){}
-  if(types===null){ try{ types=await rpcGunsOf(addr); }catch(e){ return; } }   // BOTH lookups failed → keep the cache
+       if(r.ok&&d.ok){ types=[...new Set((d.guns||[]).map(x=>x.type))];
+                       mods=[...new Set((d.mods||[]).map(x=>x.type))]; } }catch(e){}
+  if(types===null){ try{ types=await rpcGunsOf(addr); mods=await rpcModsOf(addr); }catch(e){ return; } }   // BOTH lookups failed → keep the cache
   if(gen!==nftGen)return;                             // session changed mid-flight — this result is about the wrong wallet
   // types!==null here means a lookup SUCCEEDED — a verified zero applies (they
   // really sold everything); only failures above keep the cache alive
   const before=ownedGunTypes.join(",");
-  applyGuns(types, addr, watch, true);
+  applyGuns(types, addr, watch, true, mods||ownedModTypes);
   if(before!==types.join(",")&&types.some(t=>t>0))
     walletStatus="✨ GUNS REVEALED — "+specFor(loadoutType).name;   // the menu draws walletStatus; floats never render there
 }
@@ -1744,7 +1797,7 @@ async function refreshGuns(addr, watch){
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
   if(!c||!c.types||!c.types.length)return;
   const sealed=c.types.every(t=>!t);                                          // cache from before the reveal
-  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch, true); // quiet: no gesture yet — a chime here births a dead AudioContext
+  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch, true, c.mods); // quiet: no gesture yet — a chime here births a dead AudioContext
   const gen=nftGen;                                  // captured NOW — if any other wallet applies before the timer fires, gen goes stale
   setTimeout(()=>{ if(gen===nftGen)refreshGuns(c.addr, c.watch); }, sealed?300:2500);  // sealed caches refresh straight away
   }catch(e){} })();
@@ -3608,6 +3661,8 @@ function drawHUD(t){
     g.font="900 14px Verdana"; g.globalAlpha=0.6+0.35*Math.sin(t*3);
     g.fillText("◀",W-196,48); g.fillText("▶",W-24,48);
     g.restore(); g.textAlign="right";
+    if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
+      g.fillText(sp.mods.map(m=>"⊕"+MODDEFS[m].tag).join("  "),W-14,84); }   // bolted-on attachments, under the swap pill
   } else {
   g.textAlign="right";
   g.fillStyle=sp.holo?"hsl("+(performance.now()/12%360)+",90%,65%)":"#cfd6e0";
@@ -3615,6 +3670,8 @@ function drawHUD(t){
   if(ownedGunTypes.length){ g.font="bold 9px Verdana";
     g.fillStyle="rgba(160,175,200,0.55)";
     g.fillText("Q — swap",W-14,60); }
+  if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
+    g.fillText(sp.mods.map(m=>"⊕"+MODDEFS[m].tag).join("  "),W-14,74); }
   }
   if(combo>1){ g.font="900 22px Verdana"; g.textAlign="center";
     g.lineWidth=4; g.strokeStyle="rgba(0,0,0,0.75)"; g.strokeText(combo+"×",W/2,46);
@@ -3875,6 +3932,8 @@ function drawMenu(t){
     if(g.measureText(statTxt).width>300)statTxt=statTxt.replace(/ {2}· {2}(Q swaps in-game|tap gun name in-game to swap)/,""); }
   g.fillStyle=sp.holo?"#ffd75e":"#8fa3bf";
   g.fillText(statTxt,W/2,398);
+  if(sp.mods&&sp.mods.length){ g.font="900 9px Verdana"; g.fillStyle="#9fe6ff";
+    g.fillText("⊕ MODS: "+sp.mods.map(m=>MODDEFS[m].name).join(" + ")+"  (auto-equipped, 2 slots)",W/2,409); }
   g.font="bold 10px Verdana";
   if(walletStatus){ g.fillStyle=watchMode?"#9fe6ff":"#7fd0ff"; g.fillText(walletStatus+(ownedGunTypes.length&&!watchMode?"  ·  HOLDER PERK: +1 ♥":""),W/2,418); }
   else { g.fillStyle="#4a5566"; g.fillText("own gun NFTs?  press CONNECT to load them · ⌖ ADDRESS watch-only · ❓ GUIDE",W/2,418); }
@@ -3986,7 +4045,9 @@ function drawGuide(){
   line(R2,z,"tap gun name — swap · menu: TILT & ⛶ FULLSCREEN"); z+=lh+8;
   head(R2,z,"❤ HOLDER PERKS"); z+=lh;
   line(R2,z,"Any gun: real firepower · CONNECTED holders: 4th ♥"); z+=lh;
-  line(R2,z,"Holo 1/1 (6 exist): +20% damage, rainbow gun"); z+=lh+8;
+  line(R2,z,"Holo 1/1 (6 exist): +20% damage, rainbow gun"); z+=lh;
+  line(R2,z,"⊕ WICK MODS (free mint): attachments bolt onto"); z+=lh;
+  line(R2,z,"your gun — 2 slots, best two auto-equip"); z+=lh+8;
   head(R2,z,"🏆 LEADERBOARD"); z+=lh;
   line(R2,z,"Scores are signed by your wallet — connect via"); z+=lh;
   line(R2,z,"CONNECT, then SUBMIT on the ending/gauntlet screen."); z+=lh;
@@ -4089,7 +4150,7 @@ window.PW=!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?undefined:{
   key(k,down){ if(down)keys.add(k); else keys.delete(k); },
   jump(){ if(P){P.jbuf=0.16;P.jumpHeld=true;setTimeout(()=>{if(P)P.jumpHeld=false;},260);} },
   fire(){ fireGun(); }, hold(v){ firing=!!v; },
-  setLoadout(types,tp){ ownedGunTypes=types||[]; loadoutType=tp!=null?tp:(types&&types[0]); walletAddr="0xTEST"; walletStatus="✓ test"; },
+  setLoadout(types,tp,mods){ ownedGunTypes=types||[]; ownedModTypes=mods||[]; _specKey=""; loadoutType=tp!=null?tp:(types&&types[0]); walletAddr="0xTEST"; walletStatus="✓ test"; },
   pump(sec){ for(let i=0,n=Math.round(sec*60);i<n;i++)update(1/60); render(); },
   shot:async()=>{ await fetch("/shot",{method:"POST",body:cv.toDataURL()}); return "ok"; }
 };
