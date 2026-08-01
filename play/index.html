@@ -377,22 +377,107 @@ const MODDEFS={
   5:{name:"AP ROUNDS",     tag:"AP",     apply:s=>{ s.pierce=(s.pierce||0)+1; }},
   6:{name:"DRAGON'S BREATH",tag:"DRAGON",apply:s=>{ s.pellets=(s.pellets||1)+1; }},
 };
-let ownedModTypes=[];                                  // distinct types held, from verify/rpc
+let ownedModTypes=[];                                  // every mod token held, WITH repeats — 2 lasers = two entries
 const MOD_SLOTS=3;
+const CARRY_MAX=2;                                     // you walk in with two weapons. That's the whole rule.
 let modCfg={};                                         // gunType -> [modTypes] chosen in the GUNSMITH
+let carry=[];                                          // the <=2 gun types you take in (null = the free SIDEARM)
 let gsSel=0;                                           // gunsmith: which slot the picker fills next
+let gsGun;                                             // gunsmith: the gun on the bench (browses ALL owned, not just the carried two)
+let gsToast="", gsToastT=0;                            // "⇄ HP+ moved off BOOGEYMAN P30" — a steal must be visible
 try{ const c=JSON.parse(localStorage.getItem("pw_modcfg")||"{}"); if(c&&typeof c==="object"&&!Array.isArray(c))modCfg=c; }catch(e){}
-function saveModCfg(){ try{ localStorage.setItem("pw_modcfg",JSON.stringify(modCfg)); }catch(e){} }
+try{ const c=JSON.parse(localStorage.getItem("pw_carry")||"null"); if(Array.isArray(c))carry=c.slice(0,CARRY_MAX); }catch(e){}
+/* Anything that can change what's equipped bumps this; the allocator and the
+   per-frame spec memo both key off it, so neither recomputes on a quiet frame. */
+let _modGen=0;
+function bumpMods(){ _modGen++; _specKey=""; }
+function saveModCfg(){ try{ localStorage.setItem("pw_modcfg",JSON.stringify(modCfg)); }catch(e){} bumpMods(); }
+function saveCarry(){ try{ localStorage.setItem("pw_carry",JSON.stringify(carry)); }catch(e){} bumpMods(); }
+
+/* ---- what you're carrying: at most CARRY_MAX distinct, all actually owned ----
+   Defaults to your two rarest guns; one gun means gun + sidearm; no guns means
+   just the sidearm. Q / the swap pill only ever walk this list. */
+function carrySet(){
+  const legal=t=>t==null||ownedGunTypes.includes(t);
+  let c=carry.filter((t,i)=>legal(t)&&carry.indexOf(t)===i).slice(0,CARRY_MAX);
+  if(!c.length){
+    const best=[...ownedGunTypes].sort((a,b)=>b-a);    // holo (>10) first, same rarity order the mods use
+    c=best.slice(0,CARRY_MAX);
+    if(!c.length)c=[null];
+  }
+  if(c.length<CARRY_MAX)                               // top up with the best thing not already slung
+    for(const t of [null,...[...ownedGunTypes].sort((a,b)=>b-a)])
+      if(!c.includes(t)){ c.push(t); break; }
+  return c;
+}
+function setCarry(list){
+  // over capacity keeps the NEWEST — "take this one too" must push the oldest
+  // out, not silently do nothing
+  carry=list.filter((t,i)=>list.indexOf(t)===i).slice(-CARRY_MAX);
+  saveCarry();
+  if(!carrySet().includes(loadoutType))loadoutType=carrySet()[0];   // never leave a dropped gun equipped
+}
+function modCounts(){ const m={}; for(const t of ownedModTypes) if(MODDEFS[t]) m[t]=(m[t]||0)+1; return m; }
+
+/* ---- mod allocation: a mod token is a physical object ----
+   It bolts to ONE gun, and no gun takes the same type twice. Explicit GUNSMITH
+   builds are honoured first (stable key order so it never flip-flops); whatever
+   is left auto-fits the guns you're actually carrying, rarest first. Guns you
+   aren't taking in get nothing by default — they can't spend what they can't use. */
+let _allocGen=-1, _allocVal=null;
+function modAlloc(){
+  if(_allocGen===_modGen&&_allocVal)return _allocVal;
+  const pool=modCounts(), out={};
+  const take=t=>{ if((pool[t]||0)>0){ pool[t]--; return true; } return false; };
+  const fill=(want,auto)=>{
+    const got=[];
+    const src=want||Object.keys(pool).map(Number).sort((a,b)=>b-a);
+    for(const t of src){
+      if(got.length>=MOD_SLOTS)break;
+      if(!MODDEFS[t]||got.includes(t))continue;        // same mod can't go on the same gun twice
+      if(take(t))got.push(t);                          // ...and only if a copy is still unbolted
+    }
+    return got;
+  };
+  /* Carried guns claim first. Returning players can have builds saved on every
+     gun they own from before mods were exclusive; without this, an uncarried
+     gun could win the pool and the gun actually in your hands walks in naked. */
+  const cs=carrySet().filter(t=>t!=null).map(String);
+  const rest=Object.keys(modCfg).filter(k=>k!=="d"&&!cs.includes(k)).sort();
+  for(const k of [...cs,...rest]){
+    if(!Array.isArray(modCfg[k]))continue;
+    if(!ownedGunTypes.includes(+k))continue;           // a build for a gun that left the wallet must not eat mods
+    out[k]=fill(modCfg[k]);
+  }
+  for(const gt of carrySet()){
+    if(gt==null||Array.isArray(modCfg[gt]))continue;
+    out[gt]=fill(null,true);
+  }
+  _allocGen=_modGen; _allocVal=out;
+  return out;
+}
+function modsFree(type){                               // copies of `type` not bolted to anything
+  const pool=modCounts(), a=modAlloc();
+  for(const k in a)for(const t of a[k])if(t===type)pool[t]=(pool[t]||0)-1;
+  return Math.max(0,pool[type]||0);
+}
+/* Every copy of `type` is bolted to some other gun — unbolt one so the bench can
+   have it, and say which gun lost it. Beats greying the chip out and leaving the
+   player to work out which of their guns is hoarding it. */
+function stealMod(type,exceptKey){
+  const a=modAlloc();
+  for(const k of Object.keys(a)){
+    if(String(k)===String(exceptKey)||!a[k].includes(type))continue;
+    modCfg[k]=a[k].filter(x=>x!==type);                // an auto gun becomes an explicit build minus that mod
+    saveModCfg();
+    return baseSpecFor(+k).name;
+  }
+  return null;
+}
 function activeModsFor(gunType){
   if(dailyRun)return dailyInfo().mods.filter(x=>MODDEFS[x]);   // the loadout-of-the-day, owned or not
   if(gunType==null)return [];                          // the free SIDEARM stays factory — attachments are NFT-gun utility
-  const ownedSet=[...new Set(ownedModTypes)].filter(t=>MODDEFS[t]);
-  const sel=modCfg[gunType];
-  if(Array.isArray(sel)){                              // a GUNSMITH build — honour it, but only mods still owned
-    const out=[...new Set(sel)].filter(t=>ownedSet.includes(t)).slice(0,MOD_SLOTS);
-    return out;                                        // an explicit empty build means NAKED gun, on purpose
-  }
-  return ownedSet.sort((a,b)=>b-a).slice(0,MOD_SLOTS); // default: the 3 rarest auto-equip
+  return modAlloc()[gunType]||[];
 }
 function activeMods(){ return activeModsFor(loadoutType); }
 function baseSpecFor(type){
@@ -704,6 +789,39 @@ function heroPick(pose,firing,gunType){
   for(const b of order){ if(heroImg[b])return {sh:heroImg[b],base:b,gunless:false}; }
   const any=heroImg.walk||heroImg.idle; return any?{sh:any,base:"walk",gunless:false}:null;
 }
+/* ---- where the barrel ACTUALLY ends, in world px ----
+   The shooter and the renderer used to guess this separately: bullets, tracers,
+   laser and embers all left from a hardcoded (24|34 forward, 27 up), while the
+   grip sheets place the gun through the hand anchor + gscale rig. On every
+   pistol/rifle grip sheet that guess lands a few px BELOW the barrel, which is
+   what you see as hollow-point tracers streaming out under the gun. So derive
+   it from the same transform the gun is drawn with, and let everything read it.
+   GUNDEFS already carries the barrel centreline as `line` — it was just unused. */
+function heroMuzzle(x,y,s,o){
+  o=o||{};
+  const face=o.face||1, firing=(o.muzzle||0)>0;
+  const gt=o.gunType||0, bt=gt>10?gt-10:gt, G=GUNDEFS[bt]||GUNDEFS[0];
+  const pick=heroReady()?heroPick(o.pose||"idle",firing,gt):null;
+  if(!pick)return {x:x+face*(G.tip-1)*1.15, y:y-34.6*1.15};      // vector hero — its own rig, already correct
+  const sh=pick.sh, ss=s/1.15;
+  if(!pick.gunless)                                              // gun baked into the sheet — no rig to read, keep the tuned offset
+    return {x:x+face*((gunCls(gt)==="rifle"?34:24)+HERO_MUZ.x)*ss, y:y-(27+HERO_MUZ.y)*ss};
+  const fw=sh.c.width/sh.n, pose=o.pose||"idle";
+  const f=pose==="idle" ? 0
+        : (pose==="run"&&o.dist!=null) ? Math.floor(o.dist/STRIDE_PX)%sh.n
+        : Math.floor((o.t||0)*sh.fps)%sh.n;
+  const fb=(sh.fr&&sh.fr[f])||{top:sh.top,bot:sh.bot};
+  const sc=(HERO_TARGET_H*s*HEROSCALE)/sh.ch;
+  const flip=((face>0)!==!!sh.dirR)?-1:1;                         // same mirror the sprite gets
+  const ha=HERO_HAND[pick.base]||HERO_HAND.shoot, gs=s*(ha.gscale||0.62)/1.15;
+  const gripX=G.grip||15.6, fwdAdj=gunCls(gt)==="rifle"?1:5;
+  const an=sh.hand&&sh.hand[f];
+  const ax=an?(an.hx-fw/2)*sc:ha.x*s/1.15, ay=an?(an.hy-fb.bot)*sc:-(ha.y*s/1.15);
+  const r=ha.rot||0, cs=Math.cos(r), sn=Math.sin(r);
+  const px=(G.tip-gripX+fwdAdj)*gs, py=(G.line+18.2)*gs;          // gun-local muzzle, through translate(-grip+adj, 18.2)
+  return { x:x+flip*(ax+px*cs-py*sn)+face*HERO_MUZ.x*ss,
+           y:y+HERO_FOOT+(ay+px*sn+py*cs)+HERO_MUZ.y*ss };
+}
 function drawHeroSprite(x,y,s,o){
   o=o||{}; const firing=(o.muzzle||0)>0, face=(o.face||1), pick=heroPick(o.pose||"idle",firing,o.gunType); if(!pick)return false;
   const sh=pick.sh, src=sh.c, fw=src.width/sh.n, fh=src.height;
@@ -735,12 +853,20 @@ function drawHeroSprite(x,y,s,o){
     g.drawImage(src, f*fw+2,0,sw2,fh, -sw2*sc*0.5, -(fb.bot*sc), sw2*sc,dh); }
   g.restore();
   // muzzle flash overlay so firing reads even when a sheet has no baked flash (offset scales with sprite size)
-  if(firing){ const ss=s/1.15, cls=gunCls(o.gunType||0), fwd=(cls==="rifle"?34:24)+HERO_MUZ.x;
-    g.save(); g.globalCompositeOperation="lighter"; const mx=x+face*fwd*ss, my=y-(27+HERO_MUZ.y)*ss;
-    softGlow(mx,my,9*s,"255,222,150",0.7); g.fillStyle="rgba(255,244,205,0.9)"; g.beginPath(); g.arc(mx,my,2.2*s,0,TAU); g.fill(); g.restore(); }
+  if(firing){ const m=heroMuzzle(x,y,s,o);            // same origin the bullets use — flash can't drift off the barrel
+    g.save(); g.globalCompositeOperation="lighter";
+    softGlow(m.x,m.y,9*s,"255,222,150",0.7); g.fillStyle="rgba(255,244,205,0.9)"; g.beginPath(); g.arc(m.x,m.y,2.2*s,0,TAU); g.fill(); g.restore(); }
   return true;
 }
 function drawHero(x,y,s,o){ if(!(heroReady()&&drawHeroSprite(x,y,s,o)))drawPepe(x,y,s,o); } // sprite when possible, vector fallback (even mid-load)
+/* the player's render options — built once so the shooter and the renderer can
+   never disagree about which frame (and therefore which muzzle) is on screen */
+function heroOpts(t){
+  t=(t==null)?performance.now()/1000:t;
+  return {t,face:P.face,pose:P.grounded?(Math.abs(P.vx)>40?"run":"idle"):"jump",
+    gunType:loadoutType||0,holo:loadoutType>10,muzzle:P.muzzle>0?0.55:0,
+    phase:t*11,squash:P.squash||0,dist:P.stride||0};
+}
 function drawPepe(x,y,s,o){
   o=o||{}; const t=o.t||0, pose=o.pose||"idle", face=o.face||1;
   const run=pose==="run", jump=pose==="jump", shoot=o.gun!==false;
@@ -1647,6 +1773,23 @@ function drawDoor(x,gy,t,open){
 /* ---------- NFT wallet + leaderboard ---------- */
 const NFT_VERIFY_URL="https://wick-arsenal.vercel.app/api/verify";
 const LB_URL="https://wick-arsenal.vercel.app/api/leaderboard";
+/* ---- traffic counter ----
+   Both mirrors (games.wick.pics on Pages, and the Vercel copy) call this same
+   origin, so it's the only place that sees all the traffic. One "load" per
+   browser session, one "play" per level start. Fire-and-forget: a failure here
+   must never be visible in the game. No id, no cookie, nothing about who. */
+const HIT_URL="https://wick-arsenal.vercel.app/api/hit";
+function pwHit(k){
+  try{
+    if(k==="load"){                                     // once per session, not per menu visit
+      if(sessionStorage.getItem("pw_hit"))return;
+      sessionStorage.setItem("pw_hit","1");
+    }
+    const body=JSON.stringify({k});
+    if(navigator.sendBeacon)navigator.sendBeacon(HIT_URL,new Blob([body],{type:"application/json"}));
+    else fetch(HIT_URL,{method:"POST",headers:{"content-type":"application/json"},body,keepalive:true}).catch(()=>{});
+  }catch(e){}
+}
 const GUNS_ADDR="0x188848DdB42fA8Ca2EB05649c944e05dfA2158FD";        // WickGuns — LIVE on PulseChain 2026-07-30
 const MODS_ADDR="0x004E6610ff47c6A6510DA446257822B37D26CD73";        // WickMods (free-mint attachments) — paste after LAUNCH-MODS.cmd
 const PULSE_RPC="https://rpc.pulsechain.com";
@@ -1708,6 +1851,7 @@ async function fetchTicker(){
   tickerBusy=false;
 }
 function drawTicker(t){
+  pwHit("load");                                        // self-guarded: once per browser session
   fetchPaidAds();                                       // piggyback: both are 5-min-throttled menu fetches
   if(!tickerTxt){ fetchTicker(); return; }
   fetchTicker();                                        // refresh check is self-throttled
@@ -1788,14 +1932,15 @@ function syncRotMsg(){
 function applyGuns(types, addr, watch, quiet, mods){
   types=Array.isArray(types)?types.filter(n=>typeof n==="number"&&isFinite(n)):[];   // poisoned cache can't half-apply
   ownedModTypes=Array.isArray(mods)?mods.filter(n=>typeof n==="number"&&isFinite(n)&&MODDEFS[n]):[];
-  _specKey="";                                        // gun+mod spec memo is stale the moment the loadout universe changes
   ownedGunTypes=types; watchMode=!!watch;
+  bumpMods();                                         // spec memo AND the mod allocation are stale the moment the loadout universe changes
   if(!watch)walletAddr=addr; else walletAddr=null;                    // watch mode can't sign scores
   let saved=null, sawPref=false;
   try{ const s=localStorage.getItem("pw_loadout");
        if(s==="d"){ saved=null; sawPref=true; }                      // an explicit choice of the default sidearm
        else if(s!==null&&s!==""&&!isNaN(+s)){ saved=+s; sawPref=true; } }catch(e){}
   loadoutType=(sawPref&&(saved==null||types.includes(saved)))?saved:(types[0]!=null?types[0]:null);
+  if(!carrySet().includes(loadoutType))loadoutType=carrySet()[0];     // a gun that left the wallet can't stay slung
   walletStatus=types.length
     ? (watch?"👁 watch: ":"✓ ")+types.length+" gun"+(types.length>1?"s":"")+" unlocked"+(watch?" — connect to submit scores":"")
     : (watch?"👁 watching — no WICK guns at that address":"✓ connected — no WICK guns in wallet");
@@ -1944,9 +2089,11 @@ async function refreshGuns(addr, watch){
   const gen=nftGen;                                  // captured NOW — if any other wallet applies before the timer fires, gen goes stale
   setTimeout(()=>{ if(gen===nftGen)refreshGuns(c.addr, c.watch); }, sealed?300:2500);  // sealed caches refresh straight away
   }catch(e){} })();
-function loadoutOpts(){ return [null,...ownedGunTypes]; }              // default sidearm + every gun you own
+function loadoutOpts(){ return carrySet(); }                           // ONLY what you're carrying — two weapons, not the whole safe
 function cycleLoadout(dir){
+  if(dailyRun)return;                                                 // the daily hands you a fixed loadout; swapping would break its one-attempt fairness
   const opts=loadoutOpts(), n=opts.length;
+  if(n<2)return;                                                      // nothing to swap to
   let i=opts.indexOf(loadoutType); if(i<0)i=0;
   i=((i+(dir===-1?-1:1))%n+n)%n;                                      // wraps both ways
   loadoutType=opts[i]; try{ localStorage.setItem("pw_loadout",loadoutType==null?"d":String(loadoutType)); }catch(e){}   // "d" = the player CHOSE the default sidearm; "" would read as no-preference
@@ -2286,6 +2433,7 @@ function newPlayer(x){
 const HPMAP={goon:28,heavy:90,blade:20,shield:60,marksman:22,bomber:26,hound:14,zero:200,butcher:440};
 function mkEnemy(e){ const t=e.t,x=e.x,y=e.y||GY; return {t,x,y,hp:HPMAP[t]||28,maxhp:HPMAP[t]||28,face:e.face||-1,dead:false,cd:rand(0.8,1.6),tel:0,muzzle:0,walk:Math.random()*7,px:x,dir:-1,patrol:(y&&y!==GY)?34:70,fuse:0,block:0,phase:1,summoned:0}; }
 function startLevel(i,keepDeaths){
+  pwHit("play");                     // a level actually started — the only honest "played" signal
   releaseAllInput(); paused=false;   // a fresh level starts from rest — held keys/touches must not carry across the transition
   newBestShown=false; runPrevBest=(best["l"+i]&&best["l"+i].score)||0;   // the mark this run has to beat
   dailyRun=false;
@@ -2628,10 +2776,10 @@ function fireGun(){
   P.cool=1/sp.rps; P.muzzle=0.06; tutFired=true;
   SFX.shot(sp);
   const bt=(loadoutType>10?loadoutType-10:loadoutType)||0;
-  // muzzle origin: sprite gun tip when the raster hero is active (class-aware reach), else the vector gun tip
-  const sprFwd = gunCls(loadoutType||0)==="rifle" ? 34 : 24;
-  const tipx = heroReady()? P.x+P.face*(sprFwd+HERO_MUZ.x) : P.x+P.face*(GUNDEFS[bt].tip-1)*1.15;
-  const tipy = heroReady()? P.y-(27+HERO_MUZ.y) : P.y-34.6*1.15;
+  // muzzle origin: read straight off the render rig, so every mod effect below
+  // leaves the barrel instead of floating under it
+  const muz=heroMuzzle(P.x,P.y,1.15,heroOpts());
+  const tipx=muz.x, tipy=muz.y;
   if(!MOBILE)shells.push({x:P.x+P.face*8,y:tipy+3,vx:-P.face*rand(60,130),vy:rand(-200,-130),rot:rand(0,6),vrot:rand(-14,14),t:rand(0.8,1.2)}); // casings are desktop garnish — auto-fire phones skip them
   const n=sp.pellets||1;
   // every attachment reads on screen, not just in the stat sheet:
@@ -3119,7 +3267,7 @@ addEventListener("keydown",e=>{ if(e.repeat)return;
     if(e.code==="KeyW"||e.code==="ArrowUp"||e.code==="Space"){ e.preventDefault(); P.jbuf=0.16; P.jumpHeld=true; }
     if(e.code==="KeyS"||e.code==="ArrowDown")P.dropT=0.24;
     if(e.code==="KeyJ"||e.code==="KeyX"){ keyFiring=true; fireGun(); } // optional keyboard fire; primary is mouse
-    if(e.code==="KeyQ"&&ownedGunTypes.length){ cycleLoadout();       // swap NFT guns mid-fight
+    if(e.code==="KeyQ"&&carrySet().length>1){ cycleLoadout();        // swap between the TWO you brought
       floats.push({x:P.x,y:P.y-56,txt:"⇄ "+specFor(loadoutType).name,t:1,size:12,c:"#ffd75e"}); }
   }
   else if(state==="menu"&&e.code==="Enter"&&launched())startLevel(lvIdx);
@@ -3182,7 +3330,7 @@ cv.addEventListener("pointerdown",e=>{ audio(); const p=ptr(e); mouse.x=p.x; mou
     if(paused){ for(const b of BTNS){ if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h){ b.fn(); break; } } return; }   // pause overlay owns taps
     if(MOBILE){
       if(p.x>=W/2-26&&p.x<=W/2+26&&p.y<34){ paused=true; releaseAllInput(); SFX.coin(1); return; }   // ⏸ tap target, top-center
-      if(p.x>W-210&&p.y<78&&ownedGunTypes.length){ cycleLoadout();   // the swap BUTTON top-right (zone matches the drawn 192×50 pill + slack)
+      if(p.x>W-210&&p.y<78&&carrySet().length>1){ cycleLoadout();    // the swap BUTTON top-right (zone matches the drawn 192×50 pill + slack)
         floats.push({x:P.x,y:P.y-56,txt:"⇄ "+specFor(loadoutType).name,t:1,size:12,c:"#ffd75e"}); return; }
       if(!tiltOn && p.x<W*0.44 && movePid===null){                    // left zone: plant the virtual stick
         activePtr[e.pointerId]={kind:"move",ax:p.x,ay:p.y,dx:0}; movePid=e.pointerId; return; }
@@ -3386,6 +3534,19 @@ function fetchPaidAds(){
     } else { paidAds=null; paidExclusive=false; }
   }).catch(()=>{}).finally(()=>{ paidAdsBusy=false; });
 }
+/* Fit advertiser copy inside the sign: shrink to fit, then ellipsise if even the
+   floor won't go. The board is a fixed 248*s wide, but name/tag/url are bought
+   at up to 20/28/32 chars — at the maxima they used to run straight off the
+   panel and across the sky. Someone paying 1,000,000 PLS gets text on the sign. */
+function fitText(str,maxW,weight,basePx,minPx){
+  let px=Math.max(1,basePx|0);
+  g.font=weight+" "+px+"px Verdana";
+  while(px>minPx&&g.measureText(str).width>maxW){ px--; g.font=weight+" "+px+"px Verdana"; }
+  if(g.measureText(str).width<=maxW)return str;
+  let out=String(str);
+  while(out.length>1&&g.measureText(out+"…").width>maxW)out=out.slice(0,-1);
+  return out+"…";
+}
 function drawBillboard(x,cy,ad,t,scl){
   const s=scl||1, w=248*s, h=66*s, fl=0.8+0.2*Math.sin(t*5.5+x*0.7);
   const seg=(Math.sin(t*3.1+x)*0.5+0.5)>0.94?0.35:1; // occasional tube-segment dropout (real neon flicker)
@@ -3439,10 +3600,13 @@ function drawBillboard(x,cy,ad,t,scl){
   if(!(coverLogo&&!ad.paid)) drawPepeHead(L+3*s, T+2*s, s*0.92);
   // text: url (marquee headline) + tagline
   g.save(); g.globalAlpha=fl; g.textAlign="left";
-  g.textBaseline="alphabetic"; g.font="900 "+(17*s|0)+"px Verdana"; g.fillStyle=ad.col;
+  // right of this the logo slot (or the standing Pepe) lives — copy stops short of it
+  const tx=L+54*s, availW=w-124*s;
+  g.textBaseline="alphabetic"; g.fillStyle=ad.col;
   if(!MOBILE){ g.shadowColor=ad.col; g.shadowBlur=8*s; }               // text shadowBlur is a phone-GPU killer
-  g.fillText(ad.url,L+54*s,cy-2*s); g.shadowBlur=0;
-  g.font="bold "+(9.5*s|0)+"px Verdana"; g.fillStyle="rgba(220,228,240,0.72)"; g.fillText(ad.tag,L+54*s,cy+13*s);
+  g.fillText(fitText(ad.url,availW,"900",17*s,9*s),tx,cy-2*s); g.shadowBlur=0;
+  g.fillStyle="rgba(220,228,240,0.72)";
+  g.fillText(fitText(ad.tag,availW,"bold",9.5*s,6*s),tx,cy+13*s);
   g.restore();
   g.textBaseline="alphabetic"; g.textAlign="left";
   // the advertiser's 16x16 on-chain sprite stands where Pepe would — or Pepe does
@@ -3461,8 +3625,8 @@ function drawBillboard(x,cy,ad,t,scl){
   }
   // the paid link line, under the tagline
   if(ad.paid&&ad.site){ g.save(); g.globalAlpha=fl*0.85; g.textAlign="left";
-    g.font="bold "+(8*s|0)+"px Verdana"; g.fillStyle="rgba(159,230,255,0.85)";
-    g.fillText("▸ "+ad.site,L+54*s,cy+24*s); g.restore(); }
+    g.fillStyle="rgba(159,230,255,0.85)";
+    g.fillText(fitText("▸ "+ad.site,w-124*s,"bold",8*s,5*s),L+54*s,cy+24*s); g.restore(); }
 }
 function menuBackdrop(t){
   const sky=g.createLinearGradient(0,0,0,H);
@@ -3877,7 +4041,7 @@ function render(){
     g.restore(); }
   // LASER SIGHT: an actual aim beam from the muzzle — the attachment you can SEE before you fire
   if(!P.dead&&activeMods().includes(1)){
-    const lx=P.x+P.face*(gunCls(loadoutType||0)==="rifle"?34:24), ly=P.y-27;
+    const lm=heroMuzzle(P.x,P.y,1.15,heroOpts(t)); const lx=lm.x, ly=lm.y;   // beam leaves the barrel, not the belt
     g.save(); g.globalCompositeOperation="lighter";
     g.globalAlpha=0.32+0.1*Math.sin(performance.now()/60);
     const lg=g.createLinearGradient(lx,ly,lx+P.face*340,ly);
@@ -3896,8 +4060,7 @@ function render(){
     g.restore();
   }
   if(!P.dead&&!(P.ifr>0&&Math.floor(performance.now()/80)%2===0)){
-    const hopts={t,face:P.face,pose:P.grounded?(Math.abs(P.vx)>40?"run":"idle"):"jump",
-      gunType:loadoutType||0,holo:loadoutType>10,muzzle:P.muzzle>0?0.55:0,phase:t*11,squash:P.squash||0,dist:P.stride||0};
+    const hopts=heroOpts(t);
     drawGhost();
     drawHero(P.x,P.y,1.15,hopts);
     if(loadoutType===16){                                   // the Reaper announces itself above the wearer
@@ -4449,25 +4612,55 @@ function drawGunsmith(t){
   g.textAlign="center";
   g.font="900 26px Verdana"; g.fillStyle="#7cf9a5"; g.fillText("🔧 GUNSMITH",W/2,44);
   g.font="bold 10px Verdana"; g.fillStyle="#66707f";
-  g.fillText("3 slots per gun · builds save per gun · duplicates don't stack",W/2,62);
+  g.fillText("carry 2 guns · 3 slots each · a mod fits ONE gun, once",W/2,62);
 
-  const key=loadoutType==null?"d":loadoutType;
+  // the bench browses EVERY gun you own — the carried two are just a selection of it
+  const gsOpts=[null,...ownedGunTypes];
+  if(gsGun===undefined||!gsOpts.includes(gsGun))gsGun=gsOpts.includes(loadoutType)?loadoutType:gsOpts[0];
+  const gsStep=d=>{ const n=gsOpts.length; let i=gsOpts.indexOf(gsGun); if(i<0)i=0;
+    gsGun=gsOpts[((i+d)%n+n)%n]; gsSel=0; SFX.coin(3); };
+
+  const key=gsGun==null?"d":gsGun;
   const owned=[...new Set(ownedModTypes)].filter(x=>MODDEFS[x]);
   const custom=Array.isArray(modCfg[key]);
-  const sel=custom?[...modCfg[key]].slice(0,MOD_SLOTS):activeModsFor(loadoutType).slice();
+  const sel=(modAlloc()[gsGun]||[]).slice();          // what is ACTUALLY bolted on, after the one-gun-per-mod clamp
   while(sel.length<MOD_SLOTS)sel.push(null);
 
-  // ---- the gun: big hero render + cycle (shares the menu's loadout picker state) ----
-  const sp=specFor(loadoutType), base=baseSpecFor(loadoutType);
-  menuBtn(60,86,30,30,"◀",()=>cycleLoadout(-1),"#e8e8ea","900 13px Verdana");
+  // ---- the gun: big hero render + browse ----
+  const sp=specFor(gsGun), base=baseSpecFor(gsGun);
+  menuBtn(60,86,30,30,"◀",()=>gsStep(-1),"#e8e8ea","900 13px Verdana");
   g.font="900 14px Verdana"; g.fillStyle=sp.holo?"#ffd75e":"#e8f0ff";
-  g.fillText((sp.holo?"✦ ":"")+baseSpecFor(loadoutType).name,250,106);
-  menuBtn(410,86,30,30,"▶",()=>cycleLoadout(1),"#e8e8ea","900 13px Verdana");
-  drawHero(250,388,2.0,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*3)>0.75)?0.4:0});
-  if(sel.includes(1)){ // laser preview on the big render
+  g.fillText((sp.holo?"✦ ":"")+baseSpecFor(gsGun).name,250,106);
+  menuBtn(410,86,30,30,"▶",()=>gsStep(1),"#e8e8ea","900 13px Verdana");
+  g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
+  g.fillText((gsOpts.indexOf(gsGun)+1)+" / "+gsOpts.length+"  ·  your armoury",250,120);
+  const hOpts={t,face:1,pose:"idle",gunType:gsGun||0,holo:gsGun>10,muzzle:(Math.sin(t*3)>0.75)?0.4:0};
+  drawHero(250,388,2.0,hOpts);
+  if(sel.includes(1)){ // laser preview — off the real barrel, same rig the game uses
+    const m=heroMuzzle(250,388,2.0,hOpts);
     g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.4+0.12*Math.sin(t*9);
-    const lg2=g.createLinearGradient(315,334,660,334); lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
-    g.strokeStyle=lg2; g.lineWidth=2; g.beginPath(); g.moveTo(315,334); g.lineTo(660,334); g.stroke(); g.restore();
+    const lg2=g.createLinearGradient(m.x,m.y,m.x+345,m.y); lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
+    g.strokeStyle=lg2; g.lineWidth=2; g.beginPath(); g.moveTo(m.x,m.y); g.lineTo(m.x+345,m.y); g.stroke(); g.restore();
+  }
+
+  // ---- TAKING IN: the two you actually walk in with ----
+  const cs=carrySet(), inCarry=cs.includes(gsGun);
+  g.textAlign="left"; g.font="900 11px Verdana"; g.fillStyle="#ffd75e";
+  g.fillText("TAKING IN  ("+cs.length+"/"+CARRY_MAX+")",60,150);
+  cs.forEach((gt,i)=>{
+    const bx=60+i*186;
+    g.save(); g.strokeStyle=gt===gsGun?"#ffd75e":"rgba(255,255,255,0.18)"; g.lineWidth=gt===gsGun?2:1;
+    rr(bx,158,176,34,7); g.stroke(); g.restore();
+    g.font="900 10px Verdana"; g.fillStyle=gt===gsGun?"#ffd75e":"#cfd6e0";
+    g.fillText((i===0?"① ":"② ")+baseSpecFor(gt).name.slice(0,17),bx+9,179);
+  });
+  if(ownedGunTypes.length){
+    if(inCarry&&cs.length>1)
+      menuBtn(60+CARRY_MAX*186,158,120,34,"✖ DROP",()=>{ setCarry(cs.filter(x=>x!==gsGun)); SFX.coin(1); },"#ff9d9d","900 10px Verdana");
+    else if(!inCarry)
+      menuBtn(60+CARRY_MAX*186,158,120,34,"⊕ TAKE IN",()=>{
+        setCarry([...cs,gsGun]); SFX.coin(2);                          // full → pushes the oldest out
+      },"#7cf9a5","900 10px Verdana");
   }
 
   // ---- stats: base → final, deltas lit green ----
@@ -4485,7 +4678,7 @@ function drawGunsmith(t){
   });
 
   // ---- the 3 slots (NFT guns only — the free sidearm has no rails to bolt onto) ----
-  if(loadoutType==null){
+  if(gsGun==null){
     g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#66707f";
     g.fillText("ATTACHMENTS",560,100);
     g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
@@ -4500,12 +4693,16 @@ function drawGunsmith(t){
     return;
   }
   g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle="#9fe6ff";
-  g.fillText("ATTACHMENTS"+(custom?"  ·  CUSTOM BUILD":"  ·  AUTO (3 rarest)"),560,100);
+  g.fillText("ATTACHMENTS"+(custom?"  ·  CUSTOM BUILD":(inCarry?"  ·  AUTO (rarest free)":"  ·  NOT CARRIED")),560,100);
+  const note=(!inCarry&&!custom);
+  if(note){ g.font="bold 9px Verdana"; g.fillStyle="#66707f";
+    g.fillText("guns you don't take in hold no mods — fit some, or ⊕ TAKE IN",560,116); }
+  const slotY0=note?128:112;
   // ---- 3 slots: TAP A SLOT to select it, then pick the attachment below ----
   const setSel=(arr)=>{ modCfg[key]=arr.filter(v=>v!=null); saveModCfg(); SFX.coin(2); };
   for(let i2=0;i2<MOD_SLOTS;i2++){
     const cur=sel[i2], m=cur!=null?MODDEFS[cur]:null;
-    const yb=112+i2*56;
+    const yb=slotY0+i2*56;
     menuBtn(560,yb,340,46,"",()=>{ gsSel=i2; SFX.coin(1); });
     if(gsSel===i2){ g.save(); g.strokeStyle="#7cf9a5"; g.lineWidth=2.5; rr(560,yb,340,46,8); g.stroke(); g.restore(); }
     g.textAlign="left"; g.font="900 12px Verdana"; g.fillStyle=m?"#e8f0ff":"#4a5566";
@@ -4513,7 +4710,7 @@ function drawGunsmith(t){
     g.font="bold 9px Verdana"; g.fillStyle=m?"#9fe6ff":"#3f4a5c";
     g.fillText(m?({1:"spread ×0.35 — laser accuracy",2:"+15% damage",3:"+15% fire rate",4:"+30% bullet speed, +5% dmg",5:"+1 pierce",6:"+1 projectile per shot"})[cur]:"tap, then pick an attachment below",574,yb+36);
   }
-  const y4=112+MOD_SLOTS*56+12;
+  const y4=slotY0+MOD_SLOTS*56+12;
   // ---- the picker: your attachments as chips — tap one to fit the selected slot ----
   if(owned.length){
     g.textAlign="left"; g.font="900 10px Verdana"; g.fillStyle="#8fa3bf";
@@ -4523,20 +4720,34 @@ function drawGunsmith(t){
     chips.forEach((ct,k)=>{
       const cx2=560+(k%3)*116, cy2=y4+16+Math.floor(k/3)*36;
       const inSlot=ct!=null&&sel.includes(ct);
-      menuBtn(cx2,cy2,110,30,ct!=null?MODDEFS[ct].tag:"✖ EMPTY",()=>{
+      const free=ct!=null?modsFree(ct):0;
+      const steal=ct!=null&&!inSlot&&free<=0;                       // every copy is on another gun → fitting MOVES it
+      menuBtn(cx2,cy2,110,30,ct!=null?(MODDEFS[ct].tag+(steal?" ⇄":free>1?" ×"+free:"")):"✖ EMPTY",()=>{
         const out=sel.slice();
-        if(ct!=null){ const dup=out.indexOf(ct); if(dup>=0&&dup!==gsSel)out[dup]=null; }   // distinct: moving a fitted mod vacates its old slot
+        if(ct!=null){
+          const dup=out.indexOf(ct);
+          if(dup>=0&&dup!==gsSel)out[dup]=null;                     // same mod can't sit in two slots of the same gun
+          if(dup<0&&modsFree(ct)<=0){                               // ...and can't be on two guns at once
+            const from=stealMod(ct,key);
+            gsToast=from?("⇄ "+MODDEFS[ct].tag+" moved off "+from):"";
+            gsToastT=performance.now()/1000;
+          }
+        }
         out[gsSel]=ct;
         setSel(out);
         gsSel=(gsSel+1)%MOD_SLOTS;                                 // flow: fit, auto-advance to the next slot
-      },ct!=null?MODCOL[ct]:"#8fa3bf","900 11px Verdana");
+      },ct!=null?(steal?"#8fa3bf":MODCOL[ct]):"#8fa3bf","900 11px Verdana");
       if(inSlot){ g.save(); g.strokeStyle=MODCOL[ct]; g.lineWidth=2; rr(cx2,cy2,110,30,8); g.stroke();
         g.font="900 8px Verdana"; g.textAlign="right"; g.fillStyle=MODCOL[ct]; g.fillText("●",cx2+104,cy2+11); g.restore(); g.textAlign="left"; }
     });
     const rowsUsed=Math.ceil((chips.length)/3);
     if(custom)menuBtn(560,y4+16+rowsUsed*36+6,164,26,"↺ RESET TO AUTO",()=>{ delete modCfg[key]; saveModCfg(); SFX.coin(1); },"#8fa3bf","bold 10px Verdana");
     g.textAlign="left"; g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
-    g.fillText("no holding cap — buy more mods on mint.wick.pics",560,y4+16+rowsUsed*36+52);
+    g.fillText("⇄ = every copy is on another gun; fitting it moves it here",560,y4+16+rowsUsed*36+40);
+    g.fillText("no holding cap — buy more mods on mint.wick.pics",560,y4+16+rowsUsed*36+54);
+    if(gsToast&&performance.now()/1000-gsToastT<3){                 // what just got unbolted, and from which gun
+      g.font="900 10px Verdana"; g.fillStyle="#ffd75e";
+      g.fillText(gsToast,560,y4+16+rowsUsed*36+22); }
   } else {
     g.textAlign="left"; g.font="bold 10px Verdana"; g.fillStyle="#ffd75e";
     g.fillText("No mods yet — FREE mint, 3 per gun you hold",560,y4+12);
@@ -4575,13 +4786,13 @@ function drawGuide(){
   head(L,y,"⇄ PICK YOUR GUN"); y+=lh;
   line(L,y,"Menu: tap LOADOUT to cycle your guns."); y+=lh;
   line(L,y,"In game: press Q (desktop) or tap the gun name"); y+=lh;
-  line(L,y,"top-right (phone) to swap mid-fight."); y+=lh;
+  line(L,y,"top-right (phone) swaps your 2 guns mid-fight."); y+=lh;
   // RIGHT — controls & perks
   let z=84;
   head(R2,z,"🎮 CONTROLS — DESKTOP"); z+=lh;
   line(R2,z,"A / D — move    SPACE — jump (hold = higher)"); z+=lh;
   line(R2,z,"CLICK — fire    S — drop through ledges"); z+=lh;
-  line(R2,z,"Q — swap gun    stomp heads to kill (never hounds — they bite)"); z+=lh+8;
+  line(R2,z,"Q — swap the 2 you brought    stomp heads (never hounds — they bite)"); z+=lh+8;
   head(R2,z,"📱 CONTROLS — PHONE"); z+=lh;
   line(R2,z,"hold LEFT side & slide — move (virtual stick)"); z+=lh;
   line(R2,z,"tap RIGHT side — jump · swipe ↓ — drop · auto-fire"); z+=lh;
@@ -4590,7 +4801,7 @@ function drawGuide(){
   line(R2,z,"Any gun: real firepower · CONNECTED holders: 4th ♥"); z+=lh;
   line(R2,z,"Holo 1/1 (6 exist): +20% damage, rainbow gun"); z+=lh;
   line(R2,z,"⊕ WICK MODS (free mint): attachments bolt onto"); z+=lh;
-  line(R2,z,"your gun — 3 slots · build per-gun loadouts in 🔧 GUNSMITH"); z+=lh+8;
+  line(R2,z,"carry 2 guns, 3 slots each · a mod fits ONE gun — 🔧 GUNSMITH"); z+=lh+8;
   head(R2,z,"🏆 LEADERBOARD"); z+=lh;
   line(R2,z,"Scores are signed by your wallet — connect via"); z+=lh;
   line(R2,z,"CONNECT, then SUBMIT on the ending/gauntlet screen."); z+=lh;
@@ -4695,7 +4906,13 @@ window.PW=!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?undefined:{
   key(k,down){ if(down)keys.add(k); else keys.delete(k); },
   jump(){ if(P){P.jbuf=0.16;P.jumpHeld=true;setTimeout(()=>{if(P)P.jumpHeld=false;},260);} },
   fire(){ fireGun(); }, hold(v){ firing=!!v; },
-  setLoadout(types,tp,mods){ ownedGunTypes=types||[]; ownedModTypes=mods||[]; _specKey=""; loadoutType=tp!=null?tp:(types&&types[0]); walletAddr="0xTEST"; walletStatus="✓ test"; },
+  setLoadout(types,tp,mods,carryList){ ownedGunTypes=types||[]; ownedModTypes=mods||[];
+    carry=Array.isArray(carryList)?carryList.slice(0,CARRY_MAX):[]; bumpMods();
+    loadoutType=tp!=null?tp:(types&&types[0]);
+    if(!carrySet().includes(loadoutType))loadoutType=carrySet()[0];
+    walletAddr="0xTEST"; walletStatus="✓ test"; },
+  get carry(){return carrySet()}, get alloc(){return modAlloc()},
+  muzzle(){ return heroMuzzle(P.x,P.y,1.15,heroOpts()); },
   pump(sec){ for(let i=0,n=Math.round(sec*60);i<n;i++)update(1/60); render(); },
   shot:async()=>{ await fetch("/shot",{method:"POST",body:cv.toDataURL()}); return "ok"; }
 };

@@ -17,7 +17,9 @@ window.WICK_CFG = {
   market: "0x1457C17A7132fCbCb2034337368050563DeD91e3",
   mods:       "0x004E6610ff47c6A6510DA446257822B37D26CD73",   // WICK MODS free mint — paste after LAUNCH-MODS.cmd
   modsMarket: "0xDDb963D1bb874d4ac5697550F513568c657E977E",   // mods marketplace — 50% royalty, 100% burned as $WICK
-  billboards: "0x0000000000000000000000000000000000000000",   // self-serve in-game ads — paste after LAUNCH-BILLBOARDS.cmd
+  // LIVE on PulseChain. A non-zero address here is also what UNHIDES the
+  // ADVERTISE tab (bbConfigured()) — set only after the production E2E passed.
+  billboards: "0x84587C185CAcE68CC559e86936F61812609548DF",
 };
 
 // modType -> presentation for the free-mint attachments. Effects mirror the game's

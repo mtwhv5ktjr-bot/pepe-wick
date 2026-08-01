@@ -56,6 +56,11 @@ eq((await bal(bbAddr)).toString(), "0", "contract holds nothing");
 await reverts(bb.connect(adv2).buy(today, false, "", "x", "y", 0, 0n, { value: M }), "empty name");
 await reverts(bb.connect(adv2).buy(today, false, "123456789012345678901", "x", "y", 0, 0n, { value: M }), "name 21 chars");
 await reverts(bb.connect(adv2).buy(today, false, "ok", "12345678901234567890123456789", "y", 0, 0n, { value: M }), "tag 29 chars");
+// the limit is BYTES, not characters — these are 20 and 10 characters but 80 and 30
+// bytes. The purchase page must measure the same way or it waves through a headline
+// that reverts a 1,000,000 PLS transaction.
+await reverts(bb.connect(adv2).buy(today, false, "🐸".repeat(20), "x", "y", 0, 0n, { value: M }), "20 emoji = 80 bytes");
+await reverts(bb.connect(adv2).buy(today, false, "币安交易所币安交易所", "x", "y", 0, 0n, { value: M }), "10 CJK chars = 30 bytes");
 await reverts(bb.connect(adv2).buy(today - 1, false, "ok", "x", "y", 0, 0n, { value: M }), "yesterday");
 await reverts(bb.connect(adv2).buy(today + 61, false, "ok", "x", "y", 0, 0n, { value: M }), "61 days ahead");
 

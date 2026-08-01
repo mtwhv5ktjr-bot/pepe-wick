@@ -30,8 +30,12 @@ async function fresh(feeBps = 250) {
   const seedCommit = ethers.keccak256(ownerSeed);
   const bodies = await (await new ethers.ContractFactory(Bodies.abi, Bodies.bytecode, owner).deploy()).waitForDeployment();
   const art = await (await new ethers.ContractFactory(Art.abi, Art.bytecode, owner).deploy(await bodies.getAddress())).waitForDeployment();
-  const guns = await (await new ethers.ContractFactory(Guns.abi, Guns.bytecode, owner).deploy(price, await art.getAddress(), seedCommit)).waitForDeployment();
-  const market = await (await new ethers.ContractFactory(Market.abi, Market.bytecode, owner).deploy(await guns.getAddress(), feeBps)).waitForDeployment();
+  const guns = await (await new ethers.ContractFactory(Guns.abi, Guns.bytecode, owner)
+    .deploy(price, await art.getAddress(), seedCommit, ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress)).waitForDeployment();
+  // burn route left unset (address(0) is an explicit, allowed config) — this suite
+  // probes mint/listing edge cases; the swap+burn path is covered by test.mjs
+  const market = await (await new ethers.ContractFactory(Market.abi, Market.bytecode, owner)
+    .deploy(await guns.getAddress(), feeBps, ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress)).waitForDeployment();
   return { guns, market, ownerSeed };
 }
 
@@ -42,12 +46,14 @@ async function fresh(feeBps = 250) {
   await reverts(() => guns.connect(alice).mint(0, { value: 0 }), "mint qty 0 reverts");
   await reverts(() => guns.connect(alice).mint(6, { value: price * 6n, ...G(6) }), "mint qty 6 reverts (max 5)");
   await reverts(() => guns.connect(alice).mint(2, { value: price, ...G(2) }), "mint qty 2 with 1x pay reverts");
-  // overpay succeeds (mint's require enforces payment; excess kept, recoverable via withdraw)
+  // overpay succeeds (mint's require enforces payment; excess stays in the contract)
   await (await guns.connect(alice).mint(1, { value: price * 2n, ...G(1) })).wait();
-  ok(await guns.ownerOf(6) === A, "overpaid mint succeeds (payment enforced by require)");
-  // withdraw is owner-only and callable (value-move correctness proven by test.mjs fee-split)
-  await reverts(() => guns.connect(alice).withdraw(A, { gasLimit: 80000 }), "withdraw only owner");
-  await (await guns.withdraw(D)).wait(); ok(true, "owner withdraw executes");
+  ok(await guns.ownerOf(2) === A, "overpaid mint succeeds (payment enforced by require)");
+  // the overpayment has NO owner exit: withdraw() is gone, so PLS can only ever
+  // leave as a $WICK burn — and with the burn route unset it cannot leave at all
+  ok(typeof guns.withdraw === "undefined", "withdraw() does not exist — no owner escape hatch");
+  ok(await provider.getBalance(await guns.getAddress()) === price * 2n, "overpayment pools in the contract");
+  await reverts(() => guns.connect(alice).burnPool(0, { gasLimit: 200000 }), "burnPool reverts with no burn route");
 }
 
 // ============ REVEAL security ============
@@ -65,9 +71,11 @@ async function fresh(feeBps = 250) {
   await (await guns.reveal(ownerSeed)).wait();
   ok(await guns.revealed(), "reveal after block works");
   await reverts(() => guns.reveal(ownerSeed, { gasLimit: 300000 }), "cannot reveal twice");
-  // minted-but-partial: only ids 6,7 exist; their types are valid 1..5; unminted ids type 0
-  const t6 = Number(await guns.gunTypeOf(6)), t7 = Number(await guns.gunTypeOf(7));
-  ok(t6 >= 1 && t6 <= 5 && t7 >= 1 && t7 <= 5, "partial-mint revealed tokens have valid types");
+  // minted-but-partial: only ids 2,3 exist. Valid types are the five tiers 1..5 OR one
+  // of the platinum holos 11..15 — those ride in the public pool, they are not reserved.
+  const validType = t => (t >= 1 && t <= 5) || (t >= 11 && t <= 15);
+  const t2 = Number(await guns.gunTypeOf(2)), t3 = Number(await guns.gunTypeOf(3));
+  ok(validType(t2) && validType(t3), "partial-mint revealed tokens have valid types (" + t2 + "," + t3 + ")");
   ok(Number(await guns.gunTypeOf(50)) >= 1, "unminted id still resolves a (deterministic) type via view");
 }
 
@@ -81,17 +89,21 @@ async function fresh(feeBps = 250) {
     await (await guns.closeMint()).wait();
     await provider.send("evm_mine", []); await provider.send("evm_mine", []);
     await (await guns.reveal(ownerSeed)).wait();
-    for (let id = 6; id <= 10; id++) store[id] = Number(await guns.gunTypeOf(id));
+    // ids 2..6 were the five minted cases; gunTypeOf resolves the whole pool post-reveal,
+    // so sample 20 positions — a coincidental match on a couple of ids can't flake this
+    for (let id = 2; id <= 21; id++) store[id] = Number(await guns.gunTypeOf(id));
   }
-  const same = [6,7,8,9,10].every(id => r1[id] === r2[id]);
+  const sampled = Array.from({ length: 20 }, (_, i) => i + 2);
+  const same = sampled.every(id => r1[id] === r2[id]);
   ok(!same, "different seed/blockhash => different token assignments (not fixed/predictable)");
 }
 
 // ============ MARKETPLACE attacks ============
 {
   const { guns, market } = await fresh();
-  await (await guns.mintOneOfOne(A, 1)).wait();     // alice owns 1/1 #1
-  await (await guns.mintOneOfOne(B, 2)).wait();     // bob owns 1/1 #2
+  await (await guns.mintTangent(A)).wait();         // alice owns the one reserved token, #1
+  await (await guns.setMintOpen(true)).wait();
+  await (await guns.connect(bob).mint(1, { value: price, ...G(1) })).wait();   // bob owns the first case, #2
   const mAddr = await market.getAddress();
 
   await reverts(() => market.connect(bob).list(1, price, { gasLimit: 120000 }), "cannot list a token you don't own");
@@ -128,14 +140,14 @@ async function fresh(feeBps = 250) {
 
   // fee bounds + owner controls
   await reverts(() => market.connect(alice).setFee(300, { gasLimit: 80000 }), "non-owner setFee reverts");
-  await reverts(() => market.setFee(1001, { gasLimit: 80000 }), "fee > 10% reverts");
+  await reverts(() => market.setFee(2001, { gasLimit: 80000 }), "fee > 20% reverts");
   await reverts(() => market.setOwner(ethers.ZeroAddress, { gasLimit: 80000 }), "setOwner zero reverts");
 }
 
 // ============ ERC-721 SAFETY ============
 {
   const { guns } = await fresh();
-  await (await guns.mintOneOfOne(A, 1)).wait();
+  await (await guns.mintTangent(A)).wait();
   const gunsAddr = await guns.getAddress();
   await reverts(() => guns.ownerOf(99, { gasLimit: 60000 }), "ownerOf nonexistent reverts");
   await reverts(() => guns.balanceOf(ethers.ZeroAddress, { gasLimit: 60000 }), "balanceOf(0) reverts");

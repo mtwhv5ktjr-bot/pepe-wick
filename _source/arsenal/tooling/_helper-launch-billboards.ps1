@@ -26,8 +26,8 @@ $node = $null
 foreach ($d in $nodeDirs) { if (Test-Path (Join-Path $d "node.exe")) { $node = Join-Path $d "node.exe"; break } }
 if (-not $node) { $c = Get-Command node -ErrorAction SilentlyContinue; if ($c) { $node = $c.Source } }
 if (-not $node) { Line "  ERROR: node.exe not found." "Red"; Read-Host "`n  Press Enter to close"; exit 1 }
-foreach ($f in @("deploy-mods.mjs","out\WickMods.json","out\WickModsMarket.json")) {
-  if (-not (Test-Path $f)) { Line "  ERROR: missing $f" "Red"; Read-Host "`n  Press Enter to close"; exit 1 }
+foreach ($f in @("deploy-billboards.mjs","out\WickBillboards.json")) {
+  if (-not (Test-Path $f)) { Line "  ERROR: missing $f  (run: node compile.mjs)" "Red"; Read-Host "`n  Press Enter to close"; exit 1 }
 }
 
 $env:RPC_URL = "https://rpc.pulsechain.com"

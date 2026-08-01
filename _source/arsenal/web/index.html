@@ -107,7 +107,7 @@
     <!-- WICK MODS free mint — hidden until cfg.mods is a real address -->
     <div id="modsPanel" style="display:none;margin-top:14px;padding:14px;border:2px dashed #7cf9a5;border-radius:12px;background:rgba(124,249,165,.05)">
       <h3 style="margin:0 0 4px;color:#7cf9a5;letter-spacing:1px">🧩 WICK MODS — FREE MINT · GUN HOLDERS ONLY</h3>
-      <p class="muted" style="margin:0 0 8px">Gun <b>attachments</b>, free (gas only). <b>Every WICK Arsenal gun you hold grants 3 mints</b> — 10 guns = 30. The allowance sticks to the gun, so buying a gun that already minted its 3 grants nothing. <b>Holding is UNCAPPED</b> — buy as many mods as you want on the market below. Bolt up to <b>3</b> onto any gun in-game — every effect is a real game mechanic. <span id="modsLeft"></span></p>
+      <p class="muted" style="margin:0 0 8px">Gun <b>attachments</b>, free (gas only). <b>Every WICK Arsenal gun you hold grants 3 mints</b> — 10 guns = 30. The allowance sticks to the gun, so buying a gun that already minted its 3 grants nothing. <b>Holding is UNCAPPED</b> — buy as many mods as you want on the market below. Each mod is a physical part: it fits <b>one gun at a time</b> (3 slots per gun), and fitting it elsewhere <b>moves</b> it rather than copying it — so arming a second gun takes a second mod. Every effect is a real game mechanic. <span id="modsLeft"></span></p>
       <div id="modsPool" class="muted" style="margin:0 0 10px;font-size:13px"></div>
       <div class="row" style="flex-wrap:wrap">
         <select id="modsQty"><option value="1">1 mod</option><option value="2">2 mods</option><option value="3" selected>3 mods</option></select>
@@ -125,6 +125,8 @@
     <div class="stat"><div class="n" id="sPrice">–</div><div class="l">PRICE (PLS)</div></div>
     <div class="stat"><div class="n" id="sOpen">–</div><div class="l">MINT STATUS</div></div>
     <div class="stat"><div class="n" id="sYours">–</div><div class="l">YOUR GUNS</div></div>
+    <div class="stat" title="Total $WICK held at the burn address — read live from the chain, from every source.">
+      <div class="n" id="sBurned" style="color:#ff8a3d">–</div><div class="l">🔥 $WICK BURNED</div></div>
   </div>
 
   <div class="row" style="justify-content:center;margin-bottom:8px">
@@ -187,7 +189,7 @@
   <div id="arsenal" class="grid"></div>
   <div id="arsenalEmpty" class="muted">Connect a wallet to see the guns you own.</div>
   <h2 id="modsHdr" style="display:none">🧩 YOUR MODS</h2>
-  <p class="muted" id="modsHint" style="display:none;margin:-6px 0 10px">Attachments auto-equip in-game: your <b>3 rarest distinct types</b> bolt onto whichever gun (or build custom loadouts in the in-game 🔧 GUNSMITH) you're holding. Duplicates don't stack — sell spares in one tap, and there's <b>no holding cap</b>: buy as many as you want from MOD LISTINGS.</p>
+  <p class="muted" id="modsHint" style="display:none;margin:-6px 0 10px">A mod is a <b>physical part</b>: each one bolts onto <b>one gun at a time</b>, and no gun takes the same type twice. Fitting a mod that's already on another gun <b>moves it</b> — it never copies. Guns have 3 slots; build each one in the in-game 🔧 GUNSMITH. Want the same mod on two guns? You need <b>two copies</b> — there's <b>no holding cap</b>, so buy spares from MOD LISTINGS.</p>
   <div id="modsGrid" class="grid"></div>
   </section>
 
@@ -494,6 +496,42 @@ async function refreshStats(){
       ? "All 100 cases are gone. Grab one on the secondary market below."
       : (open ? "" : "mint not open yet");
   }catch(e){ /* contract maybe not deployed */ }
+  refreshBurned();
+}
+
+/* Total $WICK sitting at the burn address, read live off-chain-of-record.
+   This is EVERY burn from EVERY source, not just the Arsenal's — the tooltip
+   says so, because "we burned this much" would be a claim we can't support. */
+/* one traffic ping per browser session — same first-party counter the game uses */
+(function(){
+  try{
+    if(sessionStorage.getItem("wa_hit"))return;
+    sessionStorage.setItem("wa_hit","1");
+    const body=JSON.stringify({k:"load"});
+    if(navigator.sendBeacon)navigator.sendBeacon("/api/hit",new Blob([body],{type:"application/json"}));
+    else fetch("/api/hit",{method:"POST",headers:{"content-type":"application/json"},body}).catch(()=>{});
+  }catch(e){}
+})();
+
+const WICK_TOKEN = "0x8CDaf3d630Da9E1450832924D5701CC0500E9cfC";
+const BURN_ADDR  = "0x000000000000000000000000000000000000dEaD";
+let _burnAt = 0;
+async function refreshBurned(){
+  if (Date.now() - _burnAt < 60_000) return;            // the menu re-renders often; the number doesn't
+  _burnAt = Date.now();
+  try{
+    const p = new ethers.JsonRpcProvider(cfg.rpcRead || cfg.chain.rpc, cfg.chain.id, { staticNetwork:true });
+    const t = new ethers.Contract(WICK_TOKEN, [
+      "function balanceOf(address) view returns (uint256)",
+      "function totalSupply() view returns (uint256)",
+    ], p);
+    const [burned, supply] = await Promise.all([t.balanceOf(BURN_ADDR), t.totalSupply()]);
+    const whole = burned / (10n ** 18n);
+    $("#sBurned").textContent = whole.toLocaleString("en-US");
+    const pct = supply > 0n ? Number(burned * 10000n / supply) / 100 : 0;
+    const lbl = $("#sBurned").parentElement.querySelector(".l");
+    if (lbl) lbl.textContent = "🔥 $WICK BURNED · " + pct.toFixed(2) + "%";
+  }catch(e){ /* a dead RPC must not blank the tile — leave the dash */ }
 }
 
 function artFor(type, id){
@@ -727,7 +765,7 @@ async function mintMods(){
     // sendBuffered matters here: type-draw randomness makes the gas estimate
     // variable, exactly like the gun mint (the 30M-PLS lesson)
     await (await sendBuffered(modsC,"mint",[qty])).wait();
-    toast("Minted "+qty+" mod"+(qty>1?"s":"")+"! They auto-equip in-game — see YOUR ARSENAL.");
+    toast("Minted "+qty+" mod"+(qty>1?"s":"")+"! Fit them to a gun in the in-game 🔧 GUNSMITH — one gun each.");
     await loadModsPanel(); await loadArsenal();
   }catch(e){ toast(e.shortMessage||e.reason||e.message||"mint failed"); }
 }
@@ -739,7 +777,7 @@ function modCardHTML(type,id,actions){
       <div style="font-size:11px;letter-spacing:2px;color:${m.color}">WICK MODS · ${m.rarity.toUpperCase()}</div>
       <div style="font-family:Impact,Arial;font-size:21px;color:#fff;margin:8px 0 2px">${m.name}</div>
       <div class="muted" style="font-size:12px;margin-bottom:8px">${m.fx}</div>
-      <div class="muted" style="font-size:11px">#${id} / 300 · bolts onto any WICK gun (3 slots)</div>
+      <div class="muted" style="font-size:11px">#${id} / 300 · fits <b>one</b> gun at a time</div>
     </div>
     <div style="padding:0 12px 12px">${actions||""}</div>
   </div>`;
@@ -1104,7 +1142,13 @@ async function buyBillboard(){
   const exc=$("#adType").value==="exc";
   const name=($("#adName").value||"").trim(), tag=($("#adTag").value||"").trim(), url=($("#adUrl").value||"").trim();
   if(!name)return toast("Give the billboard a headline (max 20 chars).");
-  if(name.length>20||tag.length>28||url.length>32)return toast("Too long: headline ≤20, tagline ≤28, site ≤32.");
+  // the contract measures BYTES, not characters — an emoji is 4 and a CJK glyph 3,
+  // so a 20-char headline can be 60 bytes and revert a 1,000,000 PLS transaction.
+  // maxlength can't express that; check it here, before the wallet ever opens.
+  const blen=s=>new TextEncoder().encode(s).length;
+  if(blen(name)>20||blen(tag)>28||blen(url)>32)
+    return toast("Too long for the chain: it counts BYTES, and emoji cost 4 each, accents/CJK 2-3. "
+      +"Headline "+blen(name)+"/20, tagline "+blen(tag)+"/28, site "+blen(url)+"/32.");
   const color=parseInt(($("#adColor").value||"#7cf9a5").replace("#",""),16)||0x7cf9a5;
   try{
     // availability re-check right before money moves
