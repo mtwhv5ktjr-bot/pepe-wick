@@ -617,6 +617,9 @@ const HERO_META={"walk":{"top":113,"bot":441,"ch":328,"dirR":0,"fr":[[113,441,32
    signage carries one consistent mark. Optional: billboards fall back to their
    vector icons until (or if) it loads. */
 let coverLogo=null;
+// where the HEAD sits inside the cover art, as fractions of the image — hair top
+// to jaw, ear to ear. Fractions (not pixels) so a re-cut cover still lands right.
+const HEAD_CROP={x:0.10,y:0.025,w:0.70,h:0.51};
 (function(){ const im=new Image();
   im.onload=()=>{ coverLogo=im; };
   im.onerror=()=>{ coverLogo=null; };
@@ -3355,12 +3358,15 @@ function drawBillboard(x,cy,ad,t,scl){
   // recessed icon pad + icon
   g.fillStyle="rgba(255,255,255,0.05)"; rr(L+9,cy-19*s,38*s,38*s,8*s); g.fill();
   g.strokeStyle="rgba(255,255,255,0.08)"; g.lineWidth=1; rr(L+9,cy-19*s,38*s,38*s,8*s); g.stroke();
-  // icon slot: the cabinet cover logo on house signage, the megaphone on paid ads
+  // icon slot: the cabinet Pepe's HEAD on house signage, the megaphone on paid ads.
+  // The cover art is a full bust (head + suit + gun) — at 33px the face turns to
+  // mush, so we crop to the head and let it fill the slot.
   if(coverLogo&&!ad.paid){
-    const box=33*s, iw=coverLogo.naturalWidth||1, ih=coverLogo.naturalHeight||1;
-    const k=Math.min(box/iw,box/ih), dw=iw*k, dh=ih*k;      // contain-fit: never squash the face
+    const iw=coverLogo.naturalWidth||1, ih=coverLogo.naturalHeight||1;
+    const sx=HEAD_CROP.x*iw, sy=HEAD_CROP.y*ih, sw=HEAD_CROP.w*iw, sh=HEAD_CROP.h*ih;
+    const box=36*s, k=Math.min(box/sw,box/sh), dw=sw*k, dh=sh*k;   // contain-fit the crop
     g.save(); g.globalAlpha=fl;
-    g.drawImage(coverLogo,L+28-dw/2,cy-dh/2,dw,dh); g.restore();
+    g.drawImage(coverLogo,sx,sy,sw,sh,L+28-dw/2,cy-dh/2,dw,dh); g.restore();
   } else {
     g.save(); g.translate(0,0); g.scale(s,s);
     drawAdIcon(ad.icon,(L+28)/s,cy/s,ad.col); g.restore();
