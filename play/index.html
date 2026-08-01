@@ -619,7 +619,10 @@ const HERO_META={"walk":{"top":113,"bot":441,"ch":328,"dirR":0,"fr":[[113,441,32
 let coverLogo=null;
 // where the HEAD sits inside the cover art, as fractions of the image — hair top
 // to jaw, ear to ear. Fractions (not pixels) so a re-cut cover still lands right.
-const HEAD_CROP={x:0.10,y:0.025,w:0.70,h:0.51};
+// Deliberately SQUARE in pixels (0.60*709 ≈ 0.564*754 ≈ 425) so cover-filling a
+// square pad crops nothing off the face. Framed with air around the whole head —
+// hair top to chin, and left of the pistol so no barrel creeps into the corner.
+const HEAD_CROP={x:0.165,y:0.010,w:0.60,h:0.564};
 (function(){ const im=new Image();
   im.onload=()=>{ coverLogo=im; };
   im.onerror=()=>{ coverLogo=null; };
@@ -3355,21 +3358,28 @@ function drawBillboard(x,cy,ad,t,scl){
   // corner bolts
   g.fillStyle="rgba(150,160,180,0.5)";
   [[L+8,T+8],[x+w/2-8,T+8],[L+8,cy+h/2-8],[x+w/2-8,cy+h/2-8]].forEach(p=>{ g.beginPath(); g.arc(p[0],p[1],1.7*s,0,TAU); g.fill(); });
-  // recessed icon pad + icon
-  g.fillStyle="rgba(255,255,255,0.05)"; rr(L+9,cy-19*s,38*s,38*s,8*s); g.fill();
-  g.strokeStyle="rgba(255,255,255,0.08)"; g.lineWidth=1; rr(L+9,cy-19*s,38*s,38*s,8*s); g.stroke();
+  // recessed icon pad. One geometry for the pad AND whatever sits in it — the pad
+  // used to grow with scale from a fixed x while the icon stayed put, so the two
+  // only lined up at exactly 1.0x.
+  const padS=38*s, padX=L+9, padY=cy-19*s, padCX=padX+padS/2, padCY=padY+padS/2;
+  g.fillStyle="rgba(255,255,255,0.05)"; rr(padX,padY,padS,padS,8*s); g.fill();
+  g.strokeStyle="rgba(255,255,255,0.08)"; g.lineWidth=1; rr(padX,padY,padS,padS,8*s); g.stroke();
   // icon slot: the cabinet Pepe's HEAD on house signage, the megaphone on paid ads.
   // The cover art is a full bust (head + suit + gun) — at 33px the face turns to
-  // mush, so we crop to the head and let it fill the slot.
+  // mush, so we crop to the head and COVER-fill the pad, clipped to its corners:
+  // an avatar tile, dead centre, no letterbox gaps.
   if(coverLogo&&!ad.paid){
     const iw=coverLogo.naturalWidth||1, ih=coverLogo.naturalHeight||1;
     const sx=HEAD_CROP.x*iw, sy=HEAD_CROP.y*ih, sw=HEAD_CROP.w*iw, sh=HEAD_CROP.h*ih;
-    const box=36*s, k=Math.min(box/sw,box/sh), dw=sw*k, dh=sh*k;   // contain-fit the crop
+    const fill=padS-2.5*s;                                   // hairline inset so the pad edge still reads
+    const k=Math.max(fill/sw,fill/sh), dw=sw*k, dh=sh*k;     // COVER: fill the tile, crop the overflow
     g.save(); g.globalAlpha=fl;
-    g.drawImage(coverLogo,sx,sy,sw,sh,L+28-dw/2,cy-dh/2,dw,dh); g.restore();
+    rr(padX+1.25*s,padY+1.25*s,fill,fill,6.6*s); g.clip();
+    g.drawImage(coverLogo,sx,sy,sw,sh,padCX-dw/2,padCY-dh/2,dw,dh);
+    g.restore();
   } else {
     g.save(); g.translate(0,0); g.scale(s,s);
-    drawAdIcon(ad.icon,(L+28)/s,cy/s,ad.col); g.restore();
+    drawAdIcon(ad.icon,padCX/s,padCY/s,ad.col); g.restore();   // same pad centre as the head
   }
   // neon double-tube frame (bright core + additive glow), with flicker
   g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=fl*seg;
