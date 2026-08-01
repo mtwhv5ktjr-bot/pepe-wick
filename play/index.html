@@ -616,16 +616,62 @@ const HERO_META={"walk":{"top":113,"bot":441,"ch":328,"dirR":0,"fr":[[113,441,32
    WICK cabinet. Rides in the icon slot of every house billboard so the city's
    signage carries one consistent mark. Optional: billboards fall back to their
    vector icons until (or if) it loads. */
-let coverLogo=null;
-// where the HEAD sits inside the cover art, as fractions of the image — hair top
-// to jaw, ear to ear. Fractions (not pixels) so a re-cut cover still lands right.
-// SQUARE in pixels (0.545*709 ≈ 0.512*754 ≈ 386) and framed tight to the head —
-// hair top to chin, left of the pistol. Tight because it's contain-fitted into
-// the tile, which adds its own margin; extra air in the crop would double up and
-// leave the head looking shrunken.
-const HEAD_CROP={x:0.185,y:0.020,w:0.545,h:0.512};
+let coverLogo=null;      // the pre-baked tile CANVAS, not the raw image
+/* The sign tile is ~32px but the art is 709x754. Drawing that straight in is a
+   12x downscale every frame with no mip pyramid — detail collapses and the face
+   goes harsh. So: crop the head ONCE at load and step-halve it down. Each halving
+   is a clean box filter, so the result stays smooth, and every frame after is a
+   near-1:1 blit instead of rescaling half a megapixel per board. */
+// Measured off the art's alpha channel, not eyeballed: the head occupies
+// x 76..600, y 5..410 of the 709x754 cover. Plus a little breathing room.
+const HEAD_CROP={x:0.079,y:0.000,w:0.795,h:0.570};
+const TILE_PX=128;
+function bakeHeadTile(im){
+  const iw=im.naturalWidth||1, ih=im.naturalHeight||1;
+  const sx=Math.round(HEAD_CROP.x*iw), sy=Math.round(HEAD_CROP.y*ih);
+  const sw=Math.min(Math.round(HEAD_CROP.w*iw),iw-sx), sh=Math.min(Math.round(HEAD_CROP.h*ih),ih-sy);
+  let c=document.createElement("canvas"); c.width=sw; c.height=sh;
+  let x=c.getContext("2d"); x.imageSmoothingEnabled=true; x.imageSmoothingQuality="high";
+  x.drawImage(im,sx,sy,sw,sh,0,0,sw,sh);
+  let cw=sw, ch=sh;
+  while(cw>TILE_PX*2&&ch>TILE_PX*2){                 // halve until within 2x of target
+    const n=document.createElement("canvas"); n.width=Math.max(1,cw>>1); n.height=Math.max(1,ch>>1);
+    const nx=n.getContext("2d"); nx.imageSmoothingEnabled=true; nx.imageSmoothingQuality="high";
+    nx.drawImage(c,0,0,n.width,n.height);
+    c=n; cw=n.width; ch=n.height;
+  }
+  const out=document.createElement("canvas"); out.width=TILE_PX; out.height=TILE_PX;
+  const ox=out.getContext("2d",{willReadFrequently:true});
+  ox.imageSmoothingEnabled=true; ox.imageSmoothingQuality="high";
+  const k=Math.min(TILE_PX/cw,TILE_PX/ch), dw=cw*k, dh=ch*k;
+  ox.drawImage(c,0,0,cw,ch,(TILE_PX-dw)/2,(TILE_PX-dh)/2,dw,dh);   // contain, centred
+  // The pistol is raised right beside the jaw, so no rectangle can hold the whole
+  // head without catching some barrel. Strip it by COLOUR instead: in the lower
+  // right only, drop anything that isn't green — the frog and his hair are green,
+  // the gun is grey steel. Feathered so the hair keeps a soft edge.
+  try{
+    const im2=ox.getImageData(0,0,TILE_PX,TILE_PX), p=im2.data;
+    for(let y2=0;y2<TILE_PX;y2++){
+      const fy=y2/TILE_PX; if(fy<0.52)continue;
+      for(let x2=0;x2<TILE_PX;x2++){
+        const fx=x2/TILE_PX; if(fx<0.62)continue;
+        const i=(y2*TILE_PX+x2)*4; if(!p[i+3])continue;
+        const r=p[i],gg=p[i+1],b=p[i+2];
+        // green must genuinely LEAD — neutral greys (r≈g≈b) are gun steel and its
+        // outlines, and a loose test let them through as faint scratches
+        const greenish=gg>r+3&&gg>=b+6;
+        if(!greenish){
+          const f=Math.min(1,(fx-0.62)/0.06)*Math.min(1,(fy-0.52)/0.06);
+          p[i+3]=Math.round(p[i+3]*(1-f));
+        }
+      }
+    }
+    ox.putImageData(im2,0,0);
+  }catch(e){ /* tainted canvas — keep the tile as-is rather than lose the logo */ }
+  return out;
+}
 (function(){ const im=new Image();
-  im.onload=()=>{ coverLogo=im; };
+  im.onload=()=>{ try{ coverLogo=bakeHeadTile(im); }catch(e){ coverLogo=null; } };
   im.onerror=()=>{ coverLogo=null; };
   im.src="/face.webp";
 })();
@@ -3373,15 +3419,12 @@ function drawBillboard(x,cy,ad,t,scl){
   // mush, so we crop to the head and COVER-fill the pad, clipped to its corners:
   // an avatar tile, dead centre, no letterbox gaps.
   if(headTile){
-    const iw=coverLogo.naturalWidth||1, ih=coverLogo.naturalHeight||1;
-    const sx=HEAD_CROP.x*iw, sy=HEAD_CROP.y*ih, sw=HEAD_CROP.w*iw, sh=HEAD_CROP.h*ih;
-    // CONTAIN, not cover: the art is a transparent cut-out, so the whole head
-    // should sit INSIDE the black tile with the tile visible around it. Cover
-    // zoomed it until the hair ran past the corners and it read as a solid block.
-    const inner=padS-6*s, k=Math.min(inner/sw,inner/sh), dw=sw*k, dh=sh*k;
-    g.save(); g.globalAlpha=fl;
-    g.drawImage(coverLogo,sx,sy,sw,sh,padCX-dw/2,padCY-dh/2,dw,dh);
-    g.restore();
+    // coverLogo is already the cropped, pre-downscaled 128px tile — just blit it,
+    // contained and centred. NOT dimmed by the neon flicker: the sign's tubes
+    // flicker, the printed logo on it does not, and multiplying a dark cut-out by
+    // 0.8 over a black tile is what was turning the face to mud.
+    const inner=padS-5*s, k=inner/TILE_PX, d=TILE_PX*k;
+    g.drawImage(coverLogo,padCX-d/2,padCY-d/2,d,d);
   } else {
     g.save(); g.translate(0,0); g.scale(s,s);
     drawAdIcon(ad.icon,padCX/s,padCY/s,ad.col); g.restore();   // same pad centre as the head
