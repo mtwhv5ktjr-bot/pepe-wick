@@ -1645,6 +1645,7 @@ async function fetchTicker(){
   tickerBusy=false;
 }
 function drawTicker(t){
+  fetchPaidAds();                                       // piggyback: both are 5-min-throttled menu fetches
   if(!tickerTxt){ fetchTicker(); return; }
   fetchTicker();                                        // refresh check is self-throttled
   g.save(); g.font="bold 11px Verdana"; g.textAlign="left";
@@ -3253,6 +3254,12 @@ function drawAdIcon(id,mx,my,c){
       g.fillStyle="#0e1420"; rr(-8,-10,16,20,2.5); g.fill(); g.strokeStyle=c; g.lineWidth=1.5; rr(-8,-10,16,20,2.5); g.stroke();
       g.fillStyle=c; rr(-3.5,-12,7,4,1.5); g.fill();
       g.strokeStyle=c; g.lineWidth=1.6; [-3,2,7].forEach(yy=>{ g.beginPath(); g.moveTo(-5,yy); g.lineTo(-2.5,yy+2.2); g.lineTo(1.5,yy-2); g.stroke(); }); break;
+    case "ad":   // 📢 paid slot — a megaphone in the buyer's accent color
+      g.fillStyle=c; g.beginPath(); g.moveTo(-9,-3); g.lineTo(2,-8); g.lineTo(2,8); g.lineTo(-9,3); g.closePath(); g.fill();
+      rr(-12,-3,4,6,1.5); g.fill();
+      g.save(); g.globalCompositeOperation="lighter"; g.strokeStyle=c; g.lineWidth=1.4;
+      g.beginPath(); g.arc(4,0,6,-0.7,0.7); g.stroke();
+      g.beginPath(); g.arc(4,0,9.5,-0.6,0.6); g.stroke(); g.restore(); break;
     case "monitor":
       g.fillStyle="#0e1420"; rr(-11,-8,22,14,2.5); g.fill(); g.strokeStyle=c; g.lineWidth=1.5; rr(-11,-8,22,14,2.5); g.stroke();
       g.fillStyle=c; rr(-2.5,6,5,3,0.5); g.fill(); rr(-6,8.5,12,2,1); g.fill();
@@ -3297,6 +3304,25 @@ const WICK_ADS=[
   { url:"survey.wick.pics",tag:"TAKE THE WICK SURVEY",    col:"#8fc0ff", rgb:"143,192,255", icon:"clip"    },
   { url:"sites.wick.pics", tag:"ALL WICK SITES",          col:"#9fe6ff", rgb:"159,230,255", icon:"monitor" },
 ];
+/* ---- 📺 PAID BILLBOARDS: anyone can buy a day at mint.wick.pics.
+   1M PLS = a rotation slot · 10M PLS = EXCLUSIVE (every board in the game is
+   theirs that day). Served by the API; on any hiccup the house boards run. ---- */
+let paidAds=null, paidExclusive=false, paidAdsAt=0, paidAdsBusy=false;
+function hexToRgb(h){ const v=parseInt(String(h||"#7cf9a5").replace("#",""),16)||0x7cf9a5;
+  return ((v>>16)&255)+","+((v>>8)&255)+","+(v&255); }
+function fetchPaidAds(){
+  if(paidAdsBusy||performance.now()-paidAdsAt<300000)return;
+  paidAdsBusy=true; paidAdsAt=performance.now();
+  fetchT("https://wick-arsenal.vercel.app/api/billboards").then(r=>r.json()).then(j=>{
+    if(j&&j.ok&&Array.isArray(j.ads)&&j.ads.length){
+      paidExclusive=!!j.exclusive;
+      paidAds=j.ads.slice(0,8).map(a=>({url:String(a.name||"").slice(0,20),
+        tag:String(a.tag||"").slice(0,28), site:String(a.url||"").slice(0,32),
+        col:a.color||"#7cf9a5", rgb:hexToRgb(a.color), icon:"ad", paid:true,
+        logo:(typeof a.logo==="string"&&/^[0-9a-f]{64}$/i.test(a.logo))?a.logo:null}));
+    } else { paidAds=null; paidExclusive=false; }
+  }).catch(()=>{}).finally(()=>{ paidAdsBusy=false; });
+}
 function drawBillboard(x,cy,ad,t,scl){
   const s=scl||1, w=248*s, h=66*s, fl=0.8+0.2*Math.sin(t*5.5+x*0.7);
   const seg=(Math.sin(t*3.1+x)*0.5+0.5)>0.94?0.35:1; // occasional tube-segment dropout (real neon flicker)
@@ -3336,9 +3362,24 @@ function drawBillboard(x,cy,ad,t,scl){
   g.font="bold "+(9.5*s|0)+"px Verdana"; g.fillStyle="rgba(220,228,240,0.72)"; g.fillText(ad.tag,L+54*s,cy+13*s);
   g.restore();
   g.textBaseline="alphabetic"; g.textAlign="left";
-  // PEPE WICK body standing in the right-hand negative space of the sign
-  { const hs=0.8*s, hx=x+w/2-24*s, hy=cy+h/2-6*s, ho={t:t*0.7,face:-1,pose:"idle",gunType:0,muzzle:0};
-    g.save(); drawHero(hx,hy,hs,ho); g.restore(); }
+  // the advertiser's 16x16 on-chain sprite stands where Pepe would — or Pepe does
+  if(ad.logo){
+    const px=2.6*s, ox=x+w/2-24*s-8*px, oy=cy-8*px;
+    g.save(); g.globalAlpha=fl;
+    g.fillStyle=ad.col; if(!MOBILE){ g.shadowColor=ad.col; g.shadowBlur=6*s; }
+    for(let i=0;i<256;i++){
+      const nib=parseInt(ad.logo[i>>2],16);            // 4 pixels per hex char
+      if((nib>>(3-(i&3)))&1)g.fillRect(ox+(i%16)*px,oy+((i/16)|0)*px,px,px);
+    }
+    g.shadowBlur=0; g.restore();
+  } else {
+    const hs=0.8*s, hx=x+w/2-24*s, hy=cy+h/2-6*s, ho={t:t*0.7,face:-1,pose:"idle",gunType:0,muzzle:0};
+    g.save(); drawHero(hx,hy,hs,ho); g.restore();
+  }
+  // the paid link line, under the tagline
+  if(ad.paid&&ad.site){ g.save(); g.globalAlpha=fl*0.85; g.textAlign="left";
+    g.font="bold "+(8*s|0)+"px Verdana"; g.fillStyle="rgba(159,230,255,0.85)";
+    g.fillText("▸ "+ad.site,L+54*s,cy+24*s); g.restore(); }
 }
 function menuBackdrop(t){
   const sky=g.createLinearGradient(0,0,0,H);
@@ -3539,7 +3580,8 @@ function render(){
     for(let i=0;i<n;i++){
       const bx=560+i*step, sx=bx-camX*0.55;
       if(sx<-160||sx>W+160)continue;                 // cull off-screen (detail is heavier now)
-      const ad=WICK_ADS[(i+lvIdx*5)%WICK_ADS.length];
+      const ad=paidExclusive&&paidAds?paidAds[0]                     // 10M exclusive: every board in the city is theirs
+        :(paidAds&&paidAds.length?[...paidAds,...WICK_ADS]:WICK_ADS)[(i+lvIdx*5)%((paidAds?paidAds.length:0)+WICK_ADS.length)];
       const cy=170+((i*53+lvIdx*17)%4)*18, scl=0.9+((i*29+lvIdx*7)%5)*0.03;
       drawBillboard(bx,cy,ad,t,scl);
     } }
