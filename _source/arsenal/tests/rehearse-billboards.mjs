@@ -10,9 +10,8 @@ import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const reqHere = createRequire(import.meta.url);
-const reqCash = createRequire("C:/Users/Bia/New folder/cashcat-printer/");
 const ganache = reqHere("ganache");
-const ethers = reqCash("ethers");
+const ethers = reqHere("ethers");
 
 const ROUTER = "0x98bf93ebf5c380C0e6Ae8e192A7e2AE08edAcc02";   // PulseX v2
 const WPLS   = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";

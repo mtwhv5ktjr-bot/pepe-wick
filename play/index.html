@@ -2417,10 +2417,17 @@ const TUT_STEPS=[
   {k:"fire", ic:"✦",   txt:"FIRE — CLICK the mouse"},
   {k:"stomp",ic:"↓",   txt:"KILL — shoot them, or LAND ON THEIR HEADS"},
 ];
-/* endless GAUNTLET mode */
+/* GAUNTLET mode — 50 waves, then a finish line */
 let gauntlet=false, gWave=0, gQueue=[], gRestT=0, gBanner=0, gBannerTxt="";
+/* The gauntlet used to be endless, which quietly broke the world board: score
+   grows with the SQUARE of the wave (clear bonus 250+120n, and enemy count keeps
+   climbing) while the server's ceiling only grows linearly per wave — so past
+   ~wave 100 a genuine run got refused as impossible. A finish line also makes
+   the board comparable: everyone is chasing the same 50 waves. */
+const GAUNTLET_WAVES=50;
+let gWin=false;
 let gBest=0; try{ gBest=+localStorage.getItem("pw_gbest")||0; }catch(e){}
-const GAUNTLET_LV={ name:"THE GAUNTLET", sign:"THE GAUNTLET", lore:"Endless waves. No door out. How long can you last?", len:2400,
+const GAUNTLET_LV={ name:"THE GAUNTLET", sign:"THE GAUNTLET", lore:"50 waves. No door out. How far can you get?", len:2400,
   floors:[[-300,2700]],
   ledges:[{x:360,y:372,w:220},{x:1820,y:372,w:220},{x:1010,y:300,w:280}],
   crates:[], kegs:[], lamps:[200,700,1200,1700,2200], checkpoints:[], enemies:[],
@@ -2480,7 +2487,7 @@ function respawnLevel(){ /* death → last checkpoint, world progress kept */
   camX=Math.max(0,cx-W*0.35);
   state="play"; introT=0;
 }
-/* ---------- endless gauntlet ---------- */
+/* ---------- the gauntlet ---------- */
 let preGLvIdx=0;
 let bossRush=false, brWin=false, brBest=+((()=>{try{return localStorage.getItem("pw_brbest")}catch(e){return 0}})()||0);
 /* 👹 BOSS RUSH — the roster back to back, one life, own board lane */
@@ -2493,7 +2500,7 @@ function startBossRush(){ startGauntlet(); bossRush=true; brWin=false;
   floats.push({x:P.x,y:P.y-100,txt:"👹 BOSS RUSH — 4 ROUNDS, ONE LIFE",t:2.4,size:14,c:"#ff9d5e"}); }
 function startGauntlet(){
   releaseAllInput(); paused=false;
-  newBestShown=false; runPrevBest=0; dailyRun=false; bossRush=false; brWin=false;   // gauntlet compares against gBest live
+  newBestShown=false; runPrevBest=0; dailyRun=false; bossRush=false; brWin=false; gWin=false;   // gauntlet compares against gBest live
   if(!gauntlet)preGLvIdx=lvIdx;         // remember the campaign selection ONCE — RUN AGAIN must not overwrite it with 0
   gauntlet=true; lvIdx=0; lvl=GAUNTLET_LV; applyTheme(0);
   P=newPlayer(GAUNTLET_LV.len/2); camX=Math.max(0,P.x-W/2); checkpointX=P.x;
@@ -2562,6 +2569,8 @@ function gauntletTick(dt){
     gRestT-=dt;
     if(gRestT<=0){ if(bossRush&&gWave>=4){ brWin=true; lvScore+=5000;
       floats.push({x:P.x,y:GY-160,txt:"RUSH CLEARED  +5000",t:2,size:16,c:"#7cf9a5"}); endGauntlet(); }
+      else if(!bossRush&&gWave>=GAUNTLET_WAVES){ gWin=true; lvScore+=10000;
+        floats.push({x:P.x,y:GY-160,txt:"ALL "+GAUNTLET_WAVES+" WAVES CLEARED  +10000",t:2.4,size:16,c:"#7cf9a5"}); endGauntlet(); }
       else nextWave(); }
   }
 }
@@ -4171,7 +4180,7 @@ function drawHUD(t){
   // combined stat line on the left; the whole right corner belongs to the swap button.
   // The desktop layout put ☠ kills at W-118 — INSIDE the swap box — hence the clutter.
   g.font=MOBILE?"900 11px Verdana":"900 13px Verdana"; g.textAlign="left"; g.fillStyle="#7cf9a5";
-  g.fillText(gauntlet?(bossRush?("👹 BOSS RUSH · ROUND "+Math.min(4,Math.max(1,gWave))+"/4"):("THE GAUNTLET · WAVE "+gWave)):(MOBILE?lvl.name.replace(/^(\d+) — (THE )?/,"$1 · "):lvl.name),14,24);
+  g.fillText(gauntlet?(bossRush?("👹 BOSS RUSH · ROUND "+Math.min(4,Math.max(1,gWave))+"/4"):("THE GAUNTLET · WAVE "+gWave+"/"+GAUNTLET_WAVES)):(MOBILE?lvl.name.replace(/^(\d+) — (THE )?/,"$1 · "):lvl.name),14,24);
   if(!MOBILE&&bountyActive()){ g.save(); g.textAlign="center"; g.font="900 10px Verdana"; g.fillStyle="#7cf9a5";
     g.fillText("🏆 PRIZE BOARD — "+fmtDur(prizeLeft())+" left",W/2,15); g.restore(); }   // phones: menu/board only — mid-run it's noise
   const la=gauntlet?0:enemies.reduce((n,e)=>n+(e.dead?0:1),0);
@@ -4318,10 +4327,11 @@ function drawGover(){
   g.fillStyle="rgba(70,0,8,"+(a*0.5)+")"; g.fillRect(0,0,W,H);
   g.fillStyle="rgba(0,0,0,"+(a*0.72)+")"; g.fillRect(0,0,W,H);
   g.save(); g.globalAlpha=a; g.textAlign="center";
-  g.font="900 30px Verdana"; g.fillStyle=bossRush?(brWin?"#7cf9a5":"#ff9d5e"):"#ff6b7a";
-  g.fillText(bossRush?(brWin?"👹 RUSH CLEARED":"👹 RUSH OVER"):"GAUNTLET OVER",W/2,120);
+  g.font="900 30px Verdana"; g.fillStyle=bossRush?(brWin?"#7cf9a5":"#ff9d5e"):(gWin?"#7cf9a5":"#ff6b7a");
+  g.fillText(bossRush?(brWin?"👹 RUSH CLEARED":"👹 RUSH OVER"):(gWin?"⚔ GAUNTLET CLEARED":"GAUNTLET OVER"),W/2,120);
   g.font="900 20px Verdana"; g.fillStyle="#7cf9a5";
-  g.fillText(bossRush?(brWin?"ALL 4 ROUNDS DOWN":("FELL IN ROUND "+Math.max(1,gWave))):("YOU REACHED WAVE "+gWave),W/2,158);
+  g.fillText(bossRush?(brWin?"ALL 4 ROUNDS DOWN":("FELL IN ROUND "+Math.max(1,gWave)))
+            :(gWin?("ALL "+GAUNTLET_WAVES+" WAVES DOWN"):("YOU REACHED WAVE "+gWave+" / "+GAUNTLET_WAVES)),W/2,158);
   g.font="900 60px Verdana"; g.fillStyle="#ffd75e"; g.fillText(Math.floor(lvScore).toLocaleString(),W/2,232);
   g.font="bold 13px Verdana"; g.fillStyle="#cfd6e0"; g.fillText(lvKills+" kills   ·   "+lvTime.toFixed(0)+"s survived",W/2,262);
   const rec=Math.floor(lvScore)>=(bossRush?brBest:gBest)&&lvScore>0;
@@ -4580,7 +4590,7 @@ function drawScoreCard(){
     g.strokeStyle=bc; g.lineWidth=3; g.beginPath(); g.arc(0,0,26,0,TAU); g.stroke();
     g.font="900 30px Verdana"; g.fillStyle=bc; g.textBaseline="middle"; g.fillText(br,0,2); g.textBaseline="alphabetic"; g.restore(); }
   g.font="bold 16px Verdana"; g.fillStyle="#cfd6e0";
-  g.fillText(gaunt?("⚔  SURVIVED TO WAVE "+gWave+"   ·   "+lvKills+" KILLS"):(done?"🦴  BISCUIT — SAFE ✓   ·   "+cleared+" / "+LEVELS.length+" CONTRACTS":cleared+" / "+LEVELS.length+" CONTRACTS CLEARED"),W/2,272);
+  g.fillText(gaunt?((gWin?"⚔  ALL "+GAUNTLET_WAVES+" WAVES CLEARED":"⚔  SURVIVED TO WAVE "+gWave+" / "+GAUNTLET_WAVES)+"   ·   "+lvKills+" KILLS"):(done?"🦴  BISCUIT — SAFE ✓   ·   "+cleared+" / "+LEVELS.length+" CONTRACTS":cleared+" / "+LEVELS.length+" CONTRACTS CLEARED"),W/2,272);
   drawHero(W/2-(done?32:0),452,1.55,{t,face:1,pose:"idle",gunType:loadoutType||0,muzzle:(Math.sin(t*4)>0.7)?0.5:0});
   if(done)drawDog(W/2+46,452,-1,{});
   if(bountyActive()){ g.font="900 14px Verdana"; g.fillStyle="#7cf9a5";
@@ -4596,7 +4606,7 @@ function shareScore(){
   try{ const a=document.createElement("a"); a.href=url; a.download="pepe-wick-score.png"; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
   const s=gauntlet?Math.floor(lvScore):totalScore();
   const txt=gauntlet
-    ? "I survived to WAVE "+gWave+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top 3 NFT holders win 50/35/15 USDC. ":"")+"play → "+SHARE_URL
+    ? (gWin?"I CLEARED all "+GAUNTLET_WAVES+" waves":"I survived to WAVE "+gWave+"/"+GAUNTLET_WAVES)+" — "+s.toLocaleString()+" pts — in the PEPE WICK ⚔ GAUNTLET 🐸🔫\n"+(bountyActive()?"Top 3 NFT holders win 50/35/15 USDC. ":"")+"play → "+SHARE_URL
     : "I scored "+s.toLocaleString()+" in PEPE WICK 🐸🔫 — get the dog back.\n"+(bountyActive()?"Top 3 NFT holders win 50/35/15 USDC. ":"")+"play → "+SHARE_URL;
   try{ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank"); }catch(e){}
   lbMsg="📸 card saved — attach it to your post!";
@@ -4809,7 +4819,7 @@ function drawGuide(){
   head(R2,z,"⚔ MODES"); z+=lh;
   line(R2,z,"STORY — 10 contracts. Clear EVERY enemy,"); z+=lh;
   line(R2,z,"then the exit door lights up. Get BISCUIT back."); z+=lh;
-  line(R2,z,"GAUNTLET — endless waves, chase the record."); z+=lh;
+  line(R2,z,"GAUNTLET — 50 waves, chase the record."); z+=lh;
   menuBtn(W/2-70,H-52,140,32,"◀ BACK",()=>{state="menu";},"#fff");
   g.textAlign="left";
 }

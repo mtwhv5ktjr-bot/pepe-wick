@@ -19,8 +19,22 @@ const MAX_SCORE = 2_000_000;        // absolute backstop; the per-mode ceilings 
 // scoring every one at a sustained 40-combo, S-ranking all ten and taking every
 // secret lands near 225k, so 300k is generous headroom over a perfect run.
 // The gauntlet is endless, so it scales with the wave reached instead.
+// The wave/level is CLIENT-SUPPLIED and feeds the ceiling, so it has to be bounded
+// by what each mode can actually reach — otherwise a tampered client just claims a
+// huge wave and buys itself a matching allowance.
+function maxLevelFor(mode) {
+  if (mode === "gauntlet") return 50;                     // the gauntlet ends at wave 50
+  if (mode === "bossrush") return 4;
+  if (String(mode).startsWith("daily-")) return 1;
+  return 10;                                              // campaign: 10 contracts
+}
 function ceilingFor(mode, level) {
-  if (mode === "gauntlet") return 5_000 + Math.max(1, level) * 12_000;
+  // 20k/wave, not 12k. Modelled against the game's own scoring: a wave-50 run
+  // scores ~476k played straight, and ~707k when every kill is stomped and chained
+  // at combo. The old 12k/wave capped wave 50 at 605k — under a strong run — and,
+  // because the old clamp let `level` reach 99 while the score grows quadratically,
+  // long runs were refused outright somewhere past a million points.
+  if (mode === "gauntlet") return 5_000 + Math.max(1, level) * 20_000;   // wave 50 -> 1,005,000
   if (String(mode).startsWith("daily-")) return 60_000;   // one level, one attempt — a perfect single-level run sits near ~30k
   if (mode === "bossrush") return 40_000;                 // 4 boss rounds + clear bonuses tops out well under this
   return 300_000;
@@ -104,7 +118,7 @@ export default async function handler(req, res) {
     if (!ts || Math.abs(Date.now() - Number(ts)) > MAX_AGE_MS)
       return res.status(401).json({ error: "stale or missing timestamp" });
 
-    const cleanLevel = Math.max(1, Math.min(99, Number(level) || 1));
+    const cleanLevel = Math.max(1, Math.min(maxLevelFor(cleanMode), Number(level) || 1));
     if (s > ceilingFor(cleanMode, cleanLevel))
       return res.status(400).json({ error: "score above what this mode can produce — flagged, not stored" });
 

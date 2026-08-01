@@ -7,9 +7,8 @@ import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const reqHere = createRequire(import.meta.url);
-const reqCash = createRequire("C:/Users/Bia/New folder/cashcat-printer/");
 const ganache = reqHere("ganache");
-const ethers = reqCash("ethers");
+const ethers = reqHere("ethers");
 
 const load = n => JSON.parse(readFileSync(join(root, "out", n + ".json"), "utf8"));
 const Guns = load("WickGuns"), Market = load("WickMarket"), Art = load("WickGunArt"), Bodies = load("WickGunBodies");

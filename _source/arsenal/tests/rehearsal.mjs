@@ -9,9 +9,8 @@ import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const reqHere = createRequire(import.meta.url);
-const reqCash = createRequire("C:/Users/Bia/New folder/cashcat-printer/");
 const ganache = reqHere("ganache");
-const ethers = reqCash("ethers");
+const ethers = reqHere("ethers");
 
 const GUNS = "0x188848DdB42fA8Ca2EB05649c944e05dfA2158FD";
 const ROUTER = "0x98bf93ebf5c380C0e6Ae8e192A7e2AE08edAcc02";

@@ -14,7 +14,8 @@ window.WICK_CFG = {
   rpcRead: "https://rpc-pulsechain.g4mm4.io",
   // ⬇⬇ paste from out/deployed.json after running deploy.mjs ⬇⬇
   guns:   "0x188848DdB42fA8Ca2EB05649c944e05dfA2158FD",
-  market: "0x1457C17A7132fCbCb2034337368050563DeD91e3",
+  market: "0x8F60741De2c49a46B8eFb6Cf89dDd3c08D1fb4e9",
+  marketOld: "0x1457C17A7132fCbCb2034337368050563DeD91e3",
   mods:       "0x004E6610ff47c6A6510DA446257822B37D26CD73",   // WICK MODS free mint — paste after LAUNCH-MODS.cmd
   modsMarket: "0xDDb963D1bb874d4ac5697550F513568c657E977E",   // mods marketplace — 50% royalty, 100% burned as $WICK
   // LIVE on PulseChain. A non-zero address here is also what UNHIDES the

@@ -1,13 +1,26 @@
-// Compile WICK Arsenal contracts, reusing cashcat-printer's installed solc.
+// Compile WICK Arsenal contracts. solc is resolved from this repo if installed,
+// else from SOLC_FROM, else the sibling checkout that has historically had it.
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
-// solc/ethers are already installed next door — borrow them, no reinstall.
-const require = createRequire("C:/Users/Bia/New folder/cashcat-printer/");
-const solc = require("solc");
+// solc is not a dependency of this repo. Prefer a local install so the script is
+// machine-independent; fall back to the neighbouring checkout that supplies it.
+let solc;
+try {
+  solc = createRequire(import.meta.url)("solc");
+} catch {
+  const from = process.env.SOLC_FROM || "C:/Users/Bia/New folder/cashcat-printer/";
+  try {
+    solc = createRequire(from)("solc");
+  } catch {
+    console.error("✗ solc not found. Either install it here:  npm i -D solc");
+    console.error("  or point at a checkout that has it:      SOLC_FROM=<path> node compile.mjs");
+    process.exit(1);
+  }
+}
 
 const files = ["WickGuns.sol", "WickMarket.sol", "WickGunArt.sol", "WickGunBodies.sol", "WickMods.sol", "WickModsMarket.sol", "WickBillboards.sol", "TestMocks.sol"];
 const sources = {};

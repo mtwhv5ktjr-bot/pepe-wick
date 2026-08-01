@@ -13,7 +13,7 @@ import { dirname, join } from "path";
 import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const ethers = createRequire("C:/Users/Bia/New folder/cashcat-printer/")("ethers");
+const ethers = createRequire(import.meta.url)("ethers");
 
 const PK = process.env.PRIVATE_KEY;
 if (!PK) { console.error("Set PRIVATE_KEY."); process.exit(1); }

@@ -13,92 +13,746 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="description" content="The PEPE WICK arcade on PulseChain. Two cabinets: PEPE WICK, playable now, and PEPE WICK vs HORDE powering up.">
-<meta name="theme-color" content="#0a0a12">
+<meta name="theme-color" content="#0a0a0a">
 <link rel="icon" href="/icon-192.png">
-<style>
-  :root{ --green:#7cf9a5; --cyan:#05d9e8; --pink:#ff2a6d; --gold:#ffd75e;
-    --display:'Press Start 2P', ui-monospace, 'Cascadia Mono', Consolas, monospace; }
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{
-    min-height:100vh; min-height:100dvh;
-    background:
-      radial-gradient(ellipse at 50% 8%, rgba(124,249,165,.08) 0%, transparent 55%),
-      linear-gradient(180deg,#0a0a12 0%,#12121f 46%,#0d0d18 100%);
-    font-family:var(--display); color:#e0e0e0;
-    padding:2rem 1.1rem 3rem;
-  }
-  body::before{ content:''; position:fixed; inset:0; opacity:.4; pointer-events:none; z-index:99;
-    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px); }
-  .wrap{max-width:1080px;margin:0 auto;position:relative;z-index:5}
-  h1{ text-align:center; font-size:clamp(1.1rem,4.4vw,2rem); letter-spacing:3px; color:var(--green);
-      text-shadow:0 0 12px currentColor,0 0 30px currentColor; animation:pulse 2.6s ease-in-out infinite; }
-  .sub{text-align:center;margin:.9rem 0 2.2rem;font-size:.55rem;letter-spacing:2px;color:#6b7686;line-height:2.2}
-  .sub a{color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(255,215,94,.4)}
-  .sub a:hover{color:#fff}
 
-  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;
-       max-width:760px;margin:0 auto}   /* two cabinets — keep them centred, not stretched */
-  .cab{display:block;text-decoration:none;color:inherit;transition:transform .18s ease}
-  .cab:hover{transform:translateY(-5px)}
-  .mq{height:44px;background:linear-gradient(180deg,#111,#222);border:3px solid #333;border-bottom:none;
-      border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 8px}
-  .mq span{font-size:.58rem;letter-spacing:2px;line-height:1.6;color:var(--green);
-    text-shadow:0 0 8px currentColor,0 0 18px currentColor;animation:pulse 2.6s ease-in-out infinite}
-  .mq b{color:var(--pink);text-shadow:0 0 8px currentColor}
-  .bz{background:linear-gradient(180deg,#1f1f1f,#151515);padding:11px 10px 10px;border:4px solid #2a2a2a;
-      border-top:none;border-radius:0 0 8px 8px;box-shadow:inset 0 0 18px rgba(0,0,0,.9),0 8px 24px rgba(0,0,0,.5)}
-  .scr{position:relative;aspect-ratio:4/3;border-radius:4px;overflow:hidden;background:#06080e;
-       display:flex;align-items:center;justify-content:center}
-  .scr img{width:100%;height:100%;object-fit:cover;display:block}
-  .scr.live img{object-fit:contain;padding:14%}
-  .scr::after{content:'';position:absolute;inset:0;pointer-events:none;
-    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.2) 3px,rgba(0,0,0,.2) 5px)}
-  .badge{position:absolute;left:0;right:0;bottom:8%;text-align:center}
-  .badge b{display:inline-block;font-weight:400;font-size:.62rem;letter-spacing:3px;color:#fff;
-    background:rgba(6,8,14,.6);border:2px solid var(--green);border-radius:6px;padding:.55em .8em;
-    text-shadow:0 0 9px var(--green);box-shadow:0 0 16px rgba(124,249,165,.3)}
-  .badge.soon b{border-color:var(--gold);color:var(--gold);text-shadow:0 0 9px var(--gold);
-    box-shadow:0 0 16px rgba(255,215,94,.25)}
-  .cap{margin-top:.7rem;text-align:center;font-size:.46rem;letter-spacing:1.5px;color:#6b7686;line-height:2}
-  .foot{margin-top:2.6rem;text-align:center;font-size:.44rem;letter-spacing:2px;color:#48515e;line-height:2.4}
-  .foot a{color:#5f6b7a;text-decoration:none;border-bottom:1px solid #2a323c}
-  .foot a:hover{color:var(--cyan);border-bottom-color:var(--cyan)}
-  @keyframes pulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.88;filter:brightness(1.28)}}
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Design system, lifted off the reference and measured, not guessed:
+   zero border-radius anywhere, 1px hairlines only, near-black ground,
+   ONE hot accent. The single saturated colour in the room comes out
+   of the machines — that is the whole idea.
+   ─────────────────────────────────────────────────────────────── */
+:root{
+  --bg:#0a0a0a;
+  --ink:#e6e6e6;
+  --mute:#757575;
+  --dim:#4a4a4a;
+  --line:rgba(230,230,230,.14);
+  --line-2:rgba(230,230,230,.30);
+  --hot:#ff4d00;
+  --screen:#7cf9a5;                       /* the game's own green — cabinet light only */
+  --sans:'Geist', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono:'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+  --gut:clamp(16px, 4vw, 56px);
+  --max:1440px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-weight:400;
+  font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{background:var(--hot);color:#000}
+a{color:inherit;text-decoration:none}
+
+/* the hall — fixed behind everything, camera dollies on scroll */
+#hall{position:fixed;inset:0;z-index:0;display:block;pointer-events:none}
+/* Type has to win, but the room has to survive. So the veil is directional:
+   heavy on the left where the headline sits, near-clear down the right where
+   the corridor is doing its work. Flat and stronger once text goes full-width. */
+#veil{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:
+    linear-gradient(180deg,rgba(10,10,10,.62) 0%,rgba(10,10,10,.14) 24%,rgba(10,10,10,.20) 58%,rgba(10,10,10,.90) 100%),
+    linear-gradient(90deg,rgba(10,10,10,.86) 0%,rgba(10,10,10,.62) 34%,rgba(10,10,10,.06) 68%,rgba(10,10,10,.30) 100%)}
+@media(max-width:900px){
+  #veil{background:linear-gradient(180deg,rgba(10,10,10,.72) 0%,rgba(10,10,10,.55) 30%,rgba(10,10,10,.62) 62%,rgba(10,10,10,.94) 100%)}
+}
+/* film grain */
+#grain{position:fixed;inset:-50%;z-index:2;pointer-events:none;opacity:.038;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 6s steps(6) infinite}
+@keyframes grain{
+  0%{transform:translate(0,0)}       16%{transform:translate(-4%,-3%)}
+  33%{transform:translate(3%,-5%)}   50%{transform:translate(-2%,4%)}
+  66%{transform:translate(5%,2%)}    83%{transform:translate(-5%,-2%)}
+  100%{transform:translate(0,0)}
+}
+/* column rules — the reference keeps a visible structural grid */
+#cols{position:fixed;inset:0;z-index:2;pointer-events:none;
+  max-width:var(--max);margin:0 auto;padding:0 var(--gut);
+  display:grid;grid-template-columns:repeat(4,1fr)}
+#cols i{border-left:1px solid rgba(230,230,230,.045)}
+#cols i:last-child{border-right:1px solid rgba(230,230,230,.045)}
+
+.shell{position:relative;z-index:3;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+
+/* ── type ─────────────────────────────────────────────── */
+.mono{font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mute)}
+.display{font-weight:600;letter-spacing:-.04em;line-height:.9;
+  font-size:clamp(38px,7.4vw,104px)}
+.h2{font-weight:600;letter-spacing:-.03em;line-height:1;font-size:clamp(26px,3.6vw,44px)}
+.lede{color:#c4c4c4;font-size:clamp(15px,1.35vw,19px);line-height:1.55;letter-spacing:-.011em;max-width:56ch}
+
+/* ── top bar ──────────────────────────────────────────── */
+header{position:fixed;top:0;left:0;right:0;z-index:20;
+  border-bottom:1px solid var(--line);
+  background:rgba(10,10,10,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.bar{max-width:var(--max);margin:0 auto;padding:0 var(--gut);height:52px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.brand b{font-weight:600;letter-spacing:-.02em;font-size:14px;color:#fff}
+.brand span{color:var(--dim)}
+.brand em{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--mute)}
+.status{display:flex;align-items:center;gap:7px}
+.dot{width:6px;height:6px;background:var(--screen);flex:none;
+  box-shadow:0 0 8px var(--screen);animation:blink 2.4s steps(1) infinite}
+@keyframes blink{0%,72%{opacity:1}73%,100%{opacity:.25}}
+nav{display:flex;gap:22px}
+nav a{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--mute);transition:color .09s linear}
+nav a:hover{color:var(--hot)}
+@media(max-width:760px){ .status{display:none} nav{gap:15px} }
+/* below ~430 the brand suffix and the nav fight over the last 2px of the bar */
+@media(max-width:430px){ .brand span,.brand em{display:none} nav{gap:13px} }
+
+/* ── section scaffolding ──────────────────────────────── */
+section{position:relative}
+.rule{display:flex;align-items:baseline;gap:18px;
+  border-top:1px solid var(--line);padding-top:12px;margin-bottom:clamp(28px,5vw,62px)}
+.rule .idx{color:var(--hot)}
+.rule .ttl{color:var(--ink)}
+.rule .rt{margin-left:auto;color:var(--dim)}
+
+/* ── hero ─────────────────────────────────────────────── */
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;
+  padding:108px 0 44px}
+.eyebrow{display:flex;gap:16px;align-items:center;margin-bottom:clamp(20px,3.4vw,34px)}
+.eyebrow .bar-i{width:clamp(28px,5vw,64px);height:1px;background:var(--hot)}
+.hero h1{max-width:15ch}
+.hero h1 .o{color:var(--hot)}
+.heroFoot{display:flex;flex-wrap:wrap;gap:clamp(22px,4vw,60px);align-items:flex-end;
+  margin-top:clamp(26px,4vw,46px)}
+.cta{display:flex;flex-wrap:wrap;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 20px;
+  border:1px solid var(--line-2);font-family:var(--mono);font-size:11px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink);
+  transition:background .09s linear,color .09s linear,border-color .09s linear}
+.btn .ar{transition:transform .16s cubic-bezier(.2,.7,.3,1)}
+.btn:hover{background:var(--ink);color:#000;border-color:var(--ink)}
+.btn:hover .ar{transform:translate(3px,-3px)}
+.btn.solid{background:var(--hot);border-color:var(--hot);color:#000;font-weight:500}
+.btn.solid:hover{background:#fff;border-color:#fff;color:#000}
+.scrollcue{position:absolute;left:var(--gut);bottom:26px;display:flex;align-items:center;gap:10px}
+.scrollcue i{display:block;width:1px;height:26px;background:linear-gradient(180deg,var(--hot),transparent);
+  animation:drop 1.9s ease-in-out infinite}
+@keyframes drop{0%,100%{transform:scaleY(.35);transform-origin:top;opacity:.5}50%{transform:scaleY(1);opacity:1}}
+
+/* ── THE MACHINES ──────────────────────────────────────
+   Everything else on this page holds the hairline discipline: no radius, 1px
+   rules, one accent. The cabinets are where all the boldness gets spent, so
+   they get real physical form — a backlit angled marquee, a tube recessed
+   behind a bezel, a control deck that juts toward the player, lit buttons and
+   a coin door. Each machine carries its OWN colour (--mc); the page does not.  */
+.floorbay{position:relative;padding-bottom:clamp(34px,6vw,78px)}
+/* the room's floor, receding under the row */
+/* The floor comes TOWARD you below the machines, so the perspective divide
+   magnifies it — measured 2603px wide inside a 1263px page. That is correct
+   geometry, not a bug, but it has to be clipped or the whole document grows
+   with it. The wrapper does the clipping so nothing touches the machines. */
+.bayfloor{position:absolute;left:0;right:0;bottom:0;height:190px;
+  z-index:0;pointer-events:none;overflow:hidden}
+.baytiles{position:absolute;left:0;right:0;top:0;height:190px;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 64px,rgba(198,214,238,.06) 64px 65px),
+    repeating-linear-gradient(0deg,transparent 0 32px,rgba(198,214,238,.045) 32px 33px);
+  transform:perspective(420px) rotateX(60deg);transform-origin:50% 0;
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.9),transparent 74%);
+          mask-image:linear-gradient(180deg,rgba(0,0,0,.9),transparent 74%)}
+.machines{position:relative;z-index:2;display:grid;align-items:end;justify-items:center;
+  grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:clamp(26px,5vw,70px)}
+.machine{--mc:var(--screen);position:relative;display:block;width:100%;max-width:396px;
+  color:inherit;isolation:isolate}
+.machine.horde{--mc:var(--hot)}
+
+/* marquee — the backlit name board, tapered like the real thing */
+.marquee{position:relative;height:clamp(46px,5.8vw,58px);margin:0 10px;overflow:hidden;
+  clip-path:polygon(5% 0,95% 0,100% 100%,0 100%);
+  background:linear-gradient(180deg,#242424,#0f0f0f)}
+.marquee::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 132%,var(--mc),transparent 66%);
+  opacity:.30;transition:opacity .16s linear}
+.machine:hover .marquee::before{opacity:.58}
+.marquee b{position:absolute;inset:0;display:grid;place-items:center;padding:0 12px;
+  font-weight:600;font-size:clamp(13px,1.6vw,18px);letter-spacing:.04em;
+  color:#fff;text-align:center;line-height:1.05;
+  text-shadow:0 0 10px var(--mc),0 0 30px var(--mc);
+  animation:tube 6.5s steps(1) infinite}
+@keyframes tube{0%,41%{opacity:1}42%{opacity:.7}43%,88%{opacity:1}89%{opacity:.84}90%,100%{opacity:1}}
+
+/* the tube sits recessed behind a bezel */
+.hood{height:12px;margin:0 4px;background:linear-gradient(180deg,#000,#151515)}
+.bezel{margin:0 4px;padding:clamp(10px,1.5vw,16px);
+  background:linear-gradient(180deg,#131313,#090909);
+  border-left:1px solid rgba(255,255,255,.05);border-right:1px solid rgba(255,255,255,.05)}
+/* A real tube has curved corners. The page keeps its hard edges; the glass does not. */
+/* Tube treatment is FOUR darkening layers multiplied together — inset shadow,
+   vignette, scanlines, brightness. Tuned individually they each looked subtle;
+   stacked they rendered both screens solid black. Keep the character, let the
+   art through: the picture is the point of a cabinet. */
+.crt{position:relative;aspect-ratio:4/3;background:#050505;overflow:hidden;
+  border-radius:14px/20px;isolation:isolate;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),inset 0 0 22px rgba(0,0,0,.36),
+             0 0 30px -8px var(--mc)}
+.crt img{width:100%;height:100%;object-fit:cover;display:block;
+  filter:saturate(.94) contrast(1.04);
+  transition:filter .18s linear,transform .5s cubic-bezier(.2,.7,.3,1)}
+.crt.live img{object-fit:contain;padding:9%}
+.machine:hover .crt img{filter:saturate(1.08) contrast(1.08) brightness(1.1);transform:scale(1.02)}
+.crt::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.16) 2px 4px)}
+/* Clear to 68% before it falls off. A cover-fit image runs edge to edge, so a
+   tighter core swallowed the horde screen whole while the centred, padded Pepe
+   art sat safely inside it — same vignette, completely different result. */
+.crt::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,transparent 68%,rgba(0,0,0,.34) 100%)}
+.sweep{position:absolute;left:0;right:0;height:26%;z-index:4;pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(255,255,255,.05),transparent);
+  animation:sweep 7.5s linear infinite}
+@keyframes sweep{0%{top:-30%}100%{top:110%}}
+/* attract mode */
+.press{position:absolute;left:0;right:0;bottom:7%;z-index:5;text-align:center;pointer-events:none;
+  font-family:var(--mono);font-size:clamp(8px,1vw,10px);letter-spacing:.24em;color:#fff;
+  /* the black shadow is what keeps it legible over busy screen art */
+  text-shadow:0 0 9px var(--mc),0 2px 7px #000,0 0 3px #000;
+  animation:startblink 1.15s steps(1) infinite}
+@keyframes startblink{0%,54%{opacity:1}55%,100%{opacity:0}}
+.press.soon{animation:none;color:var(--mc);opacity:.85}
+
+/* control deck — juts wider than the body, angled away from the player */
+.deck{position:relative;margin:0 -7px;height:clamp(56px,6.8vw,70px);
+  background:linear-gradient(180deg,#2c2c2c 0%,#1b1b1b 44%,#101010 100%);
+  clip-path:polygon(0 0,100% 0,95.5% 100%,4.5% 100%);
+  display:flex;align-items:center;justify-content:center;gap:clamp(16px,3vw,32px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+.stick{position:relative;width:24px;height:36px}
+.stick::before{content:'';position:absolute;left:50%;bottom:0;translate:-50% 0;
+  width:27px;height:9px;border-radius:50%;background:radial-gradient(ellipse,#343434,#0a0a0a)}
+.stick::after{content:'';position:absolute;left:50%;top:11px;translate:-50% 0;
+  width:5px;height:19px;background:linear-gradient(180deg,#9c9c9c,#2b2b2b)}
+.stick i{position:absolute;left:50%;top:0;translate:-50% 0;z-index:2;
+  width:17px;height:17px;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#ff8a5c,#8d1e00 78%);
+  box-shadow:0 0 13px rgba(255,77,0,.5)}
+.btns{display:flex;gap:clamp(8px,1.2vw,12px)}
+.btns b{width:18px;height:18px;border-radius:50%;background:var(--b);
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.55),inset 0 2px 3px rgba(255,255,255,.34),0 0 0 2px #0d0d0d;
+  transition:box-shadow .12s linear}
+.machine:hover .btns b{box-shadow:inset 0 -3px 5px rgba(0,0,0,.5),inset 0 2px 3px rgba(255,255,255,.4),
+  0 0 0 2px #0d0d0d,0 0 13px var(--b)}
+
+/* coin door + credit readout */
+.coindoor{margin:0 12px;height:clamp(36px,4.4vw,44px);
+  background:linear-gradient(180deg,#171717,#090909);
+  border-top:1px solid rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 clamp(10px,1.6vw,16px)}
+.slot{flex:none;width:38px;height:6px;border-radius:3px;background:#000;
+  box-shadow:inset 0 2px 3px #000,0 1px 0 rgba(255,255,255,.09)}
+.cred{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--mute);white-space:nowrap}
+.cred b{color:var(--mc)}
+.base{margin:0 18px;height:clamp(12px,1.6vw,18px);background:linear-gradient(180deg,#0b0b0b,#040404)}
+/* light the machine throws down onto the floor */
+/* Bleeding this box past the machine (left/right:-16%) pushed the document 41px
+   wider than the viewport on a phone. The glow spreads through the GRADIENT
+   instead — same pool of light, no geometry escaping the machine. */
+.spill{position:absolute;left:0;right:0;bottom:-34px;height:80px;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 78% 100% at 50% 0%,var(--mc),transparent 70%);
+  opacity:.15;filter:blur(11px);transition:opacity .18s linear}
+.machine:hover .spill{opacity:.28}
+
+/* spec placard bolted under the machine */
+.plate{margin-top:clamp(15px,2.2vw,22px);border-top:1px solid var(--line)}
+.plate div{display:flex;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.plate div:last-child{border-bottom:0}
+.plate dt{flex:none;color:var(--dim);text-transform:uppercase;letter-spacing:.14em}
+.plate dd{margin-left:auto;text-align:right;color:#c4c4c4}
+.status{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+.status b{font-weight:600;letter-spacing:-.02em;font-size:clamp(15px,1.8vw,18px)}
+.status .ar{font-family:var(--mono);color:var(--dim);
+  transition:transform .16s cubic-bezier(.2,.7,.3,1),color .09s linear}
+.machine:hover .status .ar{transform:translate(4px,-4px);color:var(--mc)}
+
+/* ── ticker ───────────────────────────────────────────── */
+/* Full-bleed to the shell's gutters. NOT 100vw — that ignores the scrollbar and
+   pushes the document 15px wider than its own client width. */
+.ticker{position:relative;overflow:hidden;border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);padding:13px 0;
+  margin:clamp(56px,9vw,120px) calc(var(--gut)*-1)}
+.track{display:flex;width:max-content;animation:roll 34s linear infinite}
+.track span{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--mute);padding:0 26px;white-space:nowrap}
+.track span em{font-style:normal;color:var(--hot)}
+@keyframes roll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ── stack list ───────────────────────────────────────── */
+.stack{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:56px minmax(0,1fr) minmax(0,1.25fr);gap:clamp(14px,3vw,40px);
+  align-items:start;padding:clamp(18px,2.4vw,26px) 0;border-bottom:1px solid var(--line);
+  transition:background .11s linear,padding-left .16s cubic-bezier(.2,.7,.3,1)}
+.row:hover{background:#0f0f0f;padding-left:12px}
+.row .n{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--hot);padding-top:5px}
+.row h3{font-weight:600;letter-spacing:-.025em;font-size:clamp(17px,1.9vw,23px);line-height:1.15}
+.row p{color:var(--mute);font-size:14.5px;line-height:1.5;letter-spacing:-.008em}
+@media(max-width:720px){
+  .row{grid-template-columns:34px minmax(0,1fr);row-gap:6px}
+  .row p{grid-column:2}
+}
+
+/* ── footer ───────────────────────────────────────────── */
+footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
+/* 13.2vw is measured, not picked: "ARCADE ALLEY" in Geist 600 runs ~6.5x its
+   font-size, so anything above ~14vw pushes past the gutters and the whole
+   document ends up wider than its own client width. overflow is the seatbelt
+   for a fallback font with wider metrics. */
+.wordmark{font-weight:600;letter-spacing:-.05em;line-height:.82;
+  font-size:clamp(34px,13.2vw,196px);color:#141414;
+  -webkit-text-stroke:1px rgba(230,230,230,.16);user-select:none;
+  white-space:nowrap;max-width:100%;overflow:hidden}
+.fbar{display:flex;flex-wrap:wrap;gap:14px 30px;justify-content:space-between;
+  border-top:1px solid var(--line);margin-top:clamp(20px,3vw,40px);padding-top:16px}
+.fbar a{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--mute);transition:color .09s linear}
+.fbar a:hover{color:var(--hot)}
+.fbar .lgl{color:var(--dim)}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>ARCADE ALLEY</h1>
-  <p class="sub">
-    THE PEPE WICK ARCADE · ON PULSECHAIN<br>
-    <a href="/play/">▶ PLAY PEPE WICK</a> &nbsp;·&nbsp; <a href="https://mint.wick.pics">WICK ARSENAL</a> &nbsp;·&nbsp; <a href="/arsenal/">THE COLLECTION</a>
-  </p>
 
-  <div class="row">
-    <a class="cab" href="/play/">
-      <div class="mq"><span>PEPE WICK</span></div>
-      <div class="bz">
-        <div class="scr live"><img src="/face.webp" alt="PEPE WICK">
-          <div class="badge"><b>▶ PLAY NOW</b></div></div>
-        <p class="cap">10 CONTRACTS · GET THE DOG BACK<br>NFT GUNS · WORLD LEADERBOARD</p>
-      </div>
-    </a>
+<canvas id="hall" aria-hidden="true"></canvas>
+<div id="veil" aria-hidden="true"></div>
+<div id="cols" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div id="grain" aria-hidden="true"></div>
 
-    <a class="cab" href="/horde/">
-      <div class="mq"><span>PEPE WICK <b>vs</b> HORDE</span></div>
-      <div class="bz">
-        <div class="scr"><img src="/horde/soon-art.png" alt="PEPE WICK vs HORDE">
-          <div class="badge soon"><b>COMING SOON</b></div></div>
-        <p class="cap">CABINET TWO · POWERING UP</p>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <b>WICK.PICS</b><span>/</span><em>ARCADE</em>
+    </div>
+    <div class="status mono"><span class="dot"></span> TWO CABINETS · ONE ONLINE</div>
+    <nav>
+      <a href="/play/">Play</a>
+      <a href="https://mint.wick.pics">Arsenal</a>
+      <a href="/arsenal/">Collection</a>
+    </nav>
+  </div>
+</header>
+
+<main class="shell">
+
+  <section class="hero">
+    <div class="eyebrow">
+      <i class="bar-i"></i>
+      <span class="mono">Arcade Alley — PulseChain</span>
+    </div>
+    <h1 class="display">A back-alley arcade where the guns are&nbsp;<span class="o">yours</span> and the leaderboard never forgets.</h1>
+    <div class="heroFoot">
+      <p class="lede">Two cabinets, one dog to get back. Fully on-chain art, NFT weapons you actually carry into the game, and a world leaderboard signed by your own wallet.</p>
+      <div class="cta">
+        <a class="btn solid" href="/play/">Play Pepe Wick <span class="ar">↗</span></a>
+        <a class="btn" href="https://mint.wick.pics">Wick Arsenal <span class="ar">↗</span></a>
       </div>
-    </a>
+    </div>
+    <div class="scrollcue mono"><i></i> Walk in</div>
+  </section>
+
+  <section>
+    <div class="rule mono">
+      <span class="idx">(01)</span><span class="ttl">Select your machine</span><span class="rt">02 units · 01 online</span>
+    </div>
+
+    <div class="floorbay">
+      <div class="bayfloor" aria-hidden="true"><div class="baytiles"></div></div>
+      <div class="machines">
+
+        <a class="machine" href="/play/">
+          <div class="spill" aria-hidden="true"></div>
+          <div class="marquee"><b>PEPE WICK</b></div>
+          <div class="hood" aria-hidden="true"></div>
+          <div class="bezel">
+            <div class="crt live">
+              <img src="/face.webp" alt="PEPE WICK" loading="eager" decoding="async">
+              <div class="sweep" aria-hidden="true"></div>
+              <div class="press">PRESS START</div>
+            </div>
+          </div>
+          <div class="deck" aria-hidden="true">
+            <div class="stick"><i></i></div>
+            <div class="btns">
+              <b style="--b:#ff4d00"></b><b style="--b:#ffd75e"></b><b style="--b:#7cf9a5"></b>
+            </div>
+          </div>
+          <div class="coindoor">
+            <span class="slot" aria-hidden="true"></span>
+            <span class="cred">FREE PLAY · CREDITS <b>∞</b></span>
+          </div>
+          <div class="base" aria-hidden="true"></div>
+          <dl class="plate">
+            <div><dt>Mode</dt><dd>Campaign · Gauntlet · Boss Rush</dd></div>
+            <div><dt>Weapons</dt><dd>NFT-gated, 101 guns</dd></div>
+            <div><dt>Scores</dt><dd>Wallet-signed world board</dd></div>
+            <div><dt>Levels</dt><dd>10 contracts</dd></div>
+          </dl>
+          <div class="status"><b>Play now</b><span class="ar">↗</span></div>
+        </a>
+
+        <a class="machine horde" href="/horde/">
+          <div class="spill" aria-hidden="true"></div>
+          <div class="marquee"><b>PEPE WICK <span style="opacity:.6">vs</span> HORDE</b></div>
+          <div class="hood" aria-hidden="true"></div>
+          <div class="bezel">
+            <div class="crt">
+              <img src="/horde/soon-art.png" alt="PEPE WICK vs HORDE" loading="lazy" decoding="async">
+              <div class="sweep" aria-hidden="true"></div>
+              <div class="press soon">POWERING UP</div>
+            </div>
+          </div>
+          <div class="deck" aria-hidden="true">
+            <div class="stick"><i></i></div>
+            <div class="btns">
+              <b style="--b:#3a3a3a"></b><b style="--b:#3a3a3a"></b><b style="--b:#3a3a3a"></b>
+            </div>
+          </div>
+          <div class="coindoor">
+            <span class="slot" aria-hidden="true"></span>
+            <span class="cred">OUT OF ORDER · CREDITS <b>00</b></span>
+          </div>
+          <div class="base" aria-hidden="true"></div>
+          <dl class="plate">
+            <div><dt>Mode</dt><dd>Crowd runner</dd></div>
+            <div><dt>Weapons</dt><dd>Wick fusion tiers</dd></div>
+            <div><dt>Scores</dt><dd>Gauntlet · Daily</dd></div>
+            <div><dt>Status</dt><dd>In development</dd></div>
+          </dl>
+          <div class="status"><b>Coming soon</b><span class="ar">↗</span></div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="track" id="track"></div>
   </div>
 
-  <p class="foot">
-    UTILITY FOR $WICK ON PULSECHAIN · ART &amp; METADATA FULLY ON-CHAIN<br>
-    <a href="https://wick.pics">wick.pics</a> &nbsp;·&nbsp; <a href="https://mint.wick.pics">mint.wick.pics</a>
-  </p>
-</div>
+  <section>
+    <div class="rule mono">
+      <span class="idx">(02)</span><span class="ttl">What's in the machine</span><span class="rt">05 systems</span>
+    </div>
+    <div class="stack">
+      <div class="row">
+        <span class="n">01</span>
+        <h3>NFT guns</h3>
+        <p>101 guns minted on PulseChain, art and stats fully on-chain. Connect a wallet and every gun you hold becomes a distinct live weapon in the cabinet — different fire rate, damage, and recoil.</p>
+      </div>
+      <div class="row">
+        <span class="n">02</span>
+        <h3>Wick Mods</h3>
+        <p>Three attachment slots per gun. Hold a gun, mint three mods against it — the allowance is tracked per gun token, so cycling wallets buys you nothing.</p>
+      </div>
+      <div class="row">
+        <span class="n">03</span>
+        <h3>World leaderboard</h3>
+        <p>Scores are signed by your wallet before they count, fenced per mode, and capped at what the mode can physically produce. Campaign, gauntlet, boss rush and the daily each keep their own lane.</p>
+      </div>
+      <div class="row">
+        <span class="n">04</span>
+        <h3>Daily contract</h3>
+        <p>One seeded run a day, identical for everybody who plays it, with a ghost of the current leader racing beside you.</p>
+      </div>
+      <div class="row">
+        <span class="n">05</span>
+        <h3>On-chain art</h3>
+        <p>No IPFS, no metadata server, no pinning service to outlive. The SVG renders from contract storage, so the art survives exactly as long as the chain does.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="shell">
+  <div class="wordmark">ARCADE ALLEY</div>
+  <div class="fbar">
+    <a href="/play/">games.wick.pics/play</a>
+    <a href="https://mint.wick.pics">mint.wick.pics</a>
+    <a href="https://wick.pics">wick.pics</a>
+    <span class="lgl mono">Utility for $WICK · PulseChain 369</span>
+  </div>
+</footer>
+
+<script>
+/* ── ticker content, duplicated once so the -50% roll is seamless ── */
+(function(){
+  const bits = ["101 NFT guns","Fully on-chain art","World leaderboard","Daily contract",
+                "Boss rush","Endless gauntlet","10 contracts","Get the dog back"];
+  const half = bits.map(b => '<span>'+b+' <em>◆</em></span>').join('');
+  document.getElementById('track').innerHTML = half + half;
+})();
+
+/* ───────────────────────────────────────────────────────────────
+   THE HALL
+   A corridor of cabinets you are standing in. Pinhole projection:
+   a point (x lateral, h height above floor, d depth from camera)
+   lands at  sx = cx + (x-camX)*f/d,  sy = horizon + (EYE-h)*f/d.
+   Scrolling dollies the camera forward; the mouse leans it sideways.
+   Machines recycle front-to-back, so the hall never ends.
+   ─────────────────────────────────────────────────────────────── */
+(function(){
+  const cv = document.getElementById('hall');
+  if (!cv || !cv.getContext) return;
+  const g = cv.getContext('2d', { alpha:false });
+  const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  let W=0, H=0, cx=0, horizon=0, f=0;
+  const EYE = 1.6;             // eye height, world units (a cabinet is ~2.5 tall)
+  const AISLE = 4.3;           // half-width of the walkway — you stand IN it
+  const GAP = 2.6, PER = 24;   // spacing and count per side
+  const SPAN = GAP * PER;      // recycle distance
+  const NEAR = 2.2;            // don't let the front machine swallow the frame
+  const CEIL = 3.45;
+
+  function resize(){
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    // clientWidth, NOT innerWidth: innerWidth includes the scrollbar, and pinning
+    // an explicit CSS width that wide makes the document overflow itself.
+    W = document.documentElement.clientWidth; H = innerHeight;
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    g.setTransform(dpr,0,0,dpr,0,0);
+    // Project against a plausible viewport. Embedded in a frame that is sized to
+    // its CONTENT, innerHeight is the whole document (measured 3000 in testing) —
+    // that puts the horizon 1500px down and the corridor out of sight. Real
+    // viewports never reach this, so the clamp is inert on an actual browser.
+    const VH = Math.min(H, 2200);
+    cx = W/2; horizon = VH*0.5; f = VH*0.95;
+  }
+
+  // Screen colours. The game's green leads, a cold filler keeps most machines
+  // quiet, and the loud ones stay rare — rarity is what keeps the room black.
+  const PAL = [[124,249,165],[255,77,0],[5,217,232],[255,42,109],[255,214,94],[122,134,164]];
+  const WEIGHT = [0,0,5,5,1,2,5,3,0,5,4,5];
+
+  const cabs = [];
+  let rnd = 1337;
+  const rand = () => (rnd = (rnd*1664525 + 1013904223) >>> 0) / 4294967296;
+
+  function seed(){
+    cabs.length = 0;
+    for (let side = -1; side <= 1; side += 2)
+      for (let i = 0; i < PER; i++)
+        cabs.push({
+          side,
+          z: NEAR + i*GAP + (side < 0 ? GAP*0.5 : 0),   // stagger the two walls
+          c: PAL[WEIGHT[(rand()*WEIGHT.length)|0]],
+          h: 2.34 + rand()*0.46,                         // a row of identical boxes reads as CG
+          ph: rand()*Math.PI*2,
+          fk: rand() < 0.2 ? 1 : 0,                      // a couple of bad tubes
+          on: rand() < 0.9
+        });
+  }
+
+  const motes = [];
+  for (let i = 0; i < 70; i++)
+    motes.push({ x:(Math.random()-0.5)*11, h:Math.random()*3.1, z:NEAR+Math.random()*SPAN,
+                 s:0.16+Math.random()*0.4, ph:Math.random()*6.28 });
+
+  let camZ = 0, camX = 0, tgtX = 0, t = 0;
+  addEventListener('pointermove', e => { tgtX = ((e.clientX/W) - 0.5) * 1.5; }, { passive:true });
+
+  function draw(){
+    g.fillStyle = '#070707';
+    g.fillRect(0,0,W,H);
+
+    // Read the scroll position here rather than off a scroll EVENT. We are already
+    // in a frame callback, so it costs nothing, and it cannot desync — no missed
+    // events, no fighting smooth-scroll or scroll anchoring.
+    camZ = scrollY * 0.011;
+    camX += (tgtX - camX) * 0.055;
+    const py = (h,s) => horizon + (EYE - h)*s;
+
+    /* floor — receding rungs, tighter and fainter with distance */
+    g.lineWidth = 1;
+    for (let k = 1; k < 46; k++){
+      const d = k*1.7 - (camZ % 1.7);
+      if (d < NEAR) continue;
+      const s = f/d, y = py(0,s), a = Math.max(0, 0.085 * (1 - d/44));
+      if (a <= 0.002) continue;
+      g.strokeStyle = 'rgba(198,214,238,'+a.toFixed(3)+')';
+      g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    }
+    /* floor — rails converging on the vanishing point */
+    for (let i = -6; i <= 6; i++){
+      const x = i*2.0;
+      const sN = f/NEAR, sF = f/46;
+      g.strokeStyle = 'rgba(198,214,238,0.05)';
+      g.beginPath();
+      g.moveTo(cx + (x-camX)*sN, py(0,sN));
+      g.lineTo(cx + (x-camX)*sF, py(0,sF));
+      g.stroke();
+    }
+
+    /* ceiling strip lights — the thing that actually says "indoors" */
+    for (let k = 1; k < 16; k++){
+      const d = k*4.4 - (camZ % 4.4);
+      if (d < NEAR) continue;
+      const s = f/d, a = 0.16 * Math.max(0, 1 - d/40);
+      if (a <= 0.003) continue;
+      const lx0 = cx + (-1.45 - camX)*s, lx1 = cx + (1.45 - camX)*s;
+      const yT = py(CEIL, s), yB = py(CEIL - 0.09, s);
+      g.fillStyle = 'rgba(214,228,255,'+a.toFixed(3)+')';
+      g.fillRect(lx0, yT, lx1 - lx0, Math.max(1, yB - yT));
+      // the glow it throws back at the ceiling
+      const gh = (yB - yT) * 9;
+      if (gh > 2){
+        const cg = g.createLinearGradient(0, yT - gh*0.35, 0, yB + gh);
+        cg.addColorStop(0, 'rgba(150,180,240,0)');
+        cg.addColorStop(0.35, 'rgba(150,180,240,'+(a*0.30).toFixed(3)+')');
+        cg.addColorStop(1, 'rgba(150,180,240,0)');
+        g.fillStyle = cg;
+        g.fillRect(lx0 - (lx1-lx0)*0.6, yT - gh*0.35, (lx1-lx0)*2.2, gh*1.35);
+      }
+    }
+
+    /* cabinets, painter's order: far first */
+    for (const c of cabs){
+      let d = c.z - camZ;
+      while (d < NEAR) { c.z += SPAN; d = c.z - camZ; }
+      while (d > NEAR + SPAN) { c.z -= SPAN; d = c.z - camZ; }
+      c.d = d;
+    }
+    cabs.sort((a,b) => b.d - a.d);
+
+    const FOG = 40;                       // machines dissolve into the dark by here
+    for (const c of cabs){
+      const d = c.d, s = f/d;
+      if (d > FOG) continue;
+      const fade = Math.max(0, Math.min(1, (FOG - d)/22));
+      const cxw = c.side*AISLE;
+      const x0 = cx + (cxw - 0.85 - camX)*s;
+      const x1 = cx + (cxw + 0.85 - camX)*s;
+      if (x1 < -60 || x0 > W + 60) continue;
+      const yTop = py(c.h, s), yBot = py(0, s), w = x1 - x0;
+
+      /* body — lit down the aisle-facing edge, dark on the far one */
+      const bg = g.createLinearGradient(x0, 0, x1, 0);
+      const lit0 = c.side < 0 ? 26 : 11, lit1 = c.side < 0 ? 11 : 26;
+      bg.addColorStop(0, 'rgba('+lit0+','+lit0+','+(lit0+2)+','+fade.toFixed(3)+')');
+      bg.addColorStop(1, 'rgba('+lit1+','+lit1+','+(lit1+2)+','+fade.toFixed(3)+')');
+      g.fillStyle = bg;
+      g.fillRect(x0, yTop, w, yBot - yTop);
+      g.strokeStyle = 'rgba(230,230,230,'+(0.06*fade).toFixed(3)+')';
+      g.lineWidth = 1;
+      g.strokeRect(x0 + .5, yTop + .5, w - 1, yBot - yTop - 1);
+
+      const [r,gr,b] = c.c, rgb = r+','+gr+','+b;
+      // tube flicker: a slow breath, plus a hard stutter on the bad ones
+      let lit = c.on ? 0.78 + 0.22*Math.sin(t*1.6 + c.ph) : 0.12;
+      if (c.fk && Math.sin(t*9.1 + c.ph) > 0.955) lit *= 0.25;
+      const A = lit * fade;
+
+      /* screen */
+      const sx0 = x0 + w*0.15, sw = w*0.7;
+      const syT = py(c.h - 0.42, s), syB = py(c.h - 1.28, s);
+      g.fillStyle = 'rgba('+rgb+','+(A*0.74).toFixed(3)+')';
+      g.fillRect(sx0, syT, sw, syB - syT);
+
+      /* bloom — tight, or the far end of the hall turns into one white smear */
+      const cxS = sx0 + sw/2, cyS = (syT + syB)/2, rad = Math.max(sw, syB - syT)*1.15;
+      if (rad > 1){
+        const bl = g.createRadialGradient(cxS, cyS, 0, cxS, cyS, rad);
+        bl.addColorStop(0, 'rgba('+rgb+','+(A*0.26).toFixed(3)+')');
+        bl.addColorStop(1, 'rgba('+rgb+',0)');
+        g.fillStyle = bl;
+        g.fillRect(cxS-rad, cyS-rad, rad*2, rad*2);
+      }
+
+      /* marquee above the screen */
+      g.fillStyle = 'rgba('+rgb+','+(A*0.4).toFixed(3)+')';
+      g.fillRect(x0 + w*0.08, py(c.h, s), w*0.84, Math.max(1, py(c.h - 0.16, s) - py(c.h, s)));
+
+      /* wet-floor reflection — the single biggest "this is a real room" cue */
+      const rH = (yBot - syT) * 0.5;
+      if (rH > 2){
+        const rf = g.createLinearGradient(0, yBot, 0, yBot + rH);
+        rf.addColorStop(0, 'rgba('+rgb+','+(A*0.26).toFixed(3)+')');
+        rf.addColorStop(0.45, 'rgba('+rgb+','+(A*0.08).toFixed(3)+')');
+        rf.addColorStop(1, 'rgba('+rgb+',0)');
+        g.fillStyle = rf;
+        g.fillRect(sx0, yBot, sw, rH);
+      }
+    }
+
+    /* distance fog: the corridor falls away into BLACK, not into glare.
+       Keep it tight — too wide and it punches a hole through the mid-hall. */
+    const fx = cx - camX*4, fr = Math.max(W,H)*0.26;
+    const fg = g.createRadialGradient(fx, horizon, 0, fx, horizon, fr);
+    fg.addColorStop(0, 'rgba(7,7,7,0.94)');
+    fg.addColorStop(0.5, 'rgba(7,7,7,0.44)');
+    fg.addColorStop(1, 'rgba(7,7,7,0)');
+    g.fillStyle = fg;
+    g.fillRect(fx - fr, horizon - fr, fr*2, fr*2);
+
+    /* dust */
+    for (const m of motes){
+      let d = m.z - camZ;
+      while (d < NEAR) { m.z += SPAN; d = m.z - camZ; }
+      while (d > NEAR + SPAN) { m.z -= SPAN; d = m.z - camZ; }
+      if (d > 30) continue;
+      const s = f/d;
+      const x = cx + (m.x + Math.sin(t*m.s + m.ph)*0.28 - camX)*s;
+      const y = py(m.h + Math.sin(t*m.s*0.7 + m.ph)*0.16, s);
+      if (x < 0 || x > W || y < 0 || y > H) continue;
+      const a = 0.24 * Math.max(0, 1 - d/30);
+      g.fillStyle = 'rgba(255,255,255,'+a.toFixed(3)+')';
+      g.fillRect(x, y, Math.max(1, s*0.012), Math.max(1, s*0.012));
+    }
+  }
+
+  let raf = 0;
+  function loop(){
+    raf = 0;
+    // No document.hidden bail here on purpose. Browsers already stop firing rAF
+    // in a hidden tab, so the check saved nothing — but it stranded the canvas
+    // blank in any frame that reports hidden at load and is later revealed by CSS
+    // (which fires no visibilitychange). Letting rAF govern makes this self-healing.
+    t += 0.016;
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+  function start(){ if (!raf && !REDUCED) raf = requestAnimationFrame(loop); }
+
+  // The resize EVENT is not enough on its own: it can be missed entirely, and it
+  // never fires when only devicePixelRatio changes (dragging between monitors),
+  // which leaves the backing store the wrong size. ResizeObserver is the reliable
+  // signal; the event stays as a belt-and-braces fallback.
+  const refit = () => { resize(); if (REDUCED) draw(); };
+  addEventListener('resize', refit, { passive:true });
+  if (window.ResizeObserver) new ResizeObserver(refit).observe(document.documentElement);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
+
+  // Paint one frame synchronously so the hall is never blank while waiting on the
+  // first rAF — which some embedded/throttled contexts delay indefinitely.
+  // Animation then layers on top when frames actually start arriving.
+  resize(); seed(); draw();
+  if (!REDUCED) start();
+
+  // expose for the preview harness only
+  window.__hall = { cabs, draw, resize, get camZ(){ return camZ; } };
+})();
+</script>
 </body>
 </html>

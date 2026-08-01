@@ -7,16 +7,20 @@
 //   MINT_PRICE_PLS=1000000  \               (price per gun, in whole PLS)
 //   FEE_BPS=1500  \                         (marketplace royalty, 15% — 100% of it buys & burns $WICK)
 //   OPEN_MINT=1  \                          (optional: open public mint now)
-//   MINT_1OF1=1  \                          (optional: mint the 6 platinum 1/1s; #6 TANGENT)
-//   TANGENT_ADDR=0x…  \                     (optional: mint 1/1 #6 straight to tangent.pls's wallet; default = you)
+//   MINT_1OF1=1  \                          (optional: mint #1 TANGENT, the one reserved token)
+//   TANGENT_ADDR=0x…  \                     (optional: mint #1 straight to tangent.pls's wallet; default = you)
 //   node deploy.mjs
+//
+//   Safety rails (both refuse rather than clobber a live collection):
+//     EXPECT_CHAIN_ID=369   asserted before anything is written; override to deploy elsewhere
+//     REDEPLOY=1            required if out/deployed.json already points at live bytecode
 import { readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const ethers = createRequire("C:/Users/Bia/New folder/cashcat-printer/")("ethers");
+const ethers = createRequire(import.meta.url)("ethers");
 
 const PK = process.env.PRIVATE_KEY;
 if (!PK) { console.error("Set PRIVATE_KEY (deployer wallet)."); process.exit(1); }
@@ -32,6 +36,36 @@ const wallet = new ethers.Wallet(PK, provider);
 const net = await provider.getNetwork();
 console.log("deployer", wallet.address, "chainId", net.chainId.toString(), "RPC", RPC);
 console.log("mint price", ethers.formatEther(mintPrice), "PLS · fee", feeBps.toString(), "bps");
+
+// --- WRONG-NETWORK GUARD ---------------------------------------------------
+// Printing the chainId is not checking it. A mistyped RPC_URL would otherwise
+// deploy the whole collection to some other chain and patch web/config.js to it.
+const EXPECT_CHAIN = BigInt(process.env.EXPECT_CHAIN_ID || "369");
+if (net.chainId !== EXPECT_CHAIN) {
+  console.error(`✗ wrong network: RPC reports chainId ${net.chainId}, expected ${EXPECT_CHAIN} (PulseChain).`);
+  console.error("  Check RPC_URL. To deploy to another chain on purpose: EXPECT_CHAIN_ID=<id> node deploy.mjs");
+  process.exit(1);
+}
+
+// --- RUN-TWICE GUARD -------------------------------------------------------
+// This must stay ABOVE the seed block below: a second run regenerates and
+// overwrites out/secret-seed.json — the live collection's blind-mint reveal
+// secret — before it deploys anything, so even a run that later fails would
+// destroy it. It would also repoint web/config.js at a fresh empty collection.
+{
+  let prior = null;
+  try { prior = JSON.parse(readFileSync(join(root, "out", "deployed.json"), "utf8")); } catch {}
+  if (prior && prior.guns && process.env.REDEPLOY !== "1") {
+    const code = await provider.getCode(prior.guns);
+    if (code && code !== "0x") {
+      console.error(`✗ already deployed: WickGuns ${prior.guns} has live bytecode on chain ${net.chainId}.`);
+      console.error("  Re-running would deploy a FRESH empty collection, overwrite out/secret-seed.json");
+      console.error("  (needed by reveal.mjs) and repoint web/config.js away from the live contracts.");
+      console.error("  If you really do want a brand-new collection: REDEPLOY=1 node deploy.mjs");
+      process.exit(1);
+    }
+  }
+}
 
 // 100% automatic buy&burn route (PulseChain mainnet defaults, verified 2026-07-30):
 // PulseX V1 Router02 — WPLS() + factory fingerprinted on-chain, and the exact

@@ -8,7 +8,7 @@ import { dirname, join } from "path";
 import { createRequire } from "module";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const ethers = createRequire("C:/Users/Bia/New folder/cashcat-printer/")("ethers");
+const ethers = createRequire(import.meta.url)("ethers");
 
 const PK = process.env.PRIVATE_KEY;
 if (!PK) { console.error("Set PRIVATE_KEY (the owner wallet)."); process.exit(1); }
@@ -30,6 +30,23 @@ console.log("split    :", Number(BURN_BPS) / 100 + "% burns $WICK · " + (100 - 
 const bal = await provider.getBalance(wallet.address);
 console.log("balance  :", ethers.formatEther(bal), "PLS");
 if (bal < ethers.parseEther("3")) { console.error("✗ not enough PLS for gas."); process.exit(1); }
+
+// --- RUN-TWICE GUARD -------------------------------------------------------
+// A second run deploys a fresh board with no ad history and overwrites the
+// address in out/deployed.json, orphaning every ad already sold on the old one.
+{
+  let prior = null;
+  try { prior = JSON.parse(readFileSync(join(root, "out", "deployed.json"), "utf8")); } catch {}
+  if (prior && prior.billboards && process.env.REDEPLOY !== "1") {
+    const code = await provider.getCode(prior.billboards);
+    if (code && code !== "0x") {
+      console.error(`✗ already deployed: WickBillboards ${prior.billboards} has live bytecode on chain 369.`);
+      console.error("  Re-running orphans every ad sold on it. For a deliberate replacement:");
+      console.error("     REDEPLOY=1 node deploy-billboards.mjs");
+      process.exit(1);
+    }
+  }
+}
 
 console.log("\ndeploying WickBillboards…");
 const bb = await (await new ethers.ContractFactory(BB.abi, BB.bytecode, wallet)
