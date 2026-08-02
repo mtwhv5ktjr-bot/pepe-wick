@@ -98,6 +98,11 @@
      pulsing at full opacity over live gameplay even though clicks are already disabled. */
   #getguns.hide{display:none!important;animation:none!important;opacity:0;pointer-events:none}
 </style>
+<!-- The real NFT gun art — the same file mint.wick.pics ships, itself shared 1:1
+     with the on-chain SVG. Only the gunsmith bench uses it, and it falls back to
+     the in-engine vector guns if it fails to load, so the game still runs as a
+     single file with no network dependency. -->
+<script src="/gunart.js"></script>
 </head>
 <body>
 <canvas id="c" width="1920" height="1080"></canvas>
@@ -4725,33 +4730,121 @@ function drawModParts(mods,G,holo){
     g.beginPath(); g.moveTo(grip+9.0,line-0.6); g.lineTo(grip+9.0,line+1.3);
     g.lineTo(grip+10.6,line+0.35); g.closePath(); g.fill(); }
 }
+/* ---- the NFT's own art on the bench ----
+   The in-engine vector guns are built to read at ~0.6x inside a fist; at bench
+   scale they are blobs. gunart.js carries the real thing. Map the game's gun ids
+   onto the art's: 1-5 line up, the Reaper (6) is the AR15 the 1/1 uses, holos
+   pass through, and the free SIDEARM borrows the pistol body since it has no NFT.
+   Rasterised once per type and cached — an SVG data URI decodes on the GPU, but
+   not for free, and the bench redraws every frame. */
+const ART_FOR={0:1,1:1,2:2,3:3,4:4,5:5,6:16,11:11,12:12,13:13,14:14,15:15,16:16};
+/* Fit the weapon inside a BOX, not to a width. A pistol's grip makes its bbox far
+   taller in proportion than a rifle's, so sizing on width alone drove the pistol
+   down through the skin row and the stat block. */
+const ART_BOX_W=430, ART_BOX_H=182;
+/* Landmarks as fractions of the weapon's own bbox, split by family: on a rifle the
+   grip tucks under the receiver, on a pistol it hangs well below — which stretches
+   the bbox downward and moves every landmark with it. */
+const ART_LAYOUT={
+  rifle: {barrel:0.30, laser:[0.60,0.415], trigger:[0.425,0.59], mag:[0.245,0.755], port:[0.535,0.265]},
+  pistol:{barrel:0.26, laser:[0.58,0.36],  trigger:[0.465,0.455], mag:[0.235,0.78], port:[0.60,0.215]},
+};
+const ART_FAMILY={1:"pistol",11:"pistol",12:"pistol",
+                  2:"rifle",3:"rifle",4:"rifle",5:"rifle",13:"rifle",14:"rifle",15:"rifle",16:"rifle"};
+const artLayout=a=>ART_LAYOUT[ART_FAMILY[a]||"rifle"];
+function drawModPartsArt(mods,wx,wy,ww,wh,L){
+  const has=m=>mods.includes(m);
+  const X=f=>wx+f*ww, Y=f=>wy+f*wh, S=ww/430;   // S keeps parts sized to the weapon
+  const barrel=L.barrel;                        // the barrel line, as a fraction of bbox height
+  if(has(4)){ g.fillStyle=MODCOL[4]; rr(X(0.97),Y(barrel-0.055),44*S,16*S,4*S); g.fill();
+    g.fillStyle="rgba(0,0,0,.35)"; rr(X(1.085),Y(barrel-0.055),5*S,16*S,2*S); g.fill(); }
+  if(has(6)){ const x0=has(4)?X(1.10):X(0.975); // muzzle device rides the longer barrel
+    g.fillStyle=MODCOL[6]; rr(x0,Y(barrel-0.10),26*S,27*S,5*S); g.fill();
+    g.fillStyle="rgba(0,0,0,.45)"; rr(x0+6*S,Y(barrel-0.075),4*S,19*S,2*S); g.fill();
+    rr(x0+15*S,Y(barrel-0.075),4*S,19*S,2*S); g.fill(); }
+  if(has(1)){ g.fillStyle=MODCOL[1]; rr(X(L.laser[0]),Y(L.laser[1]),54*S,15*S,4*S); g.fill();  // under-barrel emitter
+    g.fillStyle="#eaffff"; g.beginPath(); g.arc(X(L.laser[0]+0.125),Y(L.laser[1]+0.055),5*S,0,6.283); g.fill(); }
+  if(has(3)){ g.fillStyle=MODCOL[3]; rr(X(L.trigger[0]),Y(L.trigger[1]),13*S,21*S,3*S); g.fill(); }  // trigger shoe
+  if(has(2)){ g.fillStyle=MODCOL[2]; rr(X(L.mag[0]),Y(L.mag[1]),34*S,12*S,3*S); g.fill();       // magazine band
+    g.beginPath(); g.arc(X(L.mag[0]+0.038),Y(L.mag[1]+0.09),7*S,0,6.283); g.fill();
+    g.fillStyle="rgba(0,0,0,.42)"; g.beginPath(); g.arc(X(L.mag[0]+0.038),Y(L.mag[1]+0.082),3*S,0,6.283); g.fill(); }
+  if(has(5)){ g.fillStyle=MODCOL[5]; rr(X(L.port[0]),Y(L.port[1]),30*S,13*S,3*S); g.fill();   // AP round at the port
+    g.beginPath(); g.moveTo(X(L.port[0]+0.085),Y(L.port[1])); g.lineTo(X(L.port[0]+0.085),Y(L.port[1]+0.07));
+    g.lineTo(X(L.port[0]+0.115),Y(L.port[1]+0.035)); g.closePath(); g.fill(); }
+}
+const gunArtImg={};
+function gunArt(type){
+  const a=ART_FOR[type]!=null?ART_FOR[type]:1;
+  if(gunArtImg[a]!==undefined)return gunArtImg[a]||null;   // null = tried and failed
+  gunArtImg[a]=null;
+  if(typeof window.gunBodyURI!=="function")return null;    // script blocked/offline → vector fallback
+  try{ const im=new Image();
+    im.onload=()=>{
+      // Measure the WEAPON's own box. Each body fills a different part of the
+      // art's 400x400 — a pistol is short and sits left, the AR15 runs nearly
+      // edge to edge — so anchoring attachments to the viewBox puts them in
+      // mid-air on most guns. Everything hangs off this bbox instead.
+      try{
+        const c=document.createElement("canvas");
+        c.width=im.naturalWidth; c.height=im.naturalHeight;
+        const x=c.getContext("2d",{willReadFrequently:true}); x.drawImage(im,0,0);
+        const d=x.getImageData(0,0,c.width,c.height).data;
+        let x0=c.width,y0=c.height,x1=-1,y1=-1;
+        for(let yy=0;yy<c.height;yy++)for(let xx=0;xx<c.width;xx++){
+          if(d[(yy*c.width+xx)*4+3]>24){
+            if(xx<x0)x0=xx; if(xx>x1)x1=xx; if(yy<y0)y0=yy; if(yy>y1)y1=yy; } }
+        im._bb=(x1>x0&&y1>y0)
+          ? {x:x0/c.width,y:y0/c.height,w:(x1-x0)/c.width,h:(y1-y0)/c.height}
+          : {x:0,y:0,w:1,h:1};
+      }catch(e){ im._bb={x:0,y:0,w:1,h:1}; }                // tainted canvas → use the whole frame
+      gunArtImg[a]=im;
+    };
+    im.onerror=()=>{ gunArtImg[a]=null; };
+    im.src=window.gunBodyURI(a);
+  }catch(e){ gunArtImg[a]=null; }
+  return null;
+}
 function drawBenchGun(cx,cy,scale,type,mods,t){
   const bt=type>10?type-10:type, G=GUNDEFS[bt]||GUNDEFS[0], holo=type>10;
-  const ox=cx-(G.tip*0.5)*scale, oy=cy;
+  const art=gunArt(type), bb=art&&art._bb;
+  let wx, wy, ww, wh, artK=1;                   // the weapon's rect on screen
+  if(art&&bb){
+    // contain inside the bench box — width alone overflows the tall pistol bbox
+    artK=Math.min(ART_BOX_W/(bb.w*art.naturalWidth), ART_BOX_H/(bb.h*art.naturalHeight));
+    const dw=art.naturalWidth*artK, dh=art.naturalHeight*artK;
+    const rx=cx-(bb.x+bb.w/2)*dw, ry=cy-(bb.y+bb.h/2)*dh;  // centre the WEAPON, not the frame
+    wx=rx+bb.x*dw; wy=ry+bb.y*dh; ww=bb.w*dw; wh=bb.h*dh;
+  } else { wx=cx-(G.tip*0.5)*scale; wy=cy-22*scale; ww=G.tip*scale; wh=26*scale; }
+
   // a lit plinth so the weapon reads as sitting on a bench, not floating
-  const pw=G.tip*scale*0.86;
+  const pw=ww*0.56;
   const pl=g.createLinearGradient(cx-pw,0,cx+pw,0);
   pl.addColorStop(0,"rgba(124,249,165,0)"); pl.addColorStop(0.5,"rgba(124,249,165,0.13)");
   pl.addColorStop(1,"rgba(124,249,165,0)");
-  g.fillStyle=pl; g.fillRect(cx-pw,cy+14,pw*2,3);
-  g.save(); g.translate(ox,oy); g.scale(scale,scale);
-  drawGunInHand(type,0,holo);
-  drawModParts(mods,G,holo);
-  g.restore();
-  // leader lines out to a label stack — this is the bit that makes a build legible
+  g.fillStyle=pl; g.fillRect(cx-pw,wy+wh+16,pw*2,3);
+
+  if(art&&bb){
+    const dw=art.naturalWidth*artK, dh=art.naturalHeight*artK;
+    if(holo){ g.save(); g.shadowColor="rgba(255,215,94,0.45)"; g.shadowBlur=26; }
+    g.drawImage(art,wx-bb.x*dw,wy-bb.y*dh,dw,dh);
+    if(holo)g.restore();
+    drawModPartsArt(mods,wx,wy,ww,wh,artLayout(ART_FOR[type]!=null?ART_FOR[type]:1));
+  } else {                                      // gunart.js unavailable — engine vectors
+    const ox=cx-(G.tip*0.5)*scale, oy=cy;
+    g.save(); g.translate(ox,oy); g.scale(scale,scale);
+    drawGunInHand(type,0,holo);
+    drawModParts(mods,G,holo);
+    g.restore();
+  }
+
+  /* No leader lines or name labels: the ATTACHMENTS panel already lists all three
+     with their effects, the parts are colour-matched to those chips, and a label
+     stack could not fit beside a weapon this size without running into either the
+     muzzle or the panel. The colour IS the link. */
   const rows=mods.filter(m=>MODDEFS[m]);
-  rows.forEach((m,i)=>{
-    const a=modAnchor(m,G); if(!a)return;
-    const sx=ox+a.x*scale, sy=oy+a.y*scale;
-    const lx=cx+G.tip*scale*0.5+26, ly=cy-46+i*24;
-    g.strokeStyle=MODCOL[m]; g.globalAlpha=0.55; g.lineWidth=1;
-    g.beginPath(); g.moveTo(sx,sy); g.lineTo(lx-6,ly-3); g.stroke(); g.globalAlpha=1;
-    g.beginPath(); g.arc(sx,sy,2,0,6.283); g.fillStyle=MODCOL[m]; g.fill();
-    g.textAlign="left"; g.font="900 10px Verdana"; g.fillStyle=MODCOL[m];
-    g.fillText(MODDEFS[m].name,lx,ly);
-  });
   if(!rows.length){ g.textAlign="center"; g.font="bold 10px Verdana"; g.fillStyle="#4a5566";
-    g.fillText("no attachments fitted",cx,cy+40); }
+    g.fillText("no attachments fitted",cx,wy+wh+38); }
+  return {wx,wy,ww,wh};                         // callers need the muzzle for the laser beam
 }
 function drawGunsmith(t){
   BTNS.length=0;
@@ -4789,10 +4882,9 @@ function drawGunsmith(t){
   // sits ~24 gun-units above cy, so 332 leaves real air rather than a 5px kiss)
   const BENCH_Y=332, BENCH_S=5.2;
   const benchMods=sel.filter(m=>m!=null);
-  drawBenchGun(250,BENCH_Y,BENCH_S,gsGun||0,benchMods,t);
+  const bg=drawBenchGun(250,BENCH_Y,BENCH_S,gsGun||0,benchMods,t);
   if(benchMods.includes(1)){                                  // laser: fire the beam off the real muzzle
-    const G=GUNDEFS[(gsGun>10?gsGun-10:gsGun)||0]||GUNDEFS[0];
-    const mx=250-(G.tip*0.5)*BENCH_S+G.tip*BENCH_S, my=BENCH_Y+G.line*BENCH_S;
+    const mx=bg.wx+bg.ww, my=bg.wy+bg.wh*0.30;
     g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.4+0.12*Math.sin(t*9);
     const lg2=g.createLinearGradient(mx,my,mx+230,my);
     lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
