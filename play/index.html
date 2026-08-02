@@ -760,21 +760,92 @@ function bakeHeadTile(im){
   im.onerror=()=>{ coverLogo=null; };
   im.src="/face.webp";
 })();
-for(const k in HERO_SHEETS){ (function(k){ const cf=HERO_SHEETS[k], im=new Image();
-  im.onload=function(){
-    const M=HERO_META[k];
-    if(M&&/\.webp$/i.test(cf.file)){                     // pre-keyed + prebaked boxes: zero pixel scans, draw the Image directly
-      heroImg[k]={c:im,n:cf.n,fps:cf.fps,top:M.top,bot:M.bot,ch:M.ch,
-        fr:M.fr?M.fr.map(b=>b?{top:b[0],bot:b[1],ch:b[2]}:null):null,
-        hand:M.hand?M.hand.map(p=>p?{hx:p[0],hy:p[1]}:null):null,dirR:!!M.dirR};
-      return; }
-    const c=/\.webp$/i.test(cf.file)?rawCanvas(im):keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
-    const hd=(c.getContext&&/pistol|rifle/.test(k))?handAnchors(c,cf.n):null;   // grip sheets: find the hand per frame + native facing
-    const fr=c.getContext?contentBoxFrames(c,cf.n):null;
-    const chs=fr?fr.filter(Boolean).map(b=>b.ch).sort((a,b)=>a-b):[];
-    const medCh=chs.length?chs[Math.floor(chs.length/2)]:Math.max(1,bx.bot-bx.top);  // stable scale: median frame height
-    heroImg[k]={c,n:cf.n,fps:cf.fps,top:bx.top,bot:bx.bot,ch:medCh,fr,hand:hd?hd.frames:null,dirR:!!(hd&&hd.dirR)}; };
-  im.onerror=function(){}; im.src=cf.file; })(k); }
+/* ---------- SKINS ----------
+   Skin 0 is the Pepe everyone already has — no gate, always selectable, and the
+   fallback whenever a skin's art is missing or a wallet disconnects mid-run.
+   Everything else is gated on WICK Arsenal NFTs the wallet actually holds.
+
+   A skin only has to ship the SIX GRIP sheets: heroPick() reaches for
+   <class>_<stand|run|jump> before anything else, and those six cover every pose
+   for both gun classes. The five generic sheets have a gun painted into the art,
+   which fights the NFT gun overlay — so a skin deliberately inherits skin 0's
+   copies of those and they never get drawn while the grip sheets load.
+
+   Adding a skin = drop six files in /skins/<dir>/ and add one row here.
+   `meta` is optional: without it the loader scans the art at runtime, which
+   finds the gun hand by looking for GREEN pixels. A skin that isn't green needs
+   either green hands or its own prebaked hand anchors, or the gun stops
+   tracking the hand frame-to-frame. */
+const SKIN_SHEETS=["pistol_stand","pistol_run","pistol_jump","rifle_stand","rifle_run","rifle_jump"];
+const SKINS=[
+  { id:0, name:"PEPE WICK", dir:null, meta:HERO_META, gate:null,
+    blurb:"the original" },
+  // --- examples, inert until the art lands in /skins/<dir>/ ---
+  // { id:1, name:"GOLD WICK", dir:"gold", gate:w=>w.holo>0,
+  //   blurb:"holo 1/1 holders" },
+  // { id:2, name:"THE BUTCHER", dir:"butcher", gate:w=>w.guns>=5,
+  //   blurb:"hold 5+ Arsenal guns" },
+];
+let skinId=0; try{ const s=+localStorage.getItem("pw_skin"); if(SKINS.some(x=>x.id===s))skinId=s; }catch(e){}
+const skinById=id=>SKINS.find(s=>s.id===id)||SKINS[0];
+/* What the wallet holds, in the shape the gates read. Recomputed on demand so a
+   disconnect immediately re-locks anything it was unlocking. */
+function skinWallet(){
+  const types=ownedGunTypes||[];
+  return { guns:types.length, holo:types.filter(t=>t>10).length, types,
+           mods:(ownedModTypes||[]).length, addr:walletAddr };
+}
+function skinUnlocked(s){ if(!s||!s.gate)return true; try{ return !!s.gate(skinWallet()); }catch(e){ return false; } }
+function unlockedSkins(){ return SKINS.filter(skinUnlocked); }
+
+let _skinLoadGen=0;
+function loadHeroSheets(skin){
+  const gen=++_skinLoadGen;                          // a later switch always wins
+  for(const k in HERO_SHEETS){
+    const cf=HERO_SHEETS[k];
+    // a skin only overrides its six; the rest stay on skin 0's art
+    const useSkin=skin.dir&&SKIN_SHEETS.includes(k);
+    const file=useSkin?("/skins/"+skin.dir+"/"+k+".webp"):cf.file;
+    const meta=useSkin?(skin.meta&&skin.meta[k]):HERO_META[k];
+    (function(k,file,meta){ const im=new Image();
+      im.onload=function(){
+        if(gen!==_skinLoadGen)return;                // superseded mid-flight
+        if(meta&&/\.webp$/i.test(file)){             // pre-keyed + prebaked boxes: zero pixel scans, draw the Image directly
+          heroImg[k]={c:im,n:cf.n,fps:cf.fps,top:meta.top,bot:meta.bot,ch:meta.ch,
+            fr:meta.fr?meta.fr.map(b=>b?{top:b[0],bot:b[1],ch:b[2]}:null):null,
+            hand:meta.hand?meta.hand.map(p=>p?{hx:p[0],hy:p[1]}:null):null,dirR:!!meta.dirR};
+          return; }
+        const c=/\.webp$/i.test(file)?rawCanvas(im):keyWhite(im); const bx=(c.getContext)?contentBoxV(c):{top:0,bot:c.height};
+        const hd=(c.getContext&&/pistol|rifle/.test(k))?handAnchors(c,cf.n):null;   // grip sheets: find the hand per frame + native facing
+        const fr=c.getContext?contentBoxFrames(c,cf.n):null;
+        const chs=fr?fr.filter(Boolean).map(b=>b.ch).sort((a,b)=>a-b):[];
+        const medCh=chs.length?chs[Math.floor(chs.length/2)]:Math.max(1,bx.bot-bx.top);  // stable scale: median frame height
+        heroImg[k]={c,n:cf.n,fps:cf.fps,top:bx.top,bot:bx.bot,ch:medCh,fr,hand:hd?hd.frames:null,dirR:!!(hd&&hd.dirR)}; };
+      // A missing skin file must not blank the hero — fall back to skin 0's sheet.
+      im.onerror=function(){ if(gen!==_skinLoadGen||!useSkin)return;
+        const fb=new Image();
+        fb.onload=function(){ if(gen!==_skinLoadGen)return;
+          const M=HERO_META[k];
+          heroImg[k]={c:fb,n:cf.n,fps:cf.fps,top:M.top,bot:M.bot,ch:M.ch,
+            fr:M.fr?M.fr.map(b=>b?{top:b[0],bot:b[1],ch:b[2]}:null):null,
+            hand:M.hand?M.hand.map(p=>p?{hx:p[0],hy:p[1]}:null):null,dirR:!!M.dirR}; };
+        fb.src=cf.file; };
+      im.src=file; })(k,file,meta);
+  }
+}
+function setSkin(id){
+  const s=skinById(id);
+  if(!skinUnlocked(s))return false;
+  skinId=s.id; try{ localStorage.setItem("pw_skin",String(skinId)); }catch(e){}
+  loadHeroSheets(s);
+  return true;
+}
+/* A wallet that disconnects (or sells the gun that unlocked a skin) must not keep
+   wearing it — re-check whenever the owned set changes. */
+function reconcileSkin(){
+  if(!skinUnlocked(skinById(skinId))){ skinId=0; try{ localStorage.setItem("pw_skin","0"); }catch(e){} loadHeroSheets(SKINS[0]); }
+}
+loadHeroSheets(skinById(skinId));
 const HERO_SHEET_KEYS=["walk","idle","shoot","jump","runshoot","pistol_stand","pistol_run","rifle_stand","rifle_run"];
 function heroReady(){ return HERO_SHEET_KEYS.some(k=>heroImg[k]); }  // any sheet present → sprite mode on
 function gunCls(gt){ const bt=gt>10?gt-10:gt; return (bt>=2)?"rifle":"pistol"; }   // 0-1 pistol, 2+ rifle/MG (6 = TANGENT AR-15)
@@ -1934,6 +2005,7 @@ function applyGuns(types, addr, watch, quiet, mods){
   ownedModTypes=Array.isArray(mods)?mods.filter(n=>typeof n==="number"&&isFinite(n)&&MODDEFS[n]):[];
   ownedGunTypes=types; watchMode=!!watch;
   bumpMods();                                         // spec memo AND the mod allocation are stale the moment the loadout universe changes
+  reconcileSkin();                                    // a skin whose gate no longer passes comes straight off
   if(!watch)walletAddr=addr; else walletAddr=null;                    // watch mode can't sign scores
   let saved=null, sawPref=false;
   try{ const s=localStorage.getItem("pw_loadout");
@@ -4615,6 +4687,72 @@ function shareScore(){
    Pick a gun, fill its 3 slots from the mod NFTs you own, watch the stats move.
    Builds persist per gun (pw_modcfg); guns without a build auto-equip the 3
    rarest. An explicitly emptied build means a naked gun — that's respected. */
+/* ---- the bench gun: the weapon big, side-on, with the mods as REAL PARTS ----
+   Mods were stat-only — the bench showed a 40px gun in a character's fist, so a
+   build was invisible. Each attachment now has art bolted onto the gun in the
+   gun's own coordinate space (x forward from the grip, barrel centreline at
+   GUNDEFS.line), colour-matched to its picker chip so the part and the chip read
+   as the same object. MODCOL is the shared palette. */
+const MODCOL={1:"#7fd0ff",2:"#ff9d9d",3:"#ffd75e",4:"#c8ffe0",5:"#b26bff",6:"#ff6b3d"};
+// where each mod's part sits, and where its leader line should touch
+function modAnchor(m,G){
+  const tip=G.tip, line=G.line, grip=G.grip||15.6;
+  // 2 and 5 are both ammo, so they get SEPARATE hardware — HP on the magazine,
+  // AP at the ejection port. Sharing one band made two fitted mods look like one.
+  return {1:{x:tip-9,y:line+3.2},   2:{x:grip+2.4,y:line+6.6},
+          3:{x:grip+3.2,y:line+3.0},4:{x:tip+7,  y:line},
+          5:{x:grip+7.2,y:line+0.4},6:{x:tip+2.5,y:line-0.6}}[m];
+}
+function drawModParts(mods,G,holo){
+  const tip=G.tip, line=G.line, grip=G.grip||15.6;
+  const has=m=>mods.includes(m);
+  // LONG BARREL first so everything else sits on top of it
+  if(has(4)){ g.fillStyle=MODCOL[4]; rr(tip-1.5,line-1.5,9,3,1.2); g.fill();
+    g.fillStyle="rgba(0,0,0,.35)"; rr(tip+4.5,line-1.5,1.4,3,0.5); g.fill(); }
+  if(has(6)){ const x0=has(4)?tip+7:tip-1.6;              // muzzle device rides the longer barrel
+    g.fillStyle=MODCOL[6]; rr(x0,line-2.4,5.4,4.8,1.2); g.fill();
+    g.fillStyle="rgba(0,0,0,.45)";
+    rr(x0+1.2,line-2.0,0.9,4,0.4); g.fill(); rr(x0+3.0,line-2.0,0.9,4,0.4); g.fill(); }
+  if(has(1)){ g.fillStyle=MODCOL[1]; rr(tip-12,line+2.0,7,2.7,1); g.fill();   // under-barrel emitter
+    g.fillStyle="#eaffff"; g.beginPath(); g.arc(tip-5.6,line+3.35,0.95,0,6.283); g.fill(); }
+  if(has(3)){ g.fillStyle=MODCOL[3]; rr(grip+2.2,line+2.2,2.4,3.2,0.8); g.fill(); }  // trigger shoe
+  if(has(2)){                                               // HOLLOW POINTS — magazine band + a blunt round
+    g.fillStyle=MODCOL[2]; rr(grip+0.6,line+5.4,4.2,1.9,0.7); g.fill();
+    g.beginPath(); g.arc(grip+2.55,line+8.0,1.05,0,6.283); g.fill();
+    g.fillStyle="rgba(0,0,0,.4)"; g.beginPath(); g.arc(grip+2.55,line+7.8,0.4,0,6.283); g.fill(); }  // the hollow
+  if(has(5)){                                               // AP ROUNDS — pointed round at the ejection port
+    g.fillStyle=MODCOL[5]; rr(grip+5.4,line-0.6,3.6,1.9,0.6); g.fill();
+    g.beginPath(); g.moveTo(grip+9.0,line-0.6); g.lineTo(grip+9.0,line+1.3);
+    g.lineTo(grip+10.6,line+0.35); g.closePath(); g.fill(); }
+}
+function drawBenchGun(cx,cy,scale,type,mods,t){
+  const bt=type>10?type-10:type, G=GUNDEFS[bt]||GUNDEFS[0], holo=type>10;
+  const ox=cx-(G.tip*0.5)*scale, oy=cy;
+  // a lit plinth so the weapon reads as sitting on a bench, not floating
+  const pw=G.tip*scale*0.86;
+  const pl=g.createLinearGradient(cx-pw,0,cx+pw,0);
+  pl.addColorStop(0,"rgba(124,249,165,0)"); pl.addColorStop(0.5,"rgba(124,249,165,0.13)");
+  pl.addColorStop(1,"rgba(124,249,165,0)");
+  g.fillStyle=pl; g.fillRect(cx-pw,cy+14,pw*2,3);
+  g.save(); g.translate(ox,oy); g.scale(scale,scale);
+  drawGunInHand(type,0,holo);
+  drawModParts(mods,G,holo);
+  g.restore();
+  // leader lines out to a label stack — this is the bit that makes a build legible
+  const rows=mods.filter(m=>MODDEFS[m]);
+  rows.forEach((m,i)=>{
+    const a=modAnchor(m,G); if(!a)return;
+    const sx=ox+a.x*scale, sy=oy+a.y*scale;
+    const lx=cx+G.tip*scale*0.5+26, ly=cy-46+i*24;
+    g.strokeStyle=MODCOL[m]; g.globalAlpha=0.55; g.lineWidth=1;
+    g.beginPath(); g.moveTo(sx,sy); g.lineTo(lx-6,ly-3); g.stroke(); g.globalAlpha=1;
+    g.beginPath(); g.arc(sx,sy,2,0,6.283); g.fillStyle=MODCOL[m]; g.fill();
+    g.textAlign="left"; g.font="900 10px Verdana"; g.fillStyle=MODCOL[m];
+    g.fillText(MODDEFS[m].name,lx,ly);
+  });
+  if(!rows.length){ g.textAlign="center"; g.font="bold 10px Verdana"; g.fillStyle="#4a5566";
+    g.fillText("no attachments fitted",cx,cy+40); }
+}
 function drawGunsmith(t){
   BTNS.length=0;
   menuBackdrop(t);
@@ -4644,13 +4782,39 @@ function drawGunsmith(t){
   menuBtn(410,86,30,30,"▶",()=>gsStep(1),"#e8e8ea","900 13px Verdana");
   g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
   g.fillText((gsOpts.indexOf(gsGun)+1)+" / "+gsOpts.length+"  ·  your armoury",250,120);
-  const hOpts={t,face:1,pose:"idle",gunType:gsGun||0,holo:gsGun>10,muzzle:(Math.sin(t*3)>0.75)?0.4:0};
-  drawHero(250,388,2.0,hOpts);
-  if(sel.includes(1)){ // laser preview — off the real barrel, same rig the game uses
-    const m=heroMuzzle(250,388,2.0,hOpts);
+  // The BENCH shows the weapon, not the man — at 2x in a fist the gun was ~40px
+  // and a build was impossible to read. Character lives in-game; here you see
+  // what you're actually building.
+  // cy clears the TAKING IN row above (its boxes end at 192; the flat-top rail
+  // sits ~24 gun-units above cy, so 332 leaves real air rather than a 5px kiss)
+  const BENCH_Y=332, BENCH_S=5.2;
+  const benchMods=sel.filter(m=>m!=null);
+  drawBenchGun(250,BENCH_Y,BENCH_S,gsGun||0,benchMods,t);
+  if(benchMods.includes(1)){                                  // laser: fire the beam off the real muzzle
+    const G=GUNDEFS[(gsGun>10?gsGun-10:gsGun)||0]||GUNDEFS[0];
+    const mx=250-(G.tip*0.5)*BENCH_S+G.tip*BENCH_S, my=BENCH_Y+G.line*BENCH_S;
     g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.4+0.12*Math.sin(t*9);
-    const lg2=g.createLinearGradient(m.x,m.y,m.x+345,m.y); lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
-    g.strokeStyle=lg2; g.lineWidth=2; g.beginPath(); g.moveTo(m.x,m.y); g.lineTo(m.x+345,m.y); g.stroke(); g.restore();
+    const lg2=g.createLinearGradient(mx,my,mx+230,my);
+    lg2.addColorStop(0,"rgba(127,208,255,0.9)"); lg2.addColorStop(1,"rgba(127,208,255,0)");
+    g.strokeStyle=lg2; g.lineWidth=2; g.beginPath(); g.moveTo(mx,my); g.lineTo(mx+230,my); g.stroke(); g.restore();
+  }
+
+  // ---- SKIN: cycles only what this wallet has unlocked; 0 is always there ----
+  { const un=unlockedSkins(), cur=skinById(skinId), at=un.findIndex(s=>s.id===skinId);
+    const step=d=>{ const n=un.length; if(n<2)return;
+      const nx=un[(((at<0?0:at)+d)%n+n)%n]; if(nx&&setSkin(nx.id))SFX.coin(3); };
+    g.textAlign="center";
+    if(un.length>1){
+      menuBtn(92,398,26,26,"◀",()=>step(-1),"#e8e8ea","900 12px Verdana");
+      menuBtn(382,398,26,26,"▶",()=>step(1),"#e8e8ea","900 12px Verdana");
+    }
+    g.font="900 10px Verdana"; g.fillStyle="#9fe6ff"; g.fillText("SKIN",250,396);
+    g.font="900 13px Verdana"; g.fillStyle="#e8f0ff"; g.fillText(cur.name,250,414);
+    const locked=SKINS.length-un.length;
+    g.font="bold 9px Verdana"; g.fillStyle="#4a5566";
+    g.fillText(un.length>1 ? (at+1)+" / "+un.length+" unlocked"
+             : locked ? (locked+" more locked — hold Arsenal NFTs")
+                      : "more skins coming",250,430);
   }
 
   // ---- TAKING IN: the two you actually walk in with ----
