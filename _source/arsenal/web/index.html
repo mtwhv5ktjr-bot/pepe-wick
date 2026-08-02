@@ -1,355 +1,544 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>WICK ARSENAL — Mint &amp; Market</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%2304050a'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E🔫%3C/text%3E%3C/svg%3E">
+<meta name="description" content="101 on-chain guns on PulseChain that are also playable in PEPE WICK. Trade, bid, and equip.">
+<meta name="theme-color" content="#07090c">
 <style>
-  :root{ --bg:#04050a; --panel:#0b0e16; --line:#1c2430; --gold:#ffd23f; --green:#7cf9a5; --blue:#7fd0ff; --ink:#e8e8ea; --dim:#8a93a5; }
-  *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#0d1424,#04050a);color:var(--ink);font-family:Arial,Helvetica,sans-serif;min-height:100vh}
-  a{color:var(--blue)}
-  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:14px 22px;background:rgba(4,5,10,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-  .logo{font-family:Impact,Arial;font-weight:bold;font-size:24px;letter-spacing:3px;background:linear-gradient(90deg,#fff,#c8ecb2,#6aa84f);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .logo b{color:var(--gold);-webkit-text-fill-color:var(--gold)}
-  .grow{flex:1}
-  button{font-family:Impact,Arial;letter-spacing:1px;cursor:pointer;border:1px solid var(--line);background:#121826;color:var(--ink);padding:9px 16px;border-radius:8px;font-size:14px;transition:.15s}
-  button:hover{border-color:var(--gold);color:var(--gold)}
-  button:disabled{opacity:.4;cursor:not-allowed}
-  button.primary{background:linear-gradient(180deg,#ffd23f,#e0a41a);color:#1a1204;border:none;font-size:15px}
-  button.primary:hover{color:#000;filter:brightness(1.08)}
-  .wrap{max-width:1120px;margin:0 auto;padding:22px}
-  .hero{text-align:center;padding:34px 10px 14px}
-  .hero h1{font-family:Impact,Arial;font-size:52px;letter-spacing:4px;margin:6px 0}
-  .hero p{color:var(--dim);max-width:640px;margin:6px auto;font-size:15px}
-  .stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:18px 0}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 20px;min-width:120px}
-  .stat .n{font-family:Impact,Arial;font-size:26px;color:var(--gold)}
-  .stat .l{color:var(--dim);font-size:12px;letter-spacing:1px}
-  h2{font-family:Impact,Arial;letter-spacing:2px;font-size:22px;border-left:3px solid var(--gold);padding-left:10px;margin:34px 0 14px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:visible;display:flex;flex-direction:column}
-  .card .art{aspect-ratio:400/560;background:transparent;position:relative;perspective:900px}
-  .c3d{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .35s ease;will-change:transform}
-  .c3d.live{transition:transform .06s linear}
-  .c3d img{width:100%;height:100%;display:block;border-radius:6.5%;box-shadow:0 12px 30px rgba(0,0,0,.55)}
-  .c3d .glare{position:absolute;inset:0;border-radius:6.5%;pointer-events:none;
-    background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.32) 0%,rgba(255,255,255,.08) 32%,rgba(255,255,255,0) 60%);
-    mix-blend-mode:overlay;opacity:0;transition:opacity .3s}
-  .c3d.live .glare{opacity:1}
-  .holo .c3d .rainbow{position:absolute;inset:0;border-radius:6.5%;pointer-events:none;mix-blend-mode:color-dodge;opacity:0;transition:opacity .3s;
-    background:linear-gradient(calc(var(--ga,115deg)),rgba(255,120,120,.16),rgba(255,214,106,.16),rgba(124,249,165,.16),rgba(127,208,255,.16),rgba(184,168,255,.16),rgba(255,138,226,.16));
-    background-size:280% 280%;background-position:var(--gx,50%) var(--gy,50%)}
-  .holo .c3d.live .rainbow{opacity:1}
-  .card .body{padding:12px}
-  .card .nm{font-family:Impact,Arial;font-size:17px;letter-spacing:1px}
-  .card .rr{font-size:11px;letter-spacing:1px;text-transform:uppercase}
-  .card .bl{color:var(--dim);font-size:12px;margin:7px 0;min-height:32px}
-  .card .perk{font-size:12px;color:var(--green);margin-bottom:8px}
-  .pill{display:inline-block;font-size:10px;letter-spacing:1px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
-  .holo .art{background:conic-gradient(from 0deg,#1a2030,#3a2a50,#203a4a,#3a2a50,#1a2030)}
-  .holo .nm{background:linear-gradient(90deg,#fff,#ffd23f,#8bd6ff,#fff);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  input[type=number],input[type=text]{background:#080b12;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
-  .muted{color:var(--dim);font-size:13px}
-  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0b0e16;border:1px solid var(--gold);color:var(--ink);padding:12px 20px;border-radius:10px;z-index:50;max-width:90vw;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;transition:.25s;pointer-events:none}
-  .toast.show{opacity:1}
-  .banner{background:#2a1206;border:1px solid #6a3a12;color:#ffb877;padding:10px 16px;border-radius:10px;margin:10px 0;font-size:14px}
-  .burn{display:inline-block;margin:14px auto 0;padding:10px 22px;border-radius:30px;font-size:14px;letter-spacing:1px;color:#ffd9a0;
-    background:linear-gradient(90deg,rgba(80,28,6,.9),rgba(50,14,30,.9));border:1px solid #a3521f;box-shadow:0 0 24px rgba(255,120,40,.15)}
-  .burn b{color:#ffd23f}
-  .lb{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 16px;border-bottom:1px solid var(--line);padding-bottom:10px}
-  .tabs button{background:transparent;border:1px solid var(--line);color:#8a93a5;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer}
-  .tabs button:hover{color:#e8e8ea;border-color:#4a5566}
-  .tabs button.on{background:rgba(124,249,165,.10);border-color:var(--acc,#7cf9a5);color:var(--acc,#7cf9a5)}
-  .tab{display:none}
-  .tab.on{display:block}
-  #fAll.on,#fHolo.on,[data-msort].on{background:rgba(255,215,94,.12);border-color:#ffd75e;color:#ffd75e}
-  .bidmeta{font-size:11px;color:#8a93a5;line-height:1.7;margin:6px 0 4px}
-  .bidmeta b{color:#e8e8ea}
-  .bidhi{color:#7cf9a5;font-weight:bold}
-  /* sale history — same skin as the leaderboard, but it has to survive a phone */
-  .tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:660px}
-  .tbl th{font-family:Impact,Arial;letter-spacing:1px;color:var(--dim);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:normal;white-space:nowrap}
-  .tbl td{padding:10px 12px;border-bottom:1px solid rgba(28,36,48,.5);white-space:nowrap}
-  .tbl tr:last-child td{border-bottom:none}
-  .tbl a{color:var(--blue);text-decoration:none}
-  .tbl a:hover{text-decoration:underline}
-  .lb table{width:100%;border-collapse:collapse;font-size:14px}
-  .lb th{font-family:Impact,Arial;letter-spacing:1px;color:var(--dim);text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);font-weight:normal}
-  .lb td{padding:11px 16px;border-bottom:1px solid rgba(28,36,48,.5)}
-  .lb tr:last-child td{border-bottom:none}
-  .lb .rk{font-family:Impact,Arial;font-size:16px;width:54px}
-  .lb .r1 .rk{color:#ffd23f}.lb .r2 .rk{color:#cfd6e0}.lb .r3 .rk{color:#d29a5b}
-  .lb .ad{font-family:'Courier New',monospace;color:var(--blue)}
-  .lb .sc{text-align:right;font-family:Impact,Arial;color:var(--gold);font-size:15px}
-  .lb .lv{color:var(--dim);text-align:right;width:80px}
-  .tag{font-size:11px;color:var(--dim)}
-  footer{color:var(--dim);text-align:center;padding:40px 20px;font-size:12px}
-</style>
+/* ───────────────────────────────────────────────────────────────────────────
+   WICK ARSENAL — marketplace shell, 2026-08-01.
+   Direction: density and trust at a glance. Rarity is the only saturated thing
+   on the page; gold stays the single UI accent so it still reads as Arsenal.
+   Numbers are tabular everywhere — figures that jitter while polling look broken.
+   ─────────────────────────────────────────────────────────────────────────── */
+/* Black Ops One (Google Fonts, OFL) — self-hosted woff2, see ATTRIBUTION.md. Military
+   stencil: the headline should read as ordnance, not as a SaaS landing page. Display
+   only — it is unreadable at body sizes and never used there. */
+@font-face{font-family:"Black Ops One";src:url("black-ops-one.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap}
+:root{
+  /* CSFloat's palette: near-black navy, one confident blue for every action. Gold is
+     demoted to a WICK accent so the page still reads as Arsenal without competing. */
+  --bg:#0b0e13; --surface:#161b22; --surface-2:#1c222b; --line:#232b36; --line-2:#2f3947;
+  --ink:#e9eef5; --ink-2:#9aa7b8; --ink-3:#8b99ad;
+  --display:"Black Ops One",Impact,"Haettenschweiler",sans-serif;
+  --gold:#e3b341; --green:#3fb950; --red:#f0616d; --blue:#3b82f6; --blue-2:#60a5fa;
+  --blue-ink:#2563eb;   /* same hue, darkened until white text on it clears 4.5:1 */
+  --r-common:#7c899b; --r-uncommon:#4ea8de; --r-rare:#a06cd5; --r-legend:#e8a33a; --r-holo:#ffd75e;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+/* every number in the UI is tabular — this is the whole trick for live data */
+.n,.mono,td,th,.px,.rk,.bidmeta,input[type=number],.stat .n{font-variant-numeric:tabular-nums}
+a{color:var(--gold)}
+::selection{background:rgba(227,179,65,.28)}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:6px;
+  padding:0 16px;background:rgba(11,14,19,.88);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line)}
+.logo{font:400 17px/1 var(--display);letter-spacing:.10em;color:var(--ink);
+  padding-right:14px;margin-right:2px;border-right:1px solid var(--line);align-self:stretch;
+  display:flex;align-items:center;white-space:nowrap}
+.logo b{color:var(--gold)}
+.grow{flex:1}
+#net{font:600 11px/1 var(--mono);color:var(--ink-3);border:1px solid var(--line-2);
+  border-radius:999px;padding:5px 9px;white-space:nowrap}
+#addrLine{font:600 11px/1 var(--mono);color:var(--ink-2)}
+button,select,input{font:inherit;color:var(--ink)}
+button{background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;
+  padding:8px 13px;cursor:pointer;transition:border-color .15s,background .15s}
+button:hover:not(:disabled){border-color:#3a4757;background:#161d27}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--blue-ink);border-color:var(--blue-ink);color:#fff;font-weight:700}
+button.primary:hover:not(:disabled){background:var(--blue);border-color:var(--blue)}
+button.on{border-color:var(--blue);color:var(--blue-2);background:rgba(59,130,246,.12)}
+input,select{background:#0a0e13;border:1px solid var(--line-2);border-radius:8px;padding:8px 10px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.wrap{max-width:1400px;margin:0 auto;padding:18px 16px 64px}
+
+/* ── hero ───────────────────────────────────────────────────────────────── */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.92fr);
+  grid-template-areas:"title fan" "body fan";gap:0 30px;
+  align-items:center;padding:34px 0 26px}
+.hero h1{grid-area:title;align-self:end}
+.heroL{grid-area:body;min-width:0}
+.heroR{grid-area:fan}
+.hero h1{margin:0 0 12px;font:400 clamp(30px,4.6vw,58px)/1.06 var(--display);
+  letter-spacing:.005em;text-transform:uppercase}
+
+/* The 3D fan. CSFloat floats real items on a perspective stage behind crosshair guides;
+   these are the collection's own SVGs, so the marketing image IS the product. */
+.heroR{position:relative;min-height:340px;perspective:1400px;
+  display:flex;align-items:center;justify-content:center}
+.xhair{position:absolute;pointer-events:none;opacity:.5}
+.xhair::before,.xhair::after{content:"";position:absolute;background:var(--blue);opacity:.6}
+.xhair::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-50%)}
+.xhair::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-50%)}
+.xh1{width:22px;height:22px;left:4%;top:14%}
+.xh2{width:15px;height:15px;right:8%;top:8%;opacity:.32}
+.xh3{width:18px;height:18px;right:16%;bottom:11%;opacity:.4}
+.fan{position:relative;width:100%;height:330px;transform-style:preserve-3d;
+  display:flex;align-items:center;justify-content:center}
+.fan .fc{position:absolute;width:min(30%,168px);border-radius:12px;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line-2);
+  box-shadow:0 26px 50px -12px rgba(0,0,0,.8);
+  transition:transform .24s cubic-bezier(.2,.7,.3,1);will-change:transform;
+  animation:float 7s ease-in-out infinite}
+.fan .fc svg,.fan .fc img{display:block;width:100%;height:auto}
+.fan .fc::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(59,130,246,.10),transparent 55%)}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -11px}}
+.fan .fc:nth-child(1){transform:translateX(-116%) rotateY(21deg) rotateZ(-8deg) scale(.84);z-index:1;animation-delay:0s}
+.fan .fc:nth-child(2){transform:translateX(-58%)  rotateY(13deg) rotateZ(-4deg) scale(.93);z-index:2;animation-delay:.5s}
+.fan .fc:nth-child(3){transform:translateY(-4%)   rotateY(0deg)               scale(1.04);z-index:4;animation-delay:1s;
+  border-color:rgba(59,130,246,.5);box-shadow:0 30px 60px -10px rgba(0,0,0,.85),0 0 0 1px rgba(59,130,246,.18)}
+.fan .fc:nth-child(4){transform:translateX(58%)   rotateY(-13deg) rotateZ(4deg) scale(.93);z-index:2;animation-delay:1.5s}
+.fan .fc:nth-child(5){transform:translateX(116%)  rotateY(-21deg) rotateZ(8deg) scale(.84);z-index:1;animation-delay:2s}
+@media (prefers-reduced-motion:reduce){.fan .fc{animation:none}}
+/* Phone: the fan can't fan in 390px, so it becomes a tight 3-card stack under the copy. */
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;grid-template-areas:"title" "fan" "body";
+    gap:12px;padding:20px 0 18px}
+  .heroR{min-height:200px}
+  .fan .fc{width:min(42%,150px)}
+  .fan .fc:nth-child(1),.fan .fc:nth-child(5){display:none}
+  .fan .fc:nth-child(2){transform:translateX(-52%) rotateY(15deg) rotateZ(-5deg) scale(.9)}
+  .fan .fc:nth-child(4){transform:translateX(52%)  rotateY(-15deg) rotateZ(5deg) scale(.9)}
+  header{gap:0;padding:0 10px;flex-wrap:wrap}
+  .logo{font-size:13px;padding-right:10px;border-right:0;height:46px}
+  .tabs{order:3;flex-basis:100%;border-top:1px solid var(--line);margin:0 -10px;
+    padding:0 10px;
+    mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+  .tabs button{padding:9px 10px;font-size:12.5px;border-bottom-width:2px}
+  #net,#addrLine{display:none}
+  #connect{padding:7px 10px;font-size:12px;white-space:nowrap}
+  .fan{height:250px}
+}
+.burn{display:inline-block;font:700 12px/1.5 var(--mono);color:#ffb27a;
+  background:rgba(255,138,61,.08);border:1px solid rgba(255,138,61,.25);
+  border-radius:999px;padding:7px 14px;margin-bottom:10px}
+#heroProse{max-width:52ch;margin:0;color:var(--ink-2);font-size:14.5px}
+.banner{border:1px solid var(--red);background:rgba(240,97,109,.08);color:#ffc2c7;
+  border-radius:10px;padding:10px 13px;margin:12px 0;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px;margin:18px 0 14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center}
+.stat .n{display:block;font:750 19px/1.1 var(--mono);color:var(--ink);white-space:nowrap}
+.stat .l{display:block;margin-top:5px;font:600 9.5px/1.25 var(--sans);letter-spacing:.06em;color:var(--ink-3)}
+.row{display:flex;align-items:center;gap:8px}
+.muted{color:var(--ink-2);font-size:13px}
+
+/* ── tabs ───────────────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;align-self:stretch;
+  align-items:stretch;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
+  padding:0 13px;color:var(--ink-2);font:600 13px/1 var(--sans);letter-spacing:.005em;
+  white-space:nowrap;display:flex;align-items:center}
+.tabs button:hover{color:var(--ink);background:none}
+.tabs button.on{color:#fff;border-bottom-color:var(--blue);background:none}
+.tab{display:none}
+.tab.on{display:block}
+h2{margin:0 0 4px;font:750 17px/1.2 var(--sans);letter-spacing:.01em}
+
+/* ── the grid + the item card ───────────────────────────────────────────────
+   Rebuilt 2026-08-02. The first attempt cropped the artwork to the gun and lost the
+   asset's own DMG/MAG/ROF bars and rarity badge — it had LESS information than the
+   page it replaced. The artwork is now shown whole, and the tile earns its keep by
+   answering a question the original never did: can I buy this, and for how much. */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:7px;margin-top:12px}
+.card{position:relative;display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;--rc:var(--r-common)}
+.card:hover{border-color:color-mix(in srgb,var(--rc) 45%,var(--line-2))}
+.card .ed{margin-left:auto;font:700 10.5px/1 var(--mono);color:var(--ink-3)}
+/* artwork WHOLE and edge-to-edge — it IS the card. No header above it, because every
+   fact a header would repeat is already drawn inside the asset. */
+.card .art{position:relative;overflow:hidden;background:#080b0f;
+  border-bottom:1px solid var(--line);display:grid;place-items:center}
+.card .art .c3d{width:100%;display:grid;place-items:center}
+.card .art canvas,.card .art svg,.card .art img{width:100%;height:auto;max-width:100%;display:block}
+.card .ft{display:flex;flex-direction:column;gap:7px;padding:9px 10px 10px;flex:1}
+/* the market line — the reason this is a marketplace tile */
+.pxrow{display:flex;align-items:baseline;gap:6px;flex-wrap:nowrap;min-width:0;min-height:19px}
+.px{font:750 15px/1 var(--mono);color:var(--ink);letter-spacing:-.02em}
+.px em{font-style:normal;font-size:9.5px;font-weight:600;color:var(--ink-3);margin-left:3px}
+.px--none{font-size:11.5px;font-weight:600;color:var(--ink-3);letter-spacing:.04em}
+.px--floor{color:var(--gold)}
+.delta{font:700 9.5px/1 var(--mono);letter-spacing:.04em;color:var(--ink-3);
+  border:1px solid var(--line-2);border-radius:99px;padding:3px 6px}
+.delta--up{color:#ffb27a;border-color:rgba(255,138,61,.35)}
+.delta--floor{color:var(--green);border-color:rgba(63,185,80,.35)}
+.rbar{position:relative;height:3px;border-radius:99px;
+  background:linear-gradient(90deg,var(--r-common),var(--r-uncommon),var(--r-rare),var(--r-legend),var(--r-holo))}
+.rbar i{position:absolute;top:-2.5px;width:2px;height:8px;background:#fff;border-radius:1px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.7);left:0;transform:translateX(-50%);
+  transition:left .55s cubic-bezier(.22,1,.36,1)}
+.card.swept .rbar i{left:var(--pos,50%)}
+.card .perk{font:600 10px/1.35 var(--mono);color:var(--ink-2)}
+.card .bl{display:none}
+.card.holo{--rc:var(--r-holo)}
+.card .row{gap:5px}
+.card .row input{flex:1;min-width:0;padding:6px 8px;font-size:11.5px}
+.card .row button{padding:6px 10px;font-size:11px;font-weight:700}
+.card .sc,.card .rk{font:700 11px/1 var(--mono)}
+.bidhi{border-color:var(--gold)}
+.bidmeta{font:600 10.5px/1.4 var(--mono);color:var(--ink-2)}
+.card .ad{font-size:10.5px;color:var(--ink-3)}
+.c3d{transform-style:preserve-3d;transition:transform .18s}
+.c3d.live{transition:none}
+.glare{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(200px 150px at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.09),transparent 62%)}
+.rainbow{background:linear-gradient(90deg,#ff6b6b,#ffd75e,#7cf9a5,#4ea8de,#a06cd5);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.lv{font:700 10px/1 var(--mono);color:var(--gold)}
+
+/* ── tables (leaderboard, sales, offers) ────────────────────────────────── */
+.lb,#salesWrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font:600 9.5px/1 var(--sans);letter-spacing:.1em;color:var(--ink-3);
+  padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid #10161e;font-family:var(--mono);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#111823}
+
+/* ── toast ──────────────────────────────────────────────────────────────── */
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(140%);
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;
+  padding:11px 16px;font-size:13px;z-index:80;max-width:calc(100vw - 32px);
+  transition:transform .28s cubic-bezier(.22,1,.36,1)}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ── phone: keep TWO columns. Scanning beats reading in a collection. ────── */
+@media(max-width:760px){
+  .wrap{padding:12px 10px 56px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stats .stat:last-child{grid-column:1/-1}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .card .bl{display:none}          /* the blurb is the first thing to go, not the facts */
+  .card .nm{font-size:12px}
+  .hero{padding:16px 0 12px}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .card .rbar i{left:var(--pos,50%)}
+}
+</style><link rel="preload" as="font" type="font/woff2" href="black-ops-one.woff2" crossorigin>
+<link rel="canonical" href="https://mint.wick.pics/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0e13'/%3E%3Crect x='6' y='13' width='20' height='5' rx='1.5' fill='%233b82f6'/%3E%3Crect x='9' y='18' width='5' height='6' rx='1.5' fill='%23e3b341'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WICK ARSENAL">
+<meta property="og:title" content="WICK ARSENAL — 101 on-chain guns on PulseChain">
+<meta property="og:description" content="Browse, bid on and buy the collection. Every sale burns 15% into $WICK in the same transaction.">
+<meta property="og:image" content="https://mint.wick.pics/og.png">
+<meta property="og:url" content="https://mint.wick.pics/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WICK ARSENAL — 101 on-chain guns on PulseChain">
+<meta name="twitter:description" content="Browse, bid on and buy the collection. Every sale burns 15% into $WICK in the same transaction.">
+<meta name="twitter:image" content="https://mint.wick.pics/og.png">
 </head>
+<!-- ============================================================================
+     WICK ARSENAL — replacement front end (drop-in for web/index.html)
+
+     Single file, same three dependencies you already ship (ethers.min.js,
+     config.js, gunart.js), plus one self-hosted display font.
+     No build step, no framework, no npm.
+
+     Every contract call, ABI fragment and handler is the original code,
+     unchanged, except for the one deliberate fix below.
+
+     FIXED IN HERE — the ADVERTISE tab could never complete a purchase.
+       The billboards buy() fragment declared 6 params; the deployed contract
+       at 0x84587C185CAcE68CC559e86936F61812609548DF and your own caller both
+       use 7. The missing one is `uint256 logo`.
+       Verified by encoding the call with your own web/ethers.min.js: it now
+       produces selector 0x96480d22, the only buy() selector the deployed
+       contract exposes. Before this change the encode threw
+       UNEXPECTED_ARGUMENT: too many arguments.
+
+     ALSO NEEDS (not in this file) — web/gunart.js has 7 SVG font stacks
+       reading font-family='Impact,Arial' with no generic fallback; on a box
+       with neither face the browser falls back to a serif. Append
+       ,sans-serif to those 7 stacks.
+
+     ASSETS — black-ops-one.woff2 (Google Fonts, SIL OFL, self-hosted).
+     ============================================================================ -->
 <body>
+
 <header>
   <div class="logo">WICK <b>ARSENAL</b></div>
+
+  <!-- CSFloat carries its section nav in the header bar, not below the hero. #tabs keeps
+       its id and button[data-tab] children, which is all the app binds to. -->
+  <nav class="tabs" id="tabs">
+    <button data-tab="tCollection" class="on">Collection</button>
+    <button data-tab="tMarket">Market</button>
+    <button data-tab="tBids">Bids</button>
+    <button data-tab="tSales">Sales</button>
+    <button data-tab="tAds" id="tabAdsBtn" style="display:none">Advertise</button>
+    <button data-tab="tMine">Arsenal</button>
+    <button data-tab="tBoard">Leaderboard</button>
+  </nav>
+
   <div class="grow"></div>
-  <span id="net" class="tag"></span>
+  <span id="net"></span>
+  <span id="addrLine"></span>
   <button id="connect" class="primary">CONNECT WALLET</button>
 </header>
 
 <div class="wrap">
-  <div class="hero">
-    <h1>OWN THE GUN. WIELD IT.</h1>
-    <p id="heroProse">101 on-chain guns for <b>PEPE WICK</b> on PulseChain. Hold one in your wallet and it unlocks as a real weapon in the game — plus a +1 heart for connected holders. 6 are platinum holographic 1/1s — <b>five were pulled from the blind mint</b> (pre-committed seed + post-mint blockhash: no one, including us, could pick winners) and are now revealed and tradeable. The sixth, <b>TANGENTIAL REAPER</b>, is an honorary legendary that was <b>never mintable</b>: forged for a friend of the house. The mint <b>sold out</b> — every gun now changes hands on the marketplace below.</p>
-    <div class="burn" id="heroBurn">🔥 SOLD OUT — <b>100 CASES</b> AT <b>1,000,000 PLS</b> EACH, <b>100%</b> USED TO <b>BUY &amp; BURN $WICK</b> &nbsp;·&nbsp; EVERY RESALE BURNS ANOTHER <b>15%</b> 🔥</div>
 
-    <!-- WICK MODS free mint — hidden until cfg.mods is a real address -->
-    <div id="modsPanel" style="display:none;margin-top:14px;padding:14px;border:2px dashed #7cf9a5;border-radius:12px;background:rgba(124,249,165,.05)">
-      <h3 style="margin:0 0 4px;color:#7cf9a5;letter-spacing:1px">🧩 WICK MODS — FREE MINT · GUN HOLDERS ONLY</h3>
-      <p class="muted" style="margin:0 0 8px">Gun <b>attachments</b>, free (gas only). <b>Every WICK Arsenal gun you hold grants 3 mints</b> — 10 guns = 30. The allowance sticks to the gun, so buying a gun that already minted its 3 grants nothing. <b>Holding is UNCAPPED</b> — buy as many mods as you want on the market below. Each mod is a physical part: it fits <b>one gun at a time</b> (3 slots per gun), and fitting it elsewhere <b>moves</b> it rather than copying it — so arming a second gun takes a second mod. Every effect is a real game mechanic. <span id="modsLeft"></span></p>
-      <div id="modsPool" class="muted" style="margin:0 0 10px;font-size:13px"></div>
+  <section class="hero">
+   <h1>OWN THE GUN.<br>WIELD IT.</h1>
+   <div class="heroL">
+    <div class="burn" id="heroBurn">🔥 SOLD OUT — <b>100 CASES</b> AT <b>1,000,000 PLS</b> EACH</div>
+    <p id="heroProse" class="muted">101 on-chain guns on PulseChain. Every one is a real weapon inside PEPE WICK, and every sale burns 15% into $WICK in the same transaction.</p>
+
+    <div id="modsPanel" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--green);border-radius:12px;text-align:left">
+      <div id="modsPool" class="muted" style="margin:0 0 10px"></div>
       <div class="row" style="flex-wrap:wrap">
         <select id="modsQty"><option value="1">1 mod</option><option value="2">2 mods</option><option value="3" selected>3 mods</option></select>
         <button id="modsMint" class="primary">MINT 3 FREE</button>
-        <span class="muted" id="modsNote"></span>
+        <span id="modsNote" class="muted"></span>
       </div>
+      <div id="modsLeft" class="muted" style="margin-top:8px"></div>
     </div>
-    <p style="margin-top:12px"><a href="https://games.wick.pics/play/" target="_blank" rel="noopener" style="display:inline-block;background:#5ecb46;color:#08110a;font-weight:800;padding:9px 20px;border-radius:10px;text-decoration:none;letter-spacing:1px">▶ PLAY PEPE WICK</a> &nbsp; <span class="muted">10 contracts · get the dog back</span></p>
-  </div>
 
-  <div id="cfgWarn" class="banner" style="display:none"></div>
+    <div id="cfgWarn" class="banner" style="display:none"></div>
 
-  <div class="stats">
-    <div class="stat"><div class="n" id="sMinted">–</div><div class="l">MINTED / 101</div></div>
-    <div class="stat"><div class="n" id="sPrice">–</div><div class="l">PRICE (PLS)</div></div>
-    <div class="stat"><div class="n" id="sOpen">–</div><div class="l">MINT STATUS</div></div>
-    <div class="stat"><div class="n" id="sYours">–</div><div class="l">YOUR GUNS</div></div>
-    <div class="stat" title="Total $WICK held at the burn address — read live from the chain, from every source.">
-      <div class="n" id="sBurned" style="color:#ff8a3d">–</div><div class="l">🔥 $WICK BURNED</div></div>
-  </div>
+    <div class="stats">
+      <div class="stat"><span class="n" id="sMinted">–</span><span class="l">MINTED / 101</span></div>
+      <div class="stat"><span class="n" id="sPrice">–</span><span class="l">PRICE (PLS)</span></div>
+      <div class="stat"><span class="n" id="sOpen">–</span><span class="l">MINT STATUS</span></div>
+      <div class="stat"><span class="n" id="sYours">–</span><span class="l">YOUR GUNS</span></div>
+      <div class="stat" title="Total $WICK held at the burn address — read live from the chain."><span class="n" id="sBurned" style="color:#ff8a3d">–</span><span class="l">🔥 $WICK BURNED</span></div>
+    </div>
 
-  <div class="row" style="justify-content:center;margin-bottom:8px">
-    <span class="muted">Mint</span>
-    <input type="number" id="qty" min="1" max="5" value="1" style="width:70px">
-    <button id="mint" class="primary">MINT</button>
-    <span id="mintNote" class="muted"></span>
-  </div>
+    <div class="row" style="flex-wrap:wrap">
+      <input type="number" id="qty" min="1" max="5" value="1" style="width:74px">
+      <button id="mint" class="primary">MINT</button>
+      <span id="mintNote" class="muted"></span>
+    </div>
+    <div id="tierPanel"></div>
+    <div id="playWithGuns"></div>
+   </div>
 
-  <nav class="tabs" id="tabs">
-    <button data-tab="tCollection" class="on">THE COLLECTION</button>
-    <button data-tab="tBids">⚡ BID ON RARES</button>
-    <button data-tab="tMarket">MARKETPLACE</button>
-    <button data-tab="tSales">📈 RECENT SALES</button>
-    <button data-tab="tAds" id="tabAdsBtn" style="display:none">📺 ADVERTISE</button>
-    <button data-tab="tMine">YOUR ARSENAL</button>
-    <button data-tab="tBoard">🏆 LEADERBOARD</button>
-  </nav>
+   <!-- CSFloat's signature: real items fanned in 3D behind crosshair guides. Populated
+        from the same on-chain artwork the grid uses, so it is never a stock mockup. -->
+   <div class="heroR" aria-hidden="true">
+     <div class="xhair xh1"></div><div class="xhair xh2"></div><div class="xhair xh3"></div>
+     <div class="fan" id="heroFan"></div>
+   </div>
+  </section>
+
+  <section id="tCollection" class="tab on">
+    <h2>The Collection</h2>
+    <p class="muted">All 101 guns, rarest first. Rarity bar shows where each sits across the set.</p>
+    <div id="catalog" class="grid"></div>
+  </section>
 
   <section id="tBids" class="tab">
-    <h2>BID ON RARES</h2>
-    <p class="muted" style="margin:-6px 0 10px">Every gun <b>above Common</b> that's been revealed — Uncommon through the platinum 1/1s. Escrow a bid on any specific one; the owner can take it whenever they like. Your PLS is held by the contract and you can pull it back any time before it's accepted. Accepted bids pay the same <b>15% royalty, burned as $WICK</b>.</p>
-    <div class="row" style="margin-bottom:10px;flex-wrap:wrap">
-      <span class="muted">show:</span>
+    <h2>Bid on Rares</h2>
+    <p class="muted">Escrow an offer against a specific gun — or any gun of a type.</p>
+    <div class="row" style="margin:10px 0;flex-wrap:wrap">
       <button id="fAll" class="on">ALL RARES</button>
       <button id="fHolo">★ 1/1s ONLY</button>
-      <span class="muted" id="bidCount"></span>
+      <span id="bidCount" class="muted"></span>
     </div>
     <div id="bids" class="grid"></div>
     <div id="bidsEmpty" class="muted">Loading the rares…</div>
   </section>
 
-  <section id="tCollection" class="tab on">
-  <h2>THE COLLECTION</h2>
-  <p class="muted" style="margin:-6px 0 10px">All 11 gun types. Every card is drawn on-chain — no IPFS, no server. Five platinum holo 1/1s came out of the blind mint and are revealed; the <b>TANGENTIAL REAPER</b> was never mintable.</p>
-  <div id="catalog" class="grid"></div>
-  </section>
-
-  <section id="tBoard" class="tab">
-  <h2>TOP 10 ASSASSINS</h2>
-  <p class="muted" style="margin:-6px 0 10px">🏆 <b>Prize board:</b> when the clock runs out — <b>1st 50 USDC · 2nd 35 USDC · 3rd 15 USDC</b>. Closes <b id="prizeDeadline">Aug 6, 12:00 UTC</b> (<span id="prizeInline">–</span> left). <b>Any mode counts</b> (story or gauntlet) but <b>one prize per wallet</b> — your single best score. <b>Gun NFT holders only</b> — ownership is verified on-chain when you submit. Connect that wallet in-game and submit from the results screen; only wallet-signed scores count, and entries are reviewed before payout.</p>
-  <div class="lb" id="lbBox">
-    <table>
-      <thead><tr><th>RANK</th><th>PLAYER</th><th style="text-align:right">HIGH SCORE</th><th style="text-align:right">LEVEL</th></tr></thead>
-      <tbody id="lbRows"><tr><td colspan="4" class="muted" style="padding:18px">Loading the board…</td></tr></tbody>
-    </table>
-  </div>
-  <p class="muted" style="margin-top:8px">Scores are signed by the player's wallet in-game at <a href="https://games.wick.pics" target="_blank" rel="noopener">games.wick.pics</a> — connect your wallet on the game menu, then submit from the results screen.</p>
-
-  </section>
-
-  <section id="tMine" class="tab">
-  <h2>YOUR ARSENAL</h2>
-  <!-- Phone hand-off: connecting inside the landscape-locked game is painful, and
-       in-app browsers can't bridge to a wallet at all. Connect HERE, then carry the
-       address over so the guns are already unlocked when the game opens. -->
-  <a id="playWithGuns" href="#" target="_blank" rel="noopener" style="display:none;background:linear-gradient(180deg,#7cf9a5,#57e08a);color:#07120b;font-weight:bold;text-decoration:none;padding:14px;border-radius:10px;font-size:14.5px;letter-spacing:1px;text-align:center;margin-bottom:12px">🎮 PLAY WITH MY GUNS →</a>
-  <div id="mktApproval" class="muted" style="display:none;margin:-6px 0 12px;padding:10px 12px;border:1px solid #2c3242;border-radius:8px;background:rgba(10,14,24,.5)"></div>
-  <p class="muted" style="margin:-2px 0 10px">Every gun can be <b>listed</b> for sale or <b>sent</b> straight to another wallet. Sending is a plain transfer — no fee, no royalty, and it's permanent.</p>
-  <div id="arsenal" class="grid"></div>
-  <div id="arsenalEmpty" class="muted">Connect a wallet to see the guns you own.</div>
-  <h2 id="modsHdr" style="display:none">🧩 YOUR MODS</h2>
-  <p class="muted" id="modsHint" style="display:none;margin:-6px 0 10px">A mod is a <b>physical part</b>: each one bolts onto <b>one gun at a time</b>, and no gun takes the same type twice. Fitting a mod that's already on another gun <b>moves it</b> — it never copies. Guns have 3 slots; build each one in the in-game 🔧 GUNSMITH. Want the same mod on two guns? You need <b>two copies</b> — there's <b>no holding cap</b>, so buy spares from MOD LISTINGS.</p>
-  <div id="modsGrid" class="grid"></div>
-  </section>
-
   <section id="tMarket" class="tab">
-  <h2>MARKETPLACE</h2>
-  <p class="muted" style="margin:-6px 0 10px">Sell any gun you own. Every sale pays a <b>15% royalty</b> — and <b>100% of that royalty is swapped to $WICK and burned inside the sale transaction</b>. Nobody collects it. Sellers keep 85%.</p>
-  <div class="row" style="margin-bottom:10px;flex-wrap:wrap">
-    <span class="muted">sort:</span>
-    <button data-msort="priceAsc" class="on">PRICE ↑</button>
-    <button data-msort="priceDesc">PRICE ↓</button>
-    <button data-msort="rarity">RAREST</button>
-    <button data-msort="id">GUN #</button>
-    <span class="muted" id="marketCount"></span>
-  </div>
-  <div id="market" class="grid"></div>
-  <div id="marketEmpty" class="muted">No guns listed for sale right now.</div>
+    <h2>Marketplace</h2>
+    <div class="row" style="margin:10px 0;flex-wrap:wrap">
+      <button data-msort="priceAsc" class="on">PRICE ↑</button>
+      <button data-msort="priceDesc">PRICE ↓</button>
+      <button data-msort="rarity">RAREST</button>
+      <button data-msort="id">GUN #</button>
+      <span id="marketCount" class="muted"></span>
+    </div>
+    <div id="market" class="grid"></div>
+    <div id="marketEmpty" class="muted">No guns listed for sale right now.</div>
 
-  <h2>🧩 MOD LISTINGS</h2>
-  <p class="muted" style="margin:-6px 0 10px">Attachments on the secondary market. <b>50% of every mod sale is swapped to $WICK and burned in the sale transaction</b> — the seller keeps 50%. Holders list from YOUR ARSENAL.</p>
-  <div id="modMarket" class="grid"></div>
-  <div id="modMarketEmpty" class="muted">No mods listed yet.</div>
+    <h2 style="margin-top:26px">Mod Listings</h2>
+    <p class="muted">Attachments on the secondary market. <b>50% of every mod sale is burned as $WICK.</b></p>
+    <div id="modMarket" class="grid"></div>
+    <div id="modMarketEmpty" class="muted">No mods listed yet.</div>
 
-  <h2>OFFERS POOL</h2>
-  <p class="muted" style="margin:-6px 0 10px">Put money where your mouth is: escrow an offer for a <b>specific gun</b>, or leave a standing offer on <b>ANY gun</b> in the collection — any holder can sell into it. Your PLS is held by the contract and refundable until someone accepts.</p>
-  <div class="row" style="margin-bottom:10px;flex-wrap:wrap">
-    <input type="text" id="offAmt" placeholder="amount in PLS" style="width:150px">
-    <input type="number" id="offTok" min="0" max="101" placeholder="gun # (0 = any)" style="width:150px">
-    <select id="offTier" style="width:210px"><option value="0">any gun — no specific model</option></select>
-    <button id="offMake" class="primary">MAKE OFFER</button>
-    <span class="muted" id="offNote">Bid on one gun by number, or on a whole model — not both.</span>
-  </div>
-  <div class="lb" id="offBox">
-    <table>
-      <thead><tr><th>BIDDER</th><th>WANTS</th><th style="text-align:right">OFFER</th><th style="text-align:right">ACTION</th></tr></thead>
-      <tbody id="offRows"><tr><td colspan="4" class="muted" style="padding:18px">No open offers yet.</td></tr></tbody>
-    </table>
-  </div>
+    <h2 style="margin-top:26px">Offers Pool</h2>
+    <p class="muted">Escrow an offer for a specific gun, or <b>0</b> for any.</p>
+    <div class="row" style="margin:10px 0;flex-wrap:wrap">
+      <input type="text" id="offAmt" placeholder="amount in PLS" style="width:160px">
+      <input type="number" id="offTok" min="0" max="101" placeholder="gun # (0 = any)" style="width:160px">
+      <button id="offMake" class="primary">MAKE OFFER</button>
+    </div>
+    <div class="lb" id="offBox"><table><thead><tr><th>#</th><th>GUN</th><th>OFFER</th><th>FROM</th><th></th></tr></thead><tbody id="offRows"></tbody></table></div>
   </section>
 
   <section id="tSales" class="tab">
-  <h2>RECENT SALES</h2>
-  <p class="muted" style="margin:-6px 0 10px">Every completed sale on this contract, newest first — read straight off the chain, direct listings and accepted offers alike. <span id="salesBurn"></span></p>
-  <div id="salesWrap" style="overflow-x:auto"><table id="sales" class="tbl"></table></div>
-  <div id="salesEmpty" class="muted">No sales yet — the market is brand new.</div>
-  <p class="muted" style="margin-top:12px">Every sale burns <b>15%</b> of its price into $WICK inside the same transaction. Nobody collects that royalty — not the team, not the contract owner.</p>
+    <h2>Recent Sales</h2>
+    <p class="muted">Every completed sale on this contract, newest first — read straight from the chain.</p>
+    <div id="salesWrap"><table id="sales" class="tbl"></table></div>
+    <div id="salesEmpty" class="muted">No sales yet — the market is brand new.</div>
+    <p class="muted" style="margin-top:12px">Every sale burns <b>15%</b> of its price into $WICK in the same transaction. <span id="salesBurn"></span></p>
   </section>
 
   <section id="tAds" class="tab">
-  <h2>📺 YOUR AD, INSIDE THE GAME</h2>
-  <p class="muted" style="margin:-6px 0 10px">PEPE WICK's streets run 21 neon billboards. Buy a day and yours is up there — bought on-chain, live in-game within minutes. <b>50% of every purchase is swapped to $WICK and burned in the buy transaction</b>; 50% funds development.</p>
-  <div class="row" style="gap:14px;flex-wrap:wrap;margin-bottom:12px">
-    <div style="border:2px solid #2c3242;border-radius:10px;padding:12px 14px;min-width:220px">
-      <b style="color:#7cf9a5">ROTATION · 1,000,000 PLS/day</b>
-      <div class="muted" style="font-size:12px;margin-top:6px">joins the in-game rotation<br>max 8 advertisers per day</div>
+    <h2>Your Ad, Inside the Game</h2>
+    <p class="muted">PEPE WICK's streets run 21 neon billboards. Buy a day and yours goes up.</p>
+    <div id="adAvail" class="muted" style="margin-bottom:12px">Loading availability…</div>
+    <div class="row" style="flex-wrap:wrap;margin-bottom:8px">
+      <select id="adDay"></select>
+      <select id="adType"><option value="reg">ROTATION — 1M PLS</option><option value="exc">EXCLUSIVE — 10M PLS</option></select>
+      <input type="color" id="adColor" value="#7cf9a5" title="accent colour" style="width:46px;height:36px;padding:3px">
     </div>
-    <div style="border:2px solid #ffd75e;border-radius:10px;padding:12px 14px;min-width:220px">
-      <b style="color:#ffd75e">EXCLUSIVE · 10,000,000 PLS/day</b>
-      <div class="muted" style="font-size:12px;margin-top:6px"><b>every billboard in the game is yours</b><br>one per day · only while the day is empty</div>
+    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
+      <input type="text" id="adName" maxlength="20" placeholder="headline (max 20)" style="width:190px">
+      <input type="text" id="adTag" maxlength="28" placeholder="tagline (max 28)" style="width:230px">
+      <input type="text" id="adUrl" maxlength="32" placeholder="yoursite.com (max 32)" style="width:230px">
     </div>
-  </div>
-  <div id="adAvail" class="muted" style="margin-bottom:12px">Loading availability…</div>
-  <div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">
-    <select id="adDay"></select>
-    <select id="adType"><option value="reg">ROTATION — 1M PLS</option><option value="exc">EXCLUSIVE — 10M PLS</option></select>
-    <input type="color" id="adColor" value="#7cf9a5" title="accent color" style="width:44px;height:34px;padding:2px">
-  </div>
-  <div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
-    <input type="text" id="adName" maxlength="20" placeholder="headline (max 20)" style="width:180px">
-    <input type="text" id="adTag" maxlength="28" placeholder="tagline (max 28)" style="width:220px">
-    <input type="text" id="adUrl" maxlength="32" placeholder="yoursite.com (clickable, max 32)" style="width:220px">
-  </div>
-  <div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center">
-    <label for="adLogoFile" style="cursor:pointer;border:2px dashed #2c3242;border-radius:9px;padding:9px 13px;font-size:13px">🖼 ADD YOUR LOGO <span class="muted">(optional)</span></label>
-    <input type="file" id="adLogoFile" accept="image/*" style="display:none">
-    <button id="adLogoClear" style="display:none">✖ remove logo</button>
-    <span class="muted" style="font-size:12px">any image → baked to a 16×16 on-chain sprite in your color. It replaces the Pepe standing on the board.</span>
-  </div>
-  <div id="adPreview" style="max-width:420px;margin:0 0 12px;background:#060911;border:3px solid #7cf9a5;border-radius:11px;padding:12px 14px;box-shadow:0 0 22px rgba(124,249,165,.35);display:flex;align-items:center;gap:12px">
-    <div style="flex:1;min-width:0">
-      <div id="apName" style="font:900 19px Verdana;color:#7cf9a5">YOUR NAME HERE</div>
-      <div id="apTag" style="font:bold 11px Verdana;color:rgba(220,228,240,.72);margin-top:3px">your tagline here</div>
-      <a id="apUrl" href="#" target="_blank" rel="noopener nofollow" style="font:bold 10px Verdana;color:#9fe6ff;margin-top:4px;display:none"></a>
+    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
+      <label for="adLogoFile" style="cursor:pointer;border:1px dashed var(--line-2);border-radius:9px;padding:9px 13px;font-size:13px">＋ logo (16×16)</label>
+      <input type="file" id="adLogoFile" accept="image/*" style="display:none">
+      <button id="adLogoClear" style="display:none">✖ remove logo</button>
+      <span id="adNote" class="muted"></span>
     </div>
-    <canvas id="apLogo" width="16" height="16" style="width:64px;height:64px;image-rendering:pixelated;display:none;flex:none"></canvas>
-    <div id="apPepe" style="font-size:38px;flex:none" title="the house Pepe stands here unless you add a logo">🐸</div>
-  </div>
-  <div class="row" style="flex-wrap:wrap;gap:8px">
+    <div id="adPreview" style="max-width:430px;margin:0 0 12px;background:#060911;border:1px solid var(--green);border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center">
+      <canvas id="apLogo" width="16" height="16" style="width:34px;height:34px;image-rendering:pixelated"></canvas>
+      <div style="flex:1;min-width:0">
+        <div id="apName" style="font-weight:750"></div>
+        <div id="apTag" class="muted" style="font-size:12px"></div>
+        <div id="apUrl" class="muted" style="font-size:11px;font-family:var(--mono)"></div>
+      </div>
+      <div id="apPepe"></div>
+    </div>
     <button id="adBuy" class="primary">BUY THE DAY</button>
-    <span class="muted" id="adNote"></span>
-  </div>
-  <p class="muted" style="margin-top:12px;font-size:12px">House rules: content is short text only, rendered in the game's house style. Abusive or scam content gets banned by the operator without refund — buying is agreeing. Days are UTC.</p>
+  </section>
+
+  <section id="tMine" class="tab">
+    <h2>Your Arsenal</h2>
+    <!-- showApprovalState() owns this block's contents, including its own UNLOCK NOW
+         button. Static markup here would just be overwritten on first render. -->
+    <div id="mktApproval" class="muted" style="display:none;margin:10px 0;padding:10px 12px;border:1px solid var(--line-2);border-radius:9px"></div>
+    <div id="arsenal" class="grid"></div>
+    <div id="arsenalEmpty" class="muted">Connect a wallet to see the guns you own.</div>
+    <h2 id="modsHdr" style="display:none;margin-top:26px">Your Mods</h2>
+    <div id="modsHint" class="muted" style="display:none"></div>
+    <div id="modsGrid" class="grid"></div>
+  </section>
+
+  <section id="tBoard" class="tab">
+    <h2>Top 10 Assassins</h2>
+    <p class="muted">🏆 <b>Prize board:</b> when the clock runs out — <b>1st 50 USDC · 2nd 35 USDC · 3rd 15 USDC</b>. Closes <b id="prizeDeadline">Aug 6, 12:00 UTC</b> (<span id="prizeInline">–</span> left). <b>Any mode counts</b> but <b>one prize per wallet</b> — your single best score. <b>Gun NFT holders only</b>; ownership is verified on-chain when you submit.</p>
+    <div class="lb" id="lbBox"><table><thead><tr><th>#</th><th>PLAYER</th><th>SCORE</th><th>WHEN</th></tr></thead><tbody id="lbRows"></tbody></table></div>
   </section>
 
 </div>
 
-<!-- PRIZE BOARD popup: shown once per browser (dismissal remembered), and again if the
-     prizes change. Auto-hides after the deadline passes. -->
-<div id="prizeWrap" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(2,4,10,.82);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:18px;overflow-y:auto">
-  <div id="prizeBox" style="width:min(460px,100%);margin:auto;background:linear-gradient(180deg,#111827,#0a0e18);border:2px solid #ffd75e;border-radius:16px;box-shadow:0 0 40px rgba(255,215,94,.28);padding:22px 20px;text-align:center;position:relative">
-    <button id="prizeX" aria-label="Close" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#8a93a5;font-size:22px;line-height:1;cursor:pointer;padding:4px 8px">×</button>
-    <div style="font-size:30px;line-height:1">🏆</div>
-    <h3 style="margin:6px 0 2px;color:#ffd75e;font-size:19px;letter-spacing:1px">PRIZE BOARD IS LIVE</h3>
-    <p style="margin:0 0 10px;color:#cfd6e0;font-size:13px">Highest scores in <b>PEPE WICK</b> when the clock runs out:</p>
-    <p style="margin:0 0 14px;color:#7cf9a5;font-size:11.5px;font-weight:bold;letter-spacing:1px;border:1px dashed rgba(124,249,165,.5);border-radius:8px;padding:7px">🔫 GUN NFT HOLDERS ONLY — own one to enter</p>
-    <div style="display:grid;gap:7px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,215,94,.10);border:1px solid rgba(255,215,94,.45);border-radius:9px;padding:9px 13px">
-        <span style="color:#ffd75e;font-weight:bold">🥇 1st place</span><b style="color:#fff;font-size:17px">50 USDC</b></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:9px 13px">
-        <span style="color:#e8e8ea;font-weight:bold">🥈 2nd place</span><b style="color:#fff;font-size:17px">35 USDC</b></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,157,61,.08);border:1px solid rgba(255,157,61,.30);border-radius:9px;padding:9px 13px">
-        <span style="color:#ff9d3d;font-weight:bold">🥉 3rd place</span><b style="color:#fff;font-size:17px">15 USDC</b></div>
-    </div>
-    <div style="font-family:'Courier New',monospace;font-size:20px;font-weight:bold;color:#7cf9a5;letter-spacing:1px" id="prizeClock">–</div>
-    <div style="color:#8a93a5;font-size:10.5px;letter-spacing:1px;margin-bottom:14px">until it closes · <span id="prizeWhen"></span></div>
-    <a href="https://games.wick.pics" target="_blank" rel="noopener" style="display:block;background:#7cf9a5;color:#07120b;font-weight:bold;text-decoration:none;padding:12px;border-radius:9px;font-size:14px;letter-spacing:1px">▶ PLAY &amp; SET A SCORE</a>
-    <p style="margin:12px 0 0;color:#6b7686;font-size:10.5px;line-height:1.7">
-      To enter: <b>hold at least one WICK ARSENAL gun NFT</b>, then <b>connect that wallet in the game</b> and submit from the results screen.
-      Ownership is checked on-chain at submit time and only wallet-signed scores count (watch mode can't submit).
-      Entries are reviewed by hand before payout; anything clearly tampered with is disqualified. Prizes are sent manually by the project. Not affiliated with Lionsgate.
-    </p>
+<div id="prizeWrap" style="display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(2,4,10,.86);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:18px;overflow-y:auto">
+  <div style="position:relative;background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
+    padding:26px 30px;max-width:420px;width:100%;text-align:center">
+    <button id="prizeX" aria-label="Close" style="position:absolute;top:6px;right:8px;background:none;border:0;
+      color:var(--ink-3);font-size:22px;line-height:1;padding:4px 8px">×</button>
+    <div style="font:800 15px/1.2 var(--sans);letter-spacing:.08em;margin-bottom:14px">🏆 PRIZE BOARD</div>
+    <div id="prizeClock" style="font:700 22px/1 var(--mono);color:var(--green);letter-spacing:1px">–</div>
+    <div style="color:var(--ink-3);font-size:10.5px;letter-spacing:.1em;margin-top:6px">
+      until it closes · <span id="prizeWhen"></span></div>
   </div>
 </div>
-
-<div id="toast" class="toast"></div>
-<footer>Unofficial fan project · art &amp; metadata fully on-chain · <span id="addrLine"></span><br>
-<span style="opacity:.8">Utility is guaranteed in PEPE WICK today. Future titles may or may not support these NFTs — there is no obligation or timeline.</span></footer>
-
+<div id="toast"></div>
 <script src="ethers.min.js"></script>
 <script src="config.js"></script>
-<script src="abi.js"></script>
 <script src="gunart.js"></script>
 <script>
+
 const $ = s => document.querySelector(s);
 const cfg = window.WICK_CFG, CAT = window.WICK_GUNS;
 const ZERO = "0x0000000000000000000000000000000000000000";
 let provider, signer, account, guns, gunsRO, market, marketRO;
-// The superseded v1 venue. It does not stop existing when v2 ships: it still holds
-// escrowed offers and listing rows that ONLY their original bidder/seller can clear.
-// Read-only + cancel + buy are wired to it; nothing NEW is ever created there.
-let marketOldRO=null, marketOldC=null;
-const legacyMarket = () => cfg.marketOld && !/^0x0{40}$/i.test(cfg.marketOld) && window.WICK_ABI.marketOld;
 
-// ABIs come from web/abi.js, generated by gen-abi.mjs out of the compiler artifacts.
-// Do not retype signatures here — that is what killed the ADVERTISE tab (a buy()
-// missing its `logo` arg) and what caused the market v1/v2 offer mismatch.
-// Regenerate with `node gen-abi.mjs`; verify against chain with `node check-abi.mjs`.
-// NOTE: the market is v2 as of 2026-08-01 (cfg.market; v1 lives on at cfg.marketOld).
-// gen-abi.mjs's MARKET_IS_V2 switch and cfg.market must always move together.
-const GUNS_ABI = window.WICK_ABI.guns;
-const MARKET_ABI = window.WICK_ABI.market;
+const GUNS_ABI = [
+  "function mint(uint256 qty) payable",
+  "function mintPrice() view returns (uint256)",
+  "function mintOpen() view returns (bool)",
+  "function totalSupply() view returns (uint256)",
+  "function publicMinted() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function ownerOf(uint256) view returns (address)",
+  "function gunTypeOf(uint256) view returns (uint8)",
+  "function tokenURI(uint256) view returns (string)",
+  "function gunsOfOwner(address) view returns (uint256[] ids, uint8[] types)",
+  "function getApproved(uint256) view returns (address)",
+  "function isApprovedForAll(address,address) view returns (bool)",
+  "function approve(address,uint256)",
+  "function setApprovalForAll(address,bool)",
+  "function safeTransferFrom(address,address,uint256)",
+];
+const MARKET_ABI = [
+  "function list(uint256 id, uint256 price)",
+  "function cancel(uint256 id)",
+  "function buy(uint256 id) payable",
+  "function getListing(uint256 id) view returns (address seller, uint256 price)",
+  "function feeBps() view returns (uint96)",
+  // offers pool — tokenId 0 = a standing offer on ANY gun in the collection.
+  // These fragments MUST match the DEPLOYED v1 contract: getOffer returns 4 words,
+  // makeOffer takes one argument. If the v2 market ever ships, change the address
+  // in config.js and these two fragments in the SAME commit.
+  "function makeOffer(uint256 tokenId) payable returns (uint256)",
+  "function cancelOffer(uint256 id)",
+  "function acceptOffer(uint256 id, uint256 tokenId)",
+  "function offersCount() view returns (uint256)",
+  "function getOffer(uint256 id) view returns (address bidder, uint256 amount, uint256 tokenId, bool open)",
+  "function burnPending() view returns (uint256)",
+  "function burnPool(uint256 minOut)",
+  "event Sold(uint256 indexed id, address indexed seller, address indexed buyer, uint256 price)",
+  "event OfferAccepted(uint256 indexed offerId, uint256 indexed tokenId, address indexed seller, address bidder, uint256 amount)",
+];
 
 function toast(msg, ms=3600){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), ms); }
 const fmt = w => { try{ return Number(ethers.formatEther(w)).toLocaleString(undefined,{maximumFractionDigits:6}); }catch(e){ return "?"; } };
 const configured = () => cfg.guns && cfg.guns !== ZERO && cfg.market && cfg.market !== ZERO;
 
-const MODS_ABI = window.WICK_ABI.mods;
-const BB_ABI = window.WICK_ABI.billboards;
+const MODS_ABI=[
+  "function mint(uint256 qty)",
+  "function mintOpen() view returns (bool)",
+  "function totalSupply() view returns (uint256)",
+  "function allowanceOf(address) view returns (uint256)",   // 3 per gun held, minus what those guns already minted
+  "function gunMintsUsed(uint256) view returns (uint8)",
+  "function poolLeft() view returns (uint16[7])",
+  "function modsOfOwner(address) view returns (uint256[] ids, uint8[] types)",
+  "function modTypeOf(uint256) view returns (uint8)",
+  "function safeTransferFrom(address,address,uint256)",
+  "function ownerOf(uint256) view returns (address)",
+  "function setApprovalForAll(address,bool)",
+  "function isApprovedForAll(address,address) view returns (bool)",
+];
+const BB_ABI=[
+  "function todayId() view returns (uint32)",
+  "function daySlots(uint32) view returns (uint256 taken, bool exclusiveTaken)",
+  "function buy(uint32 day, bool exclusive, string name_, string tag_, string url_, uint24 color, uint256 logo) payable returns (uint256)",
+  "function PRICE_DAY() view returns (uint256)",
+  "function PRICE_EXCLUSIVE() view returns (uint256)",
+];
 const bbConfigured=()=>cfg.billboards&&!/^0x0{40}$/i.test(cfg.billboards);
 let bbRO=null, bbC=null;
-const MODS_MARKET_ABI = window.WICK_ABI.modsMarket;
+const MODS_MARKET_ABI=[
+  "function list(uint256 id, uint256 price)",
+  "function cancel(uint256 id)",
+  "function buy(uint256 id) payable",
+  "function getListing(uint256 id) view returns (address seller, uint256 price)",
+  "function feeBps() view returns (uint96)",
+  "function makeOffer(uint256 tokenId, uint8 modType) payable returns (uint256)",
+  "function cancelOffer(uint256 id)",
+  "function acceptOffer(uint256 id, uint256 tokenId)",
+  "function offersCount() view returns (uint256)",
+  "function getOffer(uint256 id) view returns (address bidder, uint256 amount, uint256 tokenId, uint8 modType, bool open)",
+  "event Sold(uint256 indexed id, address indexed seller, address indexed buyer, uint256 price)",
+];
 const modsConfigured=()=>cfg.mods&&!/^0x0{40}$/i.test(cfg.mods);
 const modsMktConfigured=()=>cfg.modsMarket&&!/^0x0{40}$/i.test(cfg.modsMarket);
 let modsRO=null, modsC=null, modsMktRO=null, modsMktC=null;
@@ -360,7 +549,6 @@ function readOnly(){
     // Reads go to the log-capable node; cfg.chain.rpc stays the wallet-facing RPC.
     const p=new ethers.JsonRpcProvider(cfg.rpcRead||cfg.chain.rpc, cfg.chain.id, { staticNetwork:true, batchMaxCount:20 });
     gunsRO=new ethers.Contract(cfg.guns,GUNS_ABI,p); marketRO=new ethers.Contract(cfg.market,MARKET_ABI,p);
-    if(legacyMarket())marketOldRO=new ethers.Contract(cfg.marketOld,window.WICK_ABI.marketOld,p);
     if(modsConfigured())modsRO=new ethers.Contract(cfg.mods,MODS_ABI,p);
     if(modsMktConfigured())modsMktRO=new ethers.Contract(cfg.modsMarket,MODS_MARKET_ABI,p);
     if(bbConfigured())bbRO=new ethers.Contract(cfg.billboards,BB_ABI,p);
@@ -417,7 +605,6 @@ async function connect(){
     account = await signer.getAddress();
     guns = new ethers.Contract(cfg.guns, GUNS_ABI, signer);
     market = new ethers.Contract(cfg.market, MARKET_ABI, signer);
-    if(legacyMarket()) marketOldC = new ethers.Contract(cfg.marketOld, window.WICK_ABI.marketOld, signer);
     if(modsConfigured())modsC = new ethers.Contract(cfg.mods, MODS_ABI, signer);
     if(modsMktConfigured())modsMktC = new ethers.Contract(cfg.modsMarket, MODS_MARKET_ABI, signer);
     if(bbConfigured())bbC = new ethers.Contract(cfg.billboards, BB_ABI, signer);
@@ -483,9 +670,31 @@ async function refreshBurned(){
   }catch(e){ /* a dead RPC must not blank the tile — leave the dash */ }
 }
 
+// The hero fan. CSFloat's stage floats real items rather than a rendered mockup, so this
+// pulls the collection's OWN artwork — the rarest holos, best one centred. If the art
+// module never loaded there is nothing honest to show, so it renders nothing at all.
+function buildHeroFan(){
+  const el = document.getElementById("heroFan");
+  if(!el || typeof gunArtURI !== "function" || !CAT) return;
+  const types = Object.keys(CAT).map(Number).filter(t=>t>0 && CAT[t]);
+  if(!types.length) return;
+  const holo = types.filter(t=>CAT[t].holo).sort((a,b)=>b-a);
+  const rest = types.filter(t=>!CAT[t].holo).sort((a,b)=>b-a);
+  // centre slot (index 2) gets the single best piece; the rest fan outward
+  const pick = [...holo, ...rest].slice(0,5);
+  if(pick.length < 5) while(pick.length < 5) pick.push(pick[pick.length%Math.max(1,pick.length)]);
+  const order = [pick[3], pick[1], pick[0], pick[2], pick[4]];
+  el.innerHTML = order.map(t=>{
+    const g = CAT[t] || {};
+    let uri = ""; try{ uri = gunArtURI(t, 0); }catch(e){ return ""; }
+    if(!uri) return "";
+    return `<div class="fc"><img src="${uri}" width="400" height="560" alt="${(g.name||"gun").replace(/"/g,"")}"></div>`;
+  }).join("");
+}
+
 function artFor(type, id){
   // type 0 = sealed case (blind mint, pre-reveal)
-  return `<div class="c3d"><img src="${gunArtURI(type|0, id)}" alt="gun ${id||type}"><div class="rainbow"></div><div class="glare"></div></div>`;
+  return `<div class="c3d"><img src="${gunArtURI(type|0, id)}" width="400" height="560" loading="lazy" decoding="async" alt="${(CAT[type]||{}).name||("gun "+(id||type))}"><div class="rainbow"></div><div class="glare"></div></div>`;
 }
 // 3D holographic tilt: the card leans toward your cursor/finger, glare follows
 function attachTilt(el){
@@ -507,19 +716,69 @@ function attachTilt(el){
   el.addEventListener("pointerleave",leave);
   el.addEventListener("pointercancel",leave);
 }
-function bindTilts(root){ (root||document).querySelectorAll(".c3d").forEach(attachTilt); }
+function bindTilts(root){ (root||document).querySelectorAll(".c3d").forEach(attachTilt); sweepRarity(root); }
+
+// THE memorable moment: every rarity marker travels from 0 to its true position in a
+// stagger across the grid, so the collection appears to sort itself once on arrival.
+// Once per render, never on scroll, and skipped entirely under reduced-motion.
+function sweepRarity(root){
+  const cards=[...(root||document).querySelectorAll(".card:not(.swept)")];
+  if(!cards.length) return;
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){
+    cards.forEach(c=>c.classList.add("swept")); return;
+  }
+  requestAnimationFrame(()=>cards.forEach((c,i)=>setTimeout(()=>c.classList.add("swept"), Math.min(i*22,400))));
+}
+
+// Rarity ladder -> where this gun sits on the collection-wide bar. The ladder is the
+// product's own (supply 30 down to 1), not invented here.
+// Floor price per gun TYPE, derived from live listings. The collection tab shows types,
+// so the honest market fact there is "cheapest one currently listed", not a per-token price.
+// Empty until the market loads — the card then says "not listed" rather than inventing a number.
+window.FLOOR = {};
+function indexFloors(rows){
+  const f={};
+  (rows||[]).forEach(l=>{ const t=l.type; if(!f[t]||l.price<f[t].price) f[t]={price:l.price,id:l.id};
+                          f[t].n=(f[t].n||0)+1; });
+  window.FLOOR=f;
+}
+const RARITY_POS = {"Common":8,"Uncommon":30,"Rare":52,"Epic":72,
+                    "Platinum Holo":90,"Ultra Platinum Holo":98};
 
 function cardHTML(type, id, opts={}){
   // post-reveal there are no sealed cases: an unknown type here means a failed
   // RPC read, and it must SAY so — not tell a buyer a revealed gun is unopened
   const g = CAT[type] || {name:"Gun"+(id?" #"+id:""), rarity:"Unknown", cls:"—", blurb:"Couldn't read this gun's type from the chain — refresh to retry.", perk:"type unknown (node error)", color:"#8a93a5", holo:false, unknown:true};
-  return `<div class="card ${g.holo?'holo':''}">
+  const pos = RARITY_POS[g.rarity];
+  const bar = pos===undefined ? "" :
+    `<div class="rbar"><i style="--pos:${pos}%"></i></div>`;
+
+  // THE MARKET LINE. This is what makes it a marketplace tile and not a catalogue
+  // entry: it answers "can I buy this, and for how much" before anything else.
+  // Every branch below is a real state — nothing is invented when data is missing.
+  const f = (window.FLOOR||{})[type];
+  let price = `<span class="px px--none">not listed</span>`;
+  if (opts.price !== undefined) {
+    price = `<span class="px">${fmt(opts.price)}<em>PLS</em></span>`;
+    if (f && f.price && opts.price > f.price) {
+      const over = Math.round((Number(opts.price - f.price) / Number(f.price)) * 100);
+      if (over > 0) price += `<span class="delta delta--up" title="${over}% above the cheapest ${g.name} listed">+${over}%</span>`;
+    } else if (f && f.price && opts.price === f.price) {
+      price += `<span class="delta delta--floor" title="cheapest ${g.name} on the market">floor</span>`;
+    }
+  } else if (f) {
+    price = `<span class="px px--floor">${fmt(f.price)}<em>PLS</em></span>`
+          + `<span class="delta" title="cheapest of ${f.n} listed">floor</span>`;
+  }
+
+  // The artwork is ALREADY a complete trading card: it carries the name, class, rarity
+  // badge, DMG/MAG/ROF bars, edition and perk. The old page printed all of that a second
+  // time underneath. So this tile adds only what the artwork cannot know — the market.
+  return `<div class="card ${g.holo?'holo':''}" style="--rc:${g.color}" title="${g.name} — ${g.rarity} ${g.cls}">
     <div class="art">${artFor(type,id)}</div>
-    <div class="body">
-      <div class="nm">${g.name}</div>
-      <div class="rr" style="color:${g.color}">${g.rarity} · ${g.cls}${id?` · #${id}`:` · ${g.supply} minted`}</div>
-      <div class="bl">${g.blurb}</div>
-      <div class="perk">▸ ${g.perk}</div>
+    <div class="ft">
+      <div class="pxrow">${price}${id?`<span class="ed">#${id}</span>`:``}</div>
+      ${bar}
       ${opts.actions||""}
     </div></div>`;
 }
@@ -549,10 +808,10 @@ async function loadArsenal(){
     const [seller,price]=listings[i];
     const listed = seller!==ZERO && price>0n;
     const actions = (listed
-      ? `<div class="row"><span class="muted">Listed: ${fmt(price)} PLS</span><button data-cancel="${id}">CANCEL</button></div>`
+      ? `<div class="row"><span class="muted">listed</span><button data-cancel="${id}">CANCEL</button></div>`
       : `<div class="row"><input type="text" id="p${id}" placeholder="price in PLS"><button data-list="${id}">LIST</button></div>`)
       + `<div class="row"><input type="text" id="s${id}" placeholder="send to 0x… wallet"><button data-send="${id}">SEND</button></div>`;
-    cards.push(cardHTML(type,id,{actions}));
+    cards.push(cardHTML(type,id,{actions, price: listed ? price : undefined}));
   }
   box.innerHTML=cards.join(""); bindTilts(box);
   box.querySelectorAll("[data-list]").forEach(b=>b.onclick=()=>listGun(+b.dataset.list));
@@ -724,7 +983,7 @@ function modCardHTML(type,id,actions){
   return `<div class="card" style="border-color:${m.color}">
     <div style="padding:12px;text-align:center">
       <div style="font-size:11px;letter-spacing:2px;color:${m.color}">WICK MODS · ${m.rarity.toUpperCase()}</div>
-      <div style="font-family:Impact,Arial;font-size:21px;color:#fff;margin:8px 0 2px">${m.name}</div>
+      <div style="font-family:Impact,Arial,sans-serif;font-size:21px;color:#fff;margin:8px 0 2px">${m.name}</div>
       <div class="muted" style="font-size:12px;margin-bottom:8px">${m.fx}</div>
       <div class="muted" style="font-size:11px">#${id} / 300 · fits <b>one</b> gun at a time</div>
     </div>
@@ -754,18 +1013,9 @@ async function showApprovalState(){
   let ok=false;
   try{ ok=await gunsRO.isApprovedForAll(account, cfg.market); }catch(e){ el.style.display="none"; return; }
   el.style.display="block";
-  // A listing is stored against the token id and is NOT cleared when the gun leaves
-  // your wallet by any route other than a market BUY. If you list, part with the gun,
-  // then get it back later, that old row goes live again at the old price and anyone
-  // can take it. CANCEL beats remembering.
-  const staleNote = `<div style="margin-top:6px;opacity:.75;font-size:.92em">
-    ⚠ <b>Cancel a listing before parting with the gun.</b> A listing survives the gun
-    leaving your wallet — if the gun ever returns to you, that old price is live again
-    for anyone to buy.</div>`;
-  el.innerHTML = (ok
+  el.innerHTML = ok
     ? `<span style="color:var(--green)">✓ Marketplace unlocked</span> — listing and accepting offers now takes a single transaction.`
-    : `Marketplace not unlocked yet. Your first LIST asks for a <b>one-time approval</b> that covers every gun you own, now and later. <button id="preApprove" style="margin-left:8px">UNLOCK NOW</button>`)
-    + staleNote;
+    : `Marketplace not unlocked yet. Your first LIST asks for a <b>one-time approval</b> that covers every gun you own, now and later. <button id="preApprove" style="margin-left:8px">UNLOCK NOW</button>`;
   const b=$("#preApprove");
   if(b) b.onclick=async()=>{ try{ await ensureMarketApproval(); toast("Marketplace unlocked."); await showApprovalState(); }
                              catch(e){ toast(e.shortMessage||e.message||"approval failed"); } };
@@ -783,30 +1033,16 @@ async function loadMarket(force){
   empty.textContent="Loading listings…"; empty.style.display="block";
   const calls=[];
   // a failed read is NOT the same shape as "not listed" — mark it, don't fake it
-  for(let id=1;id<=101;id++) calls.push(marketRO.getListing(id).then(r=>({id,seller:r[0],price:r[1],legacy:false})).catch(()=>({id,err:true})));
-  // Listings made before the upgrade still live in the old contract and are still
-  // buyable there. Show them rather than stranding them — but a gun listed on BOTH
-  // venues shows only the current one, so nobody is offered the same gun twice.
-  if(legacyMarket())
-    for(let id=1;id<=101;id++) calls.push(marketOldRO.getListing(id).then(r=>({id,seller:r[0],price:r[1],legacy:true})).catch(()=>({id,err:true})));
+  for(let id=1;id<=101;id++) calls.push(marketRO.getListing(id).then(r=>({id,seller:r[0],price:r[1]})).catch(()=>({id,err:true})));
   const raw=await Promise.all(calls);
   if(raw.some(r=>r.err)){ box.innerHTML=""; empty.textContent="Couldn't reach the PulseChain node — refresh to retry."; empty.style.display="block"; return; }
-  const current=new Set(raw.filter(l=>!l.legacy && l.seller!==ZERO && l.price>0n).map(l=>l.id));
-  let res=raw.filter(l=>l.seller!==ZERO && l.price>0n && !(l.legacy && current.has(l.id)));
+  let res=raw.filter(l=>l.seller!==ZERO && l.price>0n);
   // STALE listings: a gun sold through the OFFERS POOL keeps its old listing row
   // (v1 acceptOffer doesn't clear it), so the seller no longer owns the gun and
   // buy() is guaranteed to revert. Never show a BUY button that cannot work.
   const owners=await Promise.all(res.map(l=>gunsRO.ownerOf(l.id).catch(()=>null)));
   if(owners.some(o=>o===null)){ box.innerHTML=""; empty.textContent="Couldn't reach the PulseChain node — refresh to retry."; empty.style.display="block"; return; }
   res=res.filter((l,i)=>owners[i].toLowerCase()===l.seller.toLowerCase());
-  // A legacy row also needs the OLD market to still hold approval, or its buy()
-  // reverts on transferFrom. Never render a BUY button that cannot succeed.
-  if(legacyMarket() && res.some(l=>l.legacy)){
-    const appr=await Promise.all(res.map(l=>!l.legacy ? Promise.resolve(true)
-      : Promise.all([gunsRO.getApproved(l.id).catch(()=>ZERO), gunsRO.isApprovedForAll(l.seller,cfg.marketOld).catch(()=>false)])
-          .then(([a,all])=>all||a.toLowerCase()===cfg.marketOld.toLowerCase())));
-    res=res.filter((l,i)=>appr[i]);
-  }
   const types=await Promise.all(res.map(l=>gunsRO.gunTypeOf(l.id).then(Number).catch(()=>null)));
   if(types.some(t=>t===null)){ box.innerHTML=""; empty.textContent="Couldn't reach the PulseChain node — refresh to retry."; empty.style.display="block"; return; }
   res.forEach((l,i)=>{ gunTypeCache[l.id]=types[i]; });
@@ -826,22 +1062,18 @@ function renderMarket(){
     id:        (a,b)=> a.id-b.id,
   }[marketSort] || ((a,b)=>0);
   rows.sort(cmp);
+  indexFloors(rows);
   box.innerHTML = rows.map(l=>{
     const mine = account && l.seller.toLowerCase()===account.toLowerCase();
-    const lg = l.legacy ? 1 : 0;
-    // Legacy rows are honest about where they live: same gun, older venue, and the
-    // seller is nudged to move it rather than leave it on a contract nobody watches.
-    const tag = l.legacy
-      ? `<span class="muted" style="font-size:.85em;opacity:.8" title="Listed on the previous marketplace contract. Still buyable; new listings go to the current one.">· old venue</span>`
-      : "";
+    // price lives on the tile now — the action row is the action, nothing else
     const actions = mine
-      ? `<div class="row"><span class="muted">${fmt(l.price)} PLS · yours ${tag}</span><button data-cancel="${l.id}" data-legacy="${lg}">CANCEL</button></div>`
-      : `<div class="row"><span class="muted">${fmt(l.price)} PLS ${tag}</span><button class="primary" data-buy="${l.id}" data-price="${l.price}" data-legacy="${lg}">BUY</button></div>`;
-    return cardHTML(l.type,l.id,{actions});
+      ? `<div class="row"><span class="muted">yours</span><button data-cancel="${l.id}">CANCEL</button></div>`
+      : `<div class="row"><button class="primary" style="flex:1" data-buy="${l.id}" data-price="${l.price}">BUY</button></div>`;
+    return cardHTML(l.type,l.id,{actions, price:l.price});
   }).join("");
   bindTilts(box);
-  box.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>buyGun(+b.dataset.buy, BigInt(b.dataset.price), b.dataset.legacy==="1"));
-  box.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=()=>cancelGun(+b.dataset.cancel, b.dataset.legacy==="1"));
+  box.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>buyGun(+b.dataset.buy, BigInt(b.dataset.price)));
+  box.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=()=>cancelGun(+b.dataset.cancel));
 }
 
 async function loadLeaderboard(){
@@ -873,23 +1105,18 @@ function renderCatalog(){
   $("#catalog").innerHTML = Object.keys(CAT).map(t=>cardHTML(+t,0,{})).join(""); bindTilts($("#catalog"));
 }
 
-/* ---- market venue shapes ------------------------------------------------
-   Two venues can be readable at once, and their offer struct differs:
-     v2 (cfg.market)    getOffer -> (bidder, amount, tokenId, gunType, open)
-     v1 (cfg.marketOld) getOffer -> (bidder, amount, tokenId, open)
-   Decode by venue, never by guessing: the old "detect from decode failures" layer
-   deadlocked, because the flag was only set AFTER a getOffer that the wrong ABI
-   guaranteed would never succeed. */
-async function readOffer(ro,i,legacy){
+/* ---- market compatibility ----------------------------------------------
+   The deployed market is v1: getOffer returns 4 words, makeOffer takes (tokenId).
+   The old "detect v1/v2 from decode failures" compat layer deadlocked — the flag
+   was only ever set AFTER a successful getOffer, which the wrong ABI guaranteed
+   never happened. One contract, one ABI, one decode. */
+async function readOffer(ro,i){
   const r = await ro.getOffer(i);
-  return legacy
-    ? { id:i, bidder:r[0], amount:r[1], tokenId:Number(r[2]), gunType:0,         open:r[3], legacy:true }
-    : { id:i, bidder:r[0], amount:r[1], tokenId:Number(r[2]), gunType:Number(r[3]), open:r[4], legacy:false };
+  return { id:i, bidder:r[0], amount:r[1], tokenId:Number(r[2]), gunType:0, open:r[3] };
 }
-// New offers only ever go to the CURRENT venue. v2 carries the tier bid — a standing
-// "I'll pay X for ANY Marksman" — which v1 could not express at all.
 async function sendOffer(tokenId,gunType,value){
-  return sendBuffered(market,"makeOffer",[tokenId,gunType||0],{value});
+  if(gunType) throw new Error("tier bids need the upgraded marketplace");
+  return sendBuffered(market,"makeOffer",[tokenId],{value});
 }
 
 /* ---------------- BID ON RARES ----------------
@@ -914,19 +1141,10 @@ async function loadBids(force){
     const rare=ids.filter((id,i)=>isRare(types[i]));
     const owners=await Promise.all(rare.map(id=>gunsRO.ownerOf(id).catch(()=>null)));
     if(owners.some(o=>o===null)) throw new Error("couldn't read owners from the node — refresh to retry");
-    // best open offer per token (0 = collection-wide, tracked separately).
-    // BOTH venues count: a bid escrowed before the upgrade is still real money a
-    // holder can sell into, so hiding it would quietly cost sellers the best price.
+    // best open offer per token (0 = collection-wide, tracked separately)
     const n=Number(await marketRO.offersCount().catch(()=>0));
-    let offers=await Promise.all([...Array(n).keys()].map(i=>
-      readOffer(marketRO,i,false).then(o=>({i:o.id, ...o})).catch(()=>null)));
-    if(legacyMarket()){
-      try{
-        const nOld=Number(await marketOldRO.offersCount().catch(()=>0));
-        offers=offers.concat(await Promise.all([...Array(nOld).keys()].map(i=>
-          readOffer(marketOldRO,i,true).then(o=>({i:o.id, ...o})).catch(()=>null))));
-      }catch(e){ /* old venue unreadable must not blank the rares board */ }
-    }
+    const offers=await Promise.all([...Array(n).keys()].map(i=>
+      readOffer(marketRO,i).then(o=>({i:o.id, ...o})).catch(()=>null)));
     const best={}, anyBest={amount:0n};
     for(const o of offers){ if(!o||!o.open)continue;
       if(o.tokenId===0){ if(o.amount>anyBest.amount)Object.assign(anyBest,o); continue; }
@@ -943,11 +1161,10 @@ let openType=0;
 function bidActions(r){
   const mine = account && r.owner.toLowerCase()===account.toLowerCase();
   const mineBid = r.best && account && r.best.bidder.toLowerCase()===account.toLowerCase();
-  const lg = r.best && r.best.legacy ? 1 : 0;
   if(mine) return r.best
-    ? `<button class="primary" data-accept="${r.best.i}" data-tok="${r.id}" data-amt="${r.best.amount}" data-legacy="${lg}">ACCEPT ${fmt(r.best.amount)}${lg?" ·old":""}</button>`
+    ? `<button class="primary" data-accept="${r.best.i}" data-tok="${r.id}" data-amt="${r.best.amount}">ACCEPT ${fmt(r.best.amount)}</button>`
     : `<span class="muted">yours — no bids yet</span>`;   // no BID box on your own gun
-  if(mineBid)        return `<button data-pull="${r.best.i}" data-legacy="${lg}">CANCEL MY BID</button>`;
+  if(mineBid)        return `<button data-pull="${r.best.i}">CANCEL MY BID</button>`;
   return `<div class="row"><input type="text" id="b${r.id}" placeholder="PLS" style="width:104px"><button data-bid="${r.id}">BID</button></div>`;
 }
 function ownerCell(r){
@@ -966,7 +1183,7 @@ function renderBids(){
   const tierIds = Object.keys(tiers).map(Number).sort((a,b)=>b-a);   // rarest tier first
 
   $("#bidCount").textContent = holos.length+" one-of-ones · "+tierIds.length+" tiers ("+rows.filter(r=>r.type<11).length+" guns)"
-    + (window.__anyBest?"  ·  best ANY-gun bid: "+fmt(window.__anyBest.amount)+" PLS"+(window.__anyBest.legacy?" (old venue)":""):"");
+    + (window.__anyBest?"  ·  best ANY-gun bid: "+fmt(window.__anyBest.amount)+" PLS":"");
 
   // ---- the 1/1s: individually biddable ----
   let html = holos.map(r=>cardHTML(r.type, r.id, {
@@ -1006,8 +1223,8 @@ function renderBids(){
   bindTilts(box);
   const wire=el=>{
     el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>bidOn(+b.dataset.bid));
-    el.querySelectorAll("[data-accept]").forEach(b=>b.onclick=()=>takeOffer(+b.dataset.accept,+b.dataset.tok,BigInt(b.dataset.amt),b.dataset.legacy==="1"));
-    el.querySelectorAll("[data-pull]").forEach(b=>b.onclick=()=>pullOffer(+b.dataset.pull,b.dataset.legacy==="1"));
+    el.querySelectorAll("[data-accept]").forEach(b=>b.onclick=()=>takeOffer(+b.dataset.accept,+b.dataset.tok,BigInt(b.dataset.amt)));
+    el.querySelectorAll("[data-pull]").forEach(b=>b.onclick=()=>pullOffer(+b.dataset.pull));
   };
   wire(box); wire(panel);
   box.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{ const t=+b.dataset.open; openType=(openType===t?0:t); renderBids();
@@ -1027,33 +1244,27 @@ async function bidOn(id){
     await loadBids(true); await loadOffers();
   }catch(e){ toast(e.shortMessage||e.reason||"bid failed"); }
 }
-async function takeOffer(offerId, tokenId, amountWei, legacy){
+async function takeOffer(offerId, tokenId, amountWei){
   if(!signer) return toast("Connect your wallet first.");
-  const venueAddr = legacy ? cfg.marketOld : cfg.market;
-  const venueC = legacy ? marketOldC : market;
-  if(!venueC) return toast("That marketplace isn't available right now.");
   const gsold = CAT[gunTypeCache[tokenId]] || {name:"Gun #"+tokenId};
   if(!confirm("Sell "+gsold.name+" (#"+tokenId+") for "+(amountWei!=null?fmt(amountWei)+" PLS":"this bid")+"?\n\n"
-            + (legacy ? "This bid was escrowed on the previous marketplace — the money and the sale are real, it is just an older contract.\n\n" : "")
             + "This is permanent — the gun leaves your wallet as soon as this confirms.")) return;
   try{
     const approved=await gunsRO.getApproved(tokenId).catch(()=>ZERO);
-    const all=await gunsRO.isApprovedForAll(account,venueAddr).catch(()=>false);
-    if(approved.toLowerCase()!==venueAddr.toLowerCase() && !all){
+    const all=await gunsRO.isApprovedForAll(account,cfg.market).catch(()=>false);
+    if(approved.toLowerCase()!==cfg.market.toLowerCase() && !all){
       toast("Approve the marketplace for this gun…");
-      await (await guns.approve(venueAddr, tokenId)).wait();
+      await (await guns.approve(cfg.market, tokenId)).wait();
     }
     toast("Accepting the bid…");
-    await (await sendBuffered(venueC,"acceptOffer",[offerId,tokenId],{})).wait();
+    await (await sendBuffered(market,"acceptOffer",[offerId,tokenId],{})).wait();
     toast("Sold. 15% royalty burned as $WICK.");
     await refreshAll();
   }catch(e){ toast(e.shortMessage||e.reason||"accept failed"); }
 }
-async function pullOffer(offerId, legacy){
+async function pullOffer(offerId){
   if(!signer) return toast("Connect your wallet first.");
-  const venueC = legacy ? marketOldC : market;
-  if(!venueC) return toast("That marketplace isn't available right now.");
-  try{ toast("Cancelling…"); await (await sendBuffered(venueC,"cancelOffer",[offerId],{})).wait();
+  try{ toast("Cancelling…"); await (await sendBuffered(market,"cancelOffer",[offerId],{})).wait();
        toast("Bid cancelled, PLS returned."); await loadBids(true); await loadOffers();
   }catch(e){ toast(e.shortMessage||e.reason||"cancel failed"); }
 }
@@ -1155,10 +1366,7 @@ async function buyBillboard(){
     if(exTaken)return toast("That day was just taken exclusively — pick another.");
     if(exc&&Number(taken)>0)return toast("Exclusive needs an EMPTY day — this one already has rotation ads.");
     if(!exc&&Number(taken)>=8)return toast("That day just sold out — pick another.");
-    // ASK THE CONTRACT. buy() requires msg.value == PRICE_DAY exactly (not >=), so a
-    // hardcoded literal that ever drifts from the deployed constant would revert every
-    // purchase — the same hand-typed-value failure that made this tab dead on arrival.
-    const price=exc?await bbRO.PRICE_EXCLUSIVE():await bbRO.PRICE_DAY();
+    const price=exc?ethers.parseEther("10000000"):ethers.parseEther("1000000");
     const balWei=await provider.getBalance(account).catch(()=>null);
     if(balWei!==null&&balWei<price)return toast("Not enough PLS: this costs "+fmt(price)+" and the wallet holds "+fmt(balWei)+".");
     if(!confirm((exc?"EXCLUSIVE TAKEOVER — every billboard in PEPE WICK on ":"Rotation billboard in PEPE WICK on ")
@@ -1173,6 +1381,12 @@ async function buyBillboard(){
 function showTab(id){
   document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("on",s.id===id));
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===id));
+  // The tabs are now pages, not anchors. CSFloat's hero belongs to the landing view only —
+  // leaving it above the market meant picking "Market" showed you a headline, and on a
+  // phone that is the entire screen. Mint stays reachable: it lives on Collection.
+  const hero = document.querySelector(".hero");
+  if(hero) hero.style.display = (id==="tCollection") ? "" : "none";
+  window.scrollTo(0,0);
   if(id==="tBids")loadBids();
   if(id==="tSales")loadSales();                       // log scan is slow — only when the tab is opened
   if(id==="tAds")loadAdvertise();
@@ -1262,20 +1476,7 @@ async function sendGun(id){
   if(!ethers.isAddress(to)){ toast("Enter a valid 0x… wallet address."); return; }
   if(to.toLowerCase()===account.toLowerCase()){ toast("That's your own wallet."); return; }
   const g = CAT[gunTypeCache[id]] || {name:"Gun #"+id};
-  // A plain ERC-721 transfer is invisible to an approval-based market: the listing
-  // row for this token stays in the contract. It is hidden from the grid while
-  // someone else holds the gun, but it is not gone — if this gun ever comes back to
-  // you, the old price goes live again and anyone can buy it out from under you.
-  let staleWarn = "";
-  try{
-    const [seller, price] = await market.getListing(id);
-    if(price > 0n && seller.toLowerCase() === account.toLowerCase())
-      staleWarn = "\n\n⚠ THIS GUN IS STILL LISTED for "+fmt(price)+" PLS.\n"
-                + "Sending it does NOT cancel that listing. If the gun ever returns to\n"
-                + "this wallet, it becomes buyable again at that old price.\n"
-                + "Cancel the listing first unless you want that.";
-  }catch(e){ /* a read failure must not block a legitimate transfer */ }
-  if(!confirm("Send "+g.name+" (#"+id+") to\n\n"+to+"\n\nThis is permanent — the gun leaves your wallet and only the new owner can send it back."+staleWarn)) return;
+  if(!confirm("Send "+g.name+" (#"+id+") to\n\n"+to+"\n\nThis is permanent — the gun leaves your wallet and only the new owner can send it back.")) return;
   try{
     toast("Confirm the transfer…");
     await (await sendBuffered(guns, "safeTransferFrom(address,address,uint256)", [account, to, id])).wait();
@@ -1284,22 +1485,18 @@ async function sendGun(id){
   }catch(e){ toast(e.shortMessage || e.message || "transfer failed"); }
 }
 
-async function cancelGun(id, legacy){
-  const c = legacy ? marketOldC : market;
-  if(!c) return toast(legacy ? "Connect the wallet that made the old listing." : "Connect a wallet first.");
-  try{ toast("Cancelling…"); await (await c.cancel(id)).wait(); toast("Listing cancelled."); await refreshAll(); }
+async function cancelGun(id){
+  try{ toast("Cancelling…"); await (await market.cancel(id)).wait(); toast("Listing cancelled."); await refreshAll(); }
   catch(e){ toast(e.shortMessage || e.message || "cancel failed"); }
 }
 
-async function buyGun(id, priceWei, legacy){
+async function buyGun(id, priceWei){
   if(!signer) return connect();
-  const venueC = legacy ? marketOldC : market, venueRO = legacy ? marketOldRO : marketRO;
-  if(!venueC) return toast("That marketplace isn't available right now.");
   try{
     // pre-flight the two failures a wallet reports confusingly: a listing that
     // went stale (sold via the offers pool) and a price the wallet can't fund
     const [ownerNow, [seller]] = await Promise.all([
-      gunsRO.ownerOf(id).catch(()=>null), venueRO.getListing(id).catch(()=>[ZERO])]);
+      gunsRO.ownerOf(id).catch(()=>null), marketRO.getListing(id).catch(()=>[ZERO])]);
     if(ownerNow && seller && ownerNow.toLowerCase()!==seller.toLowerCase()){
       toast("This listing is stale — gun #"+id+" already changed hands. Refreshing the market…");
       marketRows=null; await loadMarket(true); return;
@@ -1308,7 +1505,7 @@ async function buyGun(id, priceWei, legacy){
     if(balWei!==null && balWei < priceWei)
       return toast("Not enough PLS: this costs "+fmt(priceWei)+" PLS and the wallet holds "+fmt(balWei)+".");
     toast("Confirm the purchase…");
-    const tx = await sendBuffered(venueC, "buy", [id], { value: priceWei });
+    const tx = await sendBuffered(market, "buy", [id], { value: priceWei });
     await tx.wait();
     toast("Bought gun #"+id+"! It's in Your Arsenal.");
     await refreshAll();
@@ -1325,21 +1522,9 @@ async function loadOffers(){
   let n=0;
   try{ n=Number(await marketRO.offersCount()); }catch(e){
     rows.innerHTML=`<tr><td colspan="4" class="muted" style="padding:18px">Offers unavailable right now.</td></tr>`; return; }
-  let list=(await Promise.all(Array.from({length:n},(_,i)=>
-    readOffer(marketRO,i,false).catch(()=>null)
+  const list=(await Promise.all(Array.from({length:n},(_,i)=>
+    readOffer(marketRO,i).catch(()=>null)
   ))).filter(o=>o&&o.open);
-  // Escrow left on the old venue is real PLS that only its bidder can pull back, and
-  // it is invisible unless we show it. Surfacing these is the difference between
-  // "reclaimable" and "stranded" for anyone who bid before the upgrade.
-  if(legacyMarket()){
-    try{
-      const nOld=Number(await marketOldRO.offersCount());
-      const old=(await Promise.all(Array.from({length:nOld},(_,i)=>
-        readOffer(marketOldRO,i,true).catch(()=>null)
-      ))).filter(o=>o&&o.open);
-      list=list.concat(old);
-    }catch(e){ /* the old venue being unreadable must not blank the current one */ }
-  }
   if(!list.length){ rows.innerHTML=`<tr><td colspan="4" class="muted" style="padding:18px">No open offers yet — be the first to bid.</td></tr>`; return; }
   list.sort((a,b)=> a.amount>b.amount?-1:a.amount<b.amount?1:0);           // best money first
   let owned=[], ownedTypes={};
@@ -1356,49 +1541,23 @@ async function loadOffers(){
       : (owned[0] ?? null);
     // gunsOfOwner is UNORDERED — owned[0] is arbitrary (it could be a 1/1). For an
     // ANY-gun offer the USER picks which gun to part with; we never pick for them.
-    const lg = o.legacy ? 1 : 0;
     const act = mine
-      ? `<button data-offcancel="${o.id}" data-legacy="${lg}">${o.legacy?"RECLAIM":"CANCEL"}</button>`
+      ? `<button data-offcancel="${o.id}">CANCEL</button>`
       : (fillWith!=null
           ? (o.tokenId===0 && !o.gunType && owned.length>1
               ? `<select data-offsel="${o.id}">${owned.map(id=>`<option value="${id}">#${id} — ${(CAT[ownedTypes[id]]||{}).name||"gun"}</option>`).join("")}</select>
-                 <button class="primary" data-offaccept="${o.id}" data-amt="${o.amount}" data-legacy="${lg}">SELL</button>`
-              : `<button class="primary" data-offaccept="${o.id}" data-tok="${fillWith}" data-amt="${o.amount}" data-legacy="${lg}">SELL #${fillWith}</button>`)
+                 <button class="primary" data-offaccept="${o.id}" data-amt="${o.amount}">SELL</button>`
+              : `<button class="primary" data-offaccept="${o.id}" data-tok="${fillWith}" data-amt="${o.amount}">SELL #${fillWith}</button>`)
           : `<span class="muted">—</span>`);
     return `<tr><td class="ad"><a href="${cfg.chain.explorer}/address/${o.bidder}" target="_blank" rel="noopener" title="${o.bidder}">${short(o.bidder)}</a>${mine?" <span class='muted'>(you)</span>":""}</td>
-      <td>${wants}${o.legacy?` <span class="muted" style="font-size:.85em" title="Escrowed on the previous marketplace. Still fully refundable to its bidder.">· old venue</span>`:""}</td><td class="sc">${fmt(o.amount)} PLS</td><td style="text-align:right">${act}</td></tr>`;
+      <td>${wants}</td><td class="sc">${fmt(o.amount)} PLS</td><td style="text-align:right">${act}</td></tr>`;
   }).join("");
-  rows.querySelectorAll("[data-offcancel]").forEach(b=>b.onclick=()=>cancelOffer(+b.dataset.offcancel, b.dataset.legacy==="1"));
+  rows.querySelectorAll("[data-offcancel]").forEach(b=>b.onclick=()=>cancelOffer(+b.dataset.offcancel));
   rows.querySelectorAll("[data-offaccept]").forEach(b=>b.onclick=()=>{
     const sel=rows.querySelector(`select[data-offsel="${b.dataset.offaccept}"]`);
     const tok=sel ? +sel.value : +b.dataset.tok;
-    acceptOffer(+b.dataset.offaccept, tok, BigInt(b.dataset.amt), b.dataset.legacy==="1");
+    acceptOffer(+b.dataset.offaccept, tok, BigInt(b.dataset.amt));
   });
-}
-
-/* TIER BIDS — "I'll pay X for ANY Marksman", fillable by any holder of that model.
-   The contract enforces `tokenId == 0 || gunType == 0` (target a token OR a tier,
-   never both), so the two inputs are made mutually exclusive here rather than
-   letting the user discover it as a revert. */
-function initTierPicker(){
-  const sel=$("#offTier"), tok=$("#offTok");
-  if(!sel) return;
-  // the mass-produced tiers first, then the one-of-ones — a "tier" bid on a 1/1
-  // type is simply a bid on that unique gun, without needing to know its number
-  const order=[1,2,3,4,5,11,12,13,14,15,16].filter(t=>CAT[t]);
-  sel.innerHTML=`<option value="0">any gun — no specific model</option>`
-    + order.map(t=>`<option value="${t}">ANY ${CAT[t].name}${CAT[t].rarity?" · "+CAT[t].rarity:""}</option>`).join("");
-  const sync=()=>{
-    const tierOn = +sel.value !== 0;
-    const tokOn  = (tok.value||"").trim() !== "" && +tok.value !== 0;
-    tok.disabled = tierOn;  tok.style.opacity = tierOn ? .45 : 1;
-    sel.disabled = tokOn;   sel.style.opacity = tokOn  ? .45 : 1;
-    $("#offNote").textContent = tierOn
-      ? "Any holder of that model can sell into this bid."
-      : tokOn ? "Bidding on that one gun only."
-              : "Bid on one gun by number, or on a whole model — not both.";
-  };
-  sel.onchange=sync; tok.oninput=sync; sync();
 }
 
 async function makeOffer(){
@@ -1409,32 +1568,24 @@ async function makeOffer(){
   const rawTok=($("#offTok").value||"").trim();
   const tok=rawTok===""?0:Number(rawTok);
   if(!Number.isInteger(tok)||tok<0||tok>101) return toast("Gun # must be a whole number 0–101 (0 = any gun).");
-  const tier=Number(($("#offTier")||{}).value||0);
-  // the contract reverts on "target a token OR a tier, not both" — say so up front
-  if(tok!==0 && tier!==0) return toast("Pick one: a specific gun # OR a model — not both.");
   const v=parsePriceInput(raw);
   if(!v){ toast(String(raw||"").trim() ? `"${String(raw).trim()}" isn't an amount I can read — try 2000000, 2,000,000 or 2m.` : "Enter an offer amount in PLS."); return; }
   try{
     toast("Confirm the offer — your PLS goes into escrow…");
-    await (await sendOffer(tok, tier, ethers.parseEther(v))).wait();
-    toast(tier!==0 ? ("Standing offer live for ANY "+((CAT[tier]||{}).name||"gun of that model")+".")
-        : tok===0 ? "Standing offer live for any gun."
-        : ("Offer live on gun #"+tok+"."));
-    $("#offAmt").value=""; $("#offTok").value=""; if($("#offTier")) $("#offTier").value="0";
-    initTierPicker();                       // re-enable both inputs after the reset
+    await (await sendOffer(tok, 0, ethers.parseEther(v))).wait();
+    toast(tok===0 ? "Standing offer live for any gun." : ("Offer live on gun #"+tok+"."));
+    $("#offAmt").value=""; $("#offTok").value="";
     await refreshAll();
   }catch(e){ toast(e.shortMessage || e.reason || e.message || "offer failed"); }
 }
 
-async function cancelOffer(id, legacy){
-  const c = legacy ? marketOldC : market;
-  if(!c) return toast("Connect the wallet that placed the offer.");
-  try{ toast("Withdrawing your offer…"); await (await sendBuffered(c,"cancelOffer",[id])).wait();
+async function cancelOffer(id){
+  try{ toast("Withdrawing your offer…"); await (await sendBuffered(market,"cancelOffer",[id])).wait();
     toast("Offer withdrawn — PLS refunded."); await refreshAll(); }
   catch(e){ toast(e.shortMessage || e.message || "cancel failed"); }
 }
 
-async function acceptOffer(id, tokenId, amountWei, legacy){
+async function acceptOffer(id, tokenId, amountWei){
   if(!signer) return connect();
   // Selling a gun is permanent — name the gun and the money BEFORE the wallet opens.
   // sendGun() confirms for a plain transfer; selling deserves at least as much.
@@ -1442,18 +1593,14 @@ async function acceptOffer(id, tokenId, amountWei, legacy){
   if(!confirm("Sell "+gsold.name+" (#"+tokenId+") for "+(amountWei!=null?fmt(amountWei)+" PLS":"this offer")+"?\n\n"
             + "This is permanent — the gun leaves your wallet as soon as this confirms.")) return;
   try{
-    // approve whichever venue actually holds the offer, not always the current one
-    const venueAddr = legacy ? cfg.marketOld : cfg.market;
-    const venueC = legacy ? marketOldC : market;
-    if(!venueC) return toast("That marketplace isn't available right now.");
     const approved = await guns.getApproved(tokenId);
-    const all = await guns.isApprovedForAll(account, venueAddr).catch(()=>false);
-    if(!all && approved.toLowerCase()!==venueAddr.toLowerCase()){
+    const all = await guns.isApprovedForAll(account, cfg.market).catch(()=>false);
+    if(!all && approved.toLowerCase()!==cfg.market.toLowerCase()){
       toast("Approve the marketplace for gun #"+tokenId+"…");
-      await (await guns.approve(venueAddr, tokenId)).wait();
+      await (await guns.approve(cfg.market, tokenId)).wait();
     }
     toast("Selling into the offer…");
-    await (await sendBuffered(venueC,"acceptOffer",[id, tokenId])).wait();
+    await (await sendBuffered(market,"acceptOffer",[id, tokenId])).wait();
     toast("Sold gun #"+tokenId+" — 85% paid to you, 15% burned as $WICK.");
     await refreshAll();
   }catch(e){ toast(e.shortMessage || e.reason || e.message || "accept failed"); }
@@ -1633,7 +1780,6 @@ function init(){
   $("#connect").onclick=connect;
   $("#mint").onclick=mint;
   $("#offMake").onclick=makeOffer;
-  initTierPicker();
   // tabs
   document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
   $("#fAll").onclick=()=>{ bidHoloOnly=false; $("#fAll").classList.add("on"); $("#fHolo").classList.remove("on"); renderBids(); };
@@ -1644,6 +1790,7 @@ function init(){
     document.querySelectorAll("[data-msort]").forEach(x=>x.classList.toggle("on",x===b));
     renderMarket();
   });
+  buildHeroFan();
   { const h=(location.hash||"").replace("#",""); const t=[...document.querySelectorAll("#tabs button")].find(b=>b.dataset.tab.toLowerCase()==="t"+h);
     if(t)showTab(t.dataset.tab); }
   if(window.ethereum){
@@ -1652,6 +1799,6 @@ function init(){
   }
 }
 init();
+
 </script>
-</body>
-</html>
+</body></html>

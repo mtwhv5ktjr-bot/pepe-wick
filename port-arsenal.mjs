@@ -22,10 +22,19 @@ if (!existsSync(join(SRC, "index.html"))) {
 }
 mkdirSync(DST, { recursive: true });
 
-// verbatim assets — same folder, so the app's relative <script src> still resolve
-for (const f of ["ethers.min.js", "config.js", "abi.js", "gunart.js"]) {
-  copyFileSync(join(SRC, f), join(DST, f));
+// Verbatim assets — same folder, so the app's relative <script src>/@font-face
+// still resolve. Optional entries are skipped rather than failing the sync: the
+// 2026-08-01 redesign dropped abi.js and added the self-hosted display font.
+const ASSETS = [
+  ["ethers.min.js", true], ["config.js", true], ["gunart.js", true],
+  ["abi.js", false], ["black-ops-one.woff2", false],
+];
+for (const [f, required] of ASSETS) {
+  if (existsSync(join(SRC, f))) copyFileSync(join(SRC, f), join(DST, f));
+  else if (required) { console.error("port-arsenal: missing required asset " + f); process.exit(1); }
 }
+// anything the HTML asks for that we did not copy is a broken page — catch it here
+
 
 let html = readFileSync(join(SRC, "index.html"), "utf8");
 
@@ -52,5 +61,19 @@ if (!html.includes('id="backToArcade"')) {
 html = html.replace(/<\/head>/i,
   `<!-- ported from wick-arsenal/web by port-arsenal.mjs — do not edit here -->\n</head>`);
 
+// Every same-origin asset the HTML references must exist in the port, or the
+// page ships broken. Cheap check, catches an asset added upstream.
+// ${...} means the value is built at runtime inside a JS template literal, not a
+// static file — those are not ours to resolve.
+const missing = [];
+const consider = (p) => { if (!p.includes("${") && !p.includes("<") && !existsSync(join(DST, p))) missing.push(p); };
+for (const m of html.matchAll(/(?:src|href)="(?!https?:|data:|#|\/)([^"?#]+)/g)) consider(m[1]);
+for (const m of html.matchAll(/url\((["']?)(?!https?:|data:)([^)"']+)\1\)/g)) consider(m[2]);
+if (missing.length) {
+  console.error("port-arsenal: HTML references files not in the port: " + [...new Set(missing)].join(", "));
+  process.exit(1);
+}
+
 writeFileSync(join(DST, "index.html"), html);
-console.log("port-arsenal: /arsenal/ updated (" + before + " api calls rewritten to " + API + ")");
+console.log("port-arsenal: /arsenal/ updated (" + before + " api calls rewritten, "
+  + ASSETS.filter(([f]) => existsSync(join(DST, f))).length + " assets)");
