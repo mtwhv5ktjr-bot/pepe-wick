@@ -3604,7 +3604,15 @@ const WICK_ADS=[
 /* ---- 📺 PAID BILLBOARDS: anyone can buy a day at mint.wick.pics.
    1M PLS = a rotation slot · 10M PLS = EXCLUSIVE (every board in the game is
    theirs that day). Served by the API; on any hiccup the house boards run. ---- */
-let paidAds=null, paidExclusive=false, paidAdsAt=0, paidAdsBusy=false;
+/* paidAdsAt starts in the deep past ON PURPOSE. It used to start at 0, and the
+   throttle below is `performance.now()-paidAdsAt < 300000` — so on a fresh page
+   performance.now() is ~1000 and 1000-0 is under the 5-minute window, meaning the
+   FIRST fetch was skipped and paid billboards never appeared until a session had
+   run 5 minutes. Most sessions are shorter, so advertisers were paying 1,000,000
+   PLS for almost no impressions. (fetchTicker/fetchBoard dodge this by also
+   testing "have I got data yet"; this one can't, because a day with no ads
+   legitimately leaves paidAds null and would then refetch every frame.) */
+let paidAds=null, paidExclusive=false, paidAdsAt=-1e9, paidAdsBusy=false;
 function hexToRgb(h){ const v=parseInt(String(h||"#7cf9a5").replace("#",""),16)||0x7cf9a5;
   return ((v>>16)&255)+","+((v>>8)&255)+","+(v&255); }
 function fetchPaidAds(){

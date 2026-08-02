@@ -14,6 +14,38 @@ const ABI = [
   "function adsOf(uint32) view returns (address[] buyers, bool[] exclusives, bool[] banneds, uint24[] colors, string[] names, string[] tags, string[] urls, uint256[] logos)",
 ];
 
+/* ---- COMPED TAKEOVER ----
+   The contract has no free path — buy() demands msg.value == PRICE exactly, and
+   the only owner functions are setOwner/setTreasury/setBanned. So a gifted slot
+   is granted HERE, by serving it exactly as the chain would.
+
+   Hard rule: this only ever fills an EMPTY day. Anyone who actually paid wins,
+   always — a comped ad must never displace a customer. `to` is required so a
+   freebie can't silently run forever.                                          */
+const HOUSE = {
+  from: 20667, to: 20667,            // unix-day ids, inclusive (1 day)
+  name: "$WARTIME",
+  tag: "IT'S WARTIME",               // their own slogan, off their art
+  url: "",                           // no link line until they give us a real one
+  color: "#e03131",
+  // 16x16 one-bit heavy bomber. Their poster art thresholds to noise at this
+  // size (tested: 12-48% ink, all unreadable), so the mark is hand-drawn.
+  logo: "0180018001800180018015a87ffe7ffe01800180018001800ff00ff000000000",
+};
+function houseAdFor(day) {
+  if (!HOUSE || !HOUSE.name) return null;
+  if (!(day >= HOUSE.from && day <= HOUSE.to)) return null;
+  return {
+    name: String(HOUSE.name).slice(0, 20),
+    tag: String(HOUSE.tag || "").slice(0, 28),
+    url: String(HOUSE.url || "").slice(0, 32),
+    color: HOUSE.color || "#7cf9a5",
+    exclusive: true,
+    logo: HOUSE.logo || null,
+    comped: true,                    // so it is never mistaken for revenue
+  };
+}
+
 // tiny in-instance cache — the game polls this and ad days change rarely
 let cache = { at: 0, key: "", body: null };
 
@@ -50,7 +82,15 @@ export default async function handler(req, res) {
       });
     }
     const [taken, exTaken] = await bb.daySlots(day);
-    const body = { ok: true, day, exclusive, ads, slotsTaken: Number(taken), exclusiveTaken: exTaken };
+
+    // comped takeover fills an empty day only — a paying advertiser always wins
+    let comped = false;
+    if (!ads.length) {
+      const h = houseAdFor(day);
+      if (h) { ads.push(h); exclusive = true; comped = true; }
+    }
+
+    const body = { ok: true, day, exclusive, ads, slotsTaken: Number(taken), exclusiveTaken: exTaken, comped };
     cache = { at: Date.now(), key, body };
     return res.status(200).json(body);
   } catch (e) {
