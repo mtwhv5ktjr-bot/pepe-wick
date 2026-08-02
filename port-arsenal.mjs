@@ -27,7 +27,7 @@ mkdirSync(DST, { recursive: true });
 // 2026-08-01 redesign dropped abi.js and added the self-hosted display font.
 const ASSETS = [
   ["ethers.min.js", true], ["config.js", true], ["gunart.js", true],
-  ["abi.js", false], ["black-ops-one.woff2", false],
+  ["abi.js", false], ["black-ops-one.woff2", false], ["og.png", false],
 ];
 for (const [f, required] of ASSETS) {
   if (existsSync(join(SRC, f))) copyFileSync(join(SRC, f), join(DST, f));
