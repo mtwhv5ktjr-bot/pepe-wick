@@ -385,7 +385,7 @@ const MODDEFS={
 let ownedModTypes=[];                                  // every mod token held, WITH repeats — 2 lasers = two entries
 /* ---- KJP GEAR (KJPGear.sol, 100 pieces) — the cross-game mint. Bought on
    kjp.wick.pics, it works HERE too: gear rides the operative, so it needs no
-   mod slot and no gun. Each mint burns 75% KJP + 25% WICK automatically. ---- */
+   mod slot and no gun. Each mint burns 50% KJP + 50% WICK automatically. ---- */
 let ownedGearTypes=[];
 const hasGear=t=>ownedGearTypes.includes(t);
 const GEARDEFS={
@@ -3641,7 +3641,11 @@ function launched(){ return Date.now()>=LAUNCH_TS||/[?&]live/.test(location.sear
 /* LEADERBOARD PRIZE — top 3 wallet-signed scores when the clock runs out.
    Only signed submissions count (watch mode can't submit), and every payout is
    reviewed by hand before it's sent. */
-const PRIZE_END=Date.UTC(2026,7,6,12,0,0);   // Thu Aug 6 2026, 12:00 UTC
+/* Extended from Aug 6 to Aug 9. The score store went down on Aug 3 and every
+   submission since has been refused, so ending on the original clock would have
+   judged players on a window they were locked out of. Three days back, which
+   more than covers the outage. */
+const PRIZE_END=Date.UTC(2026,7,9,12,0,0);   // Sun Aug 9 2026, 12:00 UTC
 const PRIZES=["50 USDC","35 USDC","15 USDC"];
 function bountyActive(){ return launched()&&Date.now()<PRIZE_END; }
 function prizeLeft(){ return PRIZE_END-Date.now(); }

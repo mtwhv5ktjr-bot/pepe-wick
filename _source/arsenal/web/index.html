@@ -277,6 +277,7 @@ tbody tr:hover{background:#111823}
     <button data-tab="tMarket">Market</button>
     <button data-tab="tBids">Bids</button>
     <button data-tab="tSales">Sales</button>
+    <button data-tab="tLegacy" id="tabLegacyBtn">v1 Listings</button>
     <button data-tab="tAds" id="tabAdsBtn" style="display:none">Advertise</button>
     <button data-tab="tMine">Arsenal</button>
     <button data-tab="tBoard">Leaderboard</button>
@@ -362,6 +363,7 @@ tbody tr:hover{background:#111823}
     </div>
     <div id="market" class="grid"></div>
     <div id="marketEmpty" class="muted">No guns listed for sale right now.</div>
+    <div id="v1Nudge" class="muted" style="display:none;margin-top:10px"></div>
 
     <h2 style="margin-top:26px">Mod Listings</h2>
     <p class="muted">Attachments on the secondary market. <b>50% of every mod sale is burned as $WICK.</b></p>
@@ -384,6 +386,17 @@ tbody tr:hover{background:#111823}
     <div id="salesWrap"><table id="sales" class="tbl"></table></div>
     <div id="salesEmpty" class="muted">No sales yet — the market is brand new.</div>
     <p class="muted" style="margin-top:12px">Every sale burns <b>15%</b> of its price into $WICK in the same transaction. <span id="salesBurn"></span></p>
+  </section>
+
+  <section id="tLegacy" class="tab">
+    <h2>v1 Listings</h2>
+    <p class="muted">The marketplace was upgraded on 1 Aug. Guns listed on the <b>old (v1)</b> contract are still
+      listed there — they just aren't shown on the main Market tab, which reads v2. They are safe: v1 never took
+      custody, so the gun is still in the seller's wallet. <b>Sellers:</b> cancel here, then relist on the new market.
+      <b>Buyers:</b> these are live and purchasable.</p>
+    <div id="legacyWrap"><div id="legacy" class="grid"></div></div>
+    <div id="legacyEmpty" class="muted">Checking the old contract…</div>
+    <p class="muted" style="margin-top:12px" id="legacyNote"></p>
   </section>
 
   <section id="tAds" class="tab">
@@ -1378,6 +1391,113 @@ async function buyBillboard(){
     await loadAdvertise();
   }catch(e){ toast(e.shortMessage||e.reason||e.message||"purchase failed"); }
 }
+
+/* ---------------- v1 (legacy) marketplace ----------------
+   cfg.marketOld holds listings made before the 1 Aug upgrade. The market is
+   approval-based — it never escrows the NFT — so nothing is trapped; the
+   listings are simply invisible because the app reads cfg.market (v2).
+   A listing is only BUYABLE if the seller still owns the gun AND the old
+   market is still approved for it. Anything else is shown as un-buyable
+   rather than given a button that is guaranteed to revert. */
+let legacyRO=null, legacyC=null, legacyRows=null;
+const legacyConfigured=()=>cfg.marketOld&&!/^0x0{40}$/i.test(cfg.marketOld)&&cfg.marketOld.toLowerCase()!==String(cfg.market||"").toLowerCase();
+function legacyRead(){
+  if(!legacyRO&&legacyConfigured()){
+    const p=new ethers.JsonRpcProvider(cfg.rpcRead||cfg.chain.rpc, cfg.chain.id, {staticNetwork:true, batchMaxCount:20});
+    legacyRO=new ethers.Contract(cfg.marketOld, MARKET_ABI, p);
+  }
+  return legacyRO;
+}
+async function loadLegacy(force){
+  const box=$("#legacy"), empty=$("#legacyEmpty"), note=$("#legacyNote");
+  if(!legacyConfigured()){ box.innerHTML=""; empty.textContent="No previous marketplace to show."; empty.style.display="block"; return; }
+  const ro=legacyRead(), { gunsRO }=readOnly();
+  if(legacyRows&&!force) return renderLegacy();
+  empty.textContent="Reading the old contract…"; empty.style.display="block"; box.innerHTML="";
+  const raw=await Promise.all(Array.from({length:101},(_,i)=>
+    ro.getListing(i+1).then(r=>({id:i+1,seller:r[0],price:r[1]})).catch(()=>({id:i+1,err:true}))));
+  if(raw.some(r=>r.err)){ empty.textContent="Couldn't reach the PulseChain node — refresh to retry."; return; }
+  let res=raw.filter(l=>l.seller!==ZERO&&l.price>0n);
+  if(!res.length){ legacyRows=[]; return renderLegacy(); }
+  // buyable == seller still owns it AND v1 still has approval
+  const own=await Promise.all(res.map(l=>gunsRO.ownerOf(l.id).catch(()=>null)));
+  const apr=await Promise.all(res.map(l=>gunsRO.getApproved(l.id).catch(()=>null)));
+  const all=await Promise.all(res.map((l,i)=>own[i]?gunsRO.isApprovedForAll(own[i],cfg.marketOld).catch(()=>false):false));
+  const types=await Promise.all(res.map(l=>gunsRO.gunTypeOf(l.id).then(Number).catch(()=>0)));
+  legacyRows=res.map((l,i)=>({...l, type:types[i], owner:own[i],
+    buyable: !!own[i] && own[i].toLowerCase()===l.seller.toLowerCase() &&
+             ((apr[i]||"").toLowerCase()===cfg.marketOld.toLowerCase() || all[i]===true) }));
+  renderLegacy();
+}
+function renderLegacy(){
+  const box=$("#legacy"), empty=$("#legacyEmpty"), note=$("#legacyNote");
+  const rows=(legacyRows||[]).slice().sort((a,b)=>Number(a.price-b.price));
+  if(!rows.length){ box.innerHTML=""; empty.textContent="Nothing is listed on the old contract."; empty.style.display="block"; note.textContent=""; return; }
+  empty.style.display="none";
+  const me=(account||"").toLowerCase();
+  const mine=rows.filter(r=>r.seller.toLowerCase()===me).length;
+  note.innerHTML = rows.length+" listing"+(rows.length>1?"s":"")+" on the old contract"+
+    (mine?" · <b>"+mine+" of them yours</b>":"")+
+    " · contract <a href=\""+cfg.chain.explorer+"/address/"+cfg.marketOld+"\" target=\"_blank\" rel=\"noopener\">"+
+    cfg.marketOld.slice(0,10)+"…</a>";
+  box.innerHTML = rows.map(r=>{
+    const g=WICK_GUNS[r.type]||{name:"Gun #"+r.id,rarity:"",color:"#cfd6e0"};
+    const isMine=r.seller.toLowerCase()===me;
+    const act = isMine
+      ? '<button data-lcancel="'+r.id+'">CANCEL LISTING</button>'
+      : (r.buyable ? '<button class="primary" data-lbuy="'+r.id+'">BUY '+fmt(r.price)+' PLS</button>'
+                   : '<button disabled title="The seller no longer owns this gun, or removed the old market\'s approval — this listing cannot complete.">UNAVAILABLE</button>');
+    return '<div class="card'+(g.holo?" holo":"")+'">'+
+      '<div class="art">'+artFor(r.type,r.id)+'</div>'+
+      '<div class="body"><div class="nm">'+g.name+'</div>'+
+      '<div class="rr" style="color:'+g.color+'">#'+r.id+' · '+(g.rarity||"")+'</div>'+
+      '<div class="bl">'+fmt(r.price)+' PLS'+(isMine?" · your listing":"")+'</div>'+
+      act+'</div></div>';
+  }).join("");
+  box.querySelectorAll("[data-lbuy]").forEach(b=>b.onclick=()=>legacyBuy(+b.dataset.lbuy));
+  box.querySelectorAll("[data-lcancel]").forEach(b=>b.onclick=()=>legacyCancel(+b.dataset.lcancel));
+}
+async function legacyBuy(id){
+  if(!signer) return connect();
+  const row=(legacyRows||[]).find(r=>r.id===id); if(!row) return;
+  if(!confirm("Buy gun #"+id+" from the OLD (v1) marketplace for "+fmt(row.price)+" PLS?\n\n"+
+              "Same 15% royalty, burned as $WICK in the same transaction.")) return;
+  try{
+    const c=new ethers.Contract(cfg.marketOld, MARKET_ABI, signer);
+    toast("Confirm in your wallet…");
+    await (await sendBuffered(c,"buy",[id],{value:row.price})).wait();
+    toast("Bought gun #"+id+" from the old market.");
+    legacyRows=null; loadLegacy(true); refreshStats();
+  }catch(e){ toast(e.shortMessage||e.reason||e.message||"purchase failed"); }
+}
+async function legacyCancel(id){
+  if(!signer) return connect();
+  if(!confirm("Cancel your v1 listing for gun #"+id+"?\n\n"+
+              "The gun never left your wallet. After this you can list it on the new marketplace.")) return;
+  try{
+    const c=new ethers.Contract(cfg.marketOld, MARKET_ABI, signer);
+    toast("Confirm in your wallet…");
+    await (await sendBuffered(c,"cancel",[id])).wait();
+    toast("Cancelled. You can now list gun #"+id+" on the new market.");
+    legacyRows=null; loadLegacy(true);
+  }catch(e){ toast(e.shortMessage||e.reason||e.message||"cancel failed"); }
+}
+/* point sellers at the old tab from the main market, but only if v1 really has rows */
+async function checkLegacyNudge(){
+  try{
+    if(!legacyConfigured())return;
+    const ro=legacyRead();
+    const raw=await Promise.all(Array.from({length:101},(_,i)=>ro.getListing(i+1).then(r=>r[0]).catch(()=>ZERO)));
+    const n=raw.filter(a=>a!==ZERO).length;
+    const el=$("#v1Nudge"); if(!el)return;
+    if(n){ el.style.display="block";
+      el.innerHTML="⚠ "+n+" gun"+(n>1?"s are":" is")+" still listed on the <b>previous marketplace</b> and won't show here. "+
+        "<a href=\"#\" id=\"v1Jump\">Open the v1 Listings tab →</a>";
+      const j=$("#v1Jump"); if(j)j.onclick=e=>{e.preventDefault();showTab("tLegacy");};
+    }
+  }catch(e){}
+}
+
 function showTab(id){
   document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("on",s.id===id));
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===id));
@@ -1388,7 +1508,9 @@ function showTab(id){
   if(hero) hero.style.display = (id==="tCollection") ? "" : "none";
   window.scrollTo(0,0);
   if(id==="tBids")loadBids();
-  if(id==="tSales")loadSales();                       // log scan is slow — only when the tab is opened
+  if(id==="tMarket")checkLegacyNudge();
+  if(id==="tSales")loadSales();
+  if(id==="tLegacy")loadLegacy();                       // log scan is slow — only when the tab is opened
   if(id==="tAds")loadAdvertise();
   if(id==="tMine")showApprovalState();
   try{ history.replaceState(null,"","#"+id.slice(1).toLowerCase()); }catch(e){}
