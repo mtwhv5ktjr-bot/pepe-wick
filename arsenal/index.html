@@ -585,7 +585,11 @@ const GEAR_ABI=[
   "function gearOfOwner(address) view returns (uint256[] ids, uint8[] types)",
   "function setApprovalForAll(address,bool)",
   "function isApprovedForAll(address,address) view returns (bool)",
-  "function transferFrom(address,address,uint256)"
+  "function transferFrom(address,address,uint256)",
+  /* SEND uses the safe variant so a piece sent to a contract that cannot hold
+     ERC-721s reverts instead of vanishing. It was missing from this ABI, which
+     would have made the SEND button throw "no matching function" on click. */
+  "function safeTransferFrom(address,address,uint256)"
 ];
 const GEAR_MARKET_ABI=[
   "function listings(uint256) view returns (address seller, uint256 price)",
@@ -1042,7 +1046,12 @@ async function loadMyGear(){
     const [ids,types]=await gearRO.gearOfOwner(account);
     if(!ids.length){ hide(); return; }
     hdr.style.display="block"; hint.style.display="block";
-    hint.textContent="Live in KJP and PEPE WICK automatically — no slots, no limit. Resale burns 15%: half KJP, half WICK.";
+    /* Only promise the resale burn when a gear market actually exists to do the
+       burning — otherwise this is a claim about a contract nobody deployed. */
+    hint.textContent="Live in KJP and PEPE WICK automatically — no slots, no limit. "
+      + (gearMktConfigured()
+          ? "Resale burns 15%: half KJP, half WICK."
+          : "Send a piece to any wallet — its perks go with it.");
     const lst = gearMktRO ? await Promise.all([...ids].map(id=>gearMktRO.listings(Number(id)).catch(()=>[ZERO,0n]))) : [...ids].map(()=>[ZERO,0n]);
     grid.innerHTML=[...ids].map((id,i)=>{
       const t=Number(types[i]); id=Number(id); gearTypeCache[id]=t;
@@ -1051,11 +1060,32 @@ async function loadMyGear(){
       const sell = !gearMktRO ? "" : (listed
         ? '<div class="row"><span class="muted">Listed: '+fmt(price)+' PLS</span><button data-gearcancel="'+id+'">CANCEL</button></div>'
         : '<div class="row"><input type="text" id="gp'+id+'" placeholder="price in PLS"><button data-gearlist="'+id+'">SELL</button></div>');
-      return gearCardHTML(t,id,sell);
+      /* SEND — gear is a normal ERC-721, so a holder must be able to move a
+         piece to another wallet without going through the market at all. */
+      const send = '<div class="row"><input type="text" id="gs'+id+'" placeholder="send to 0x… wallet"><button data-gearsend="'+id+'">SEND</button></div>';
+      return gearCardHTML(t,id,sell+send);
     }).join("");
     grid.querySelectorAll("[data-gearlist]").forEach(b=>b.onclick=()=>listGear(+b.dataset.gearlist));
     grid.querySelectorAll("[data-gearcancel]").forEach(b=>b.onclick=()=>cancelGear(+b.dataset.gearcancel));
+    grid.querySelectorAll("[data-gearsend]").forEach(b=>b.onclick=()=>sendGear(+b.dataset.gearsend));
   }catch(e){ hide(); }
+}
+/* Send a gear piece to another wallet. Same shape as sendMod: validate the
+   address, refuse a self-send, name the actual item in the confirm, and say
+   out loud that it is permanent — the perks leave with it. */
+async function sendGear(id){
+  if(!signer) return connect();
+  const to=(($("#gs"+id)||{}).value||"").trim();
+  if(!ethers.isAddress(to)) return toast("Enter a valid 0x… wallet address.");
+  if(to.toLowerCase()===account.toLowerCase()) return toast("That's your own wallet.");
+  const g=(window.WICK_GEAR||{})[gearTypeCache[id]]||{name:"GEAR #"+id};
+  if(!confirm("Send "+g.name+" (gear #"+id+") to\n\n"+to+"\n\nThis is permanent, and its perks go with it — in KJP and in PEPE WICK.")) return;
+  try{
+    toast("Confirm the transfer…");
+    await (await sendBuffered(gearC,"safeTransferFrom(address,address,uint256)",[account,to,id])).wait();
+    toast("Sent "+g.name+" (#"+id+").");
+    await loadMyGear();
+  }catch(e){ toast(e.shortMessage||e.message||"transfer failed"); }
 }
 function gearCardHTML(type,id,actions){
   const g=(window.WICK_GEAR||{})[type]||{name:"GEAR #"+id,rarity:"?",color:"#8a93a5",fx:"unknown",pool:0};

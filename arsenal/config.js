@@ -18,7 +18,10 @@ window.WICK_CFG = {
   marketOld: "0x1457C17A7132fCbCb2034337368050563DeD91e3",
   mods:       "0x004E6610ff47c6A6510DA446257822B37D26CD73",   // WICK MODS free mint — paste after LAUNCH-MODS.cmd
   modsMarket: "0xDDb963D1bb874d4ac5697550F513568c657E977E",   // mods marketplace — 50% royalty, 100% burned as $WICK
-  gear:       "0x0000000000000000000000000000000000000000",   // KJPGear — paste after tools/deploy-gear.mjs
+  gear:       "0x6BdED56bA6F0d8062e056062D47F41ac735d5d10",   // KJPGear — LIVE on PulseChain 2026-08-04
+  // KJPGearMarket is compiled but NOT deployed. Zero here is load-bearing, not a
+  // TODO: it hides the gear market and makes the owned-gear cards render SEND
+  // only. Do not paste an address until the market is actually live on-chain.
   gearMarket: "0x0000000000000000000000000000000000000000",   // KJPGearMarket — 15% royalty, burned 50/50 KJP+WICK
   // LIVE on PulseChain. A non-zero address here is also what UNHIDES the
   // ADVERTISE tab (bbConfigured()) — set only after the production E2E passed.
