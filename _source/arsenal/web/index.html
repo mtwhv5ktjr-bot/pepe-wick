@@ -294,8 +294,8 @@ tbody tr:hover{background:#111823}
   <section class="hero">
    <h1>OWN THE GUN.<br>WIELD IT.</h1>
    <div class="heroL">
-    <div class="burn" id="heroBurn">🔥 SOLD OUT — <b>100 CASES</b> AT <b>1,000,000 PLS</b> EACH</div>
-    <p id="heroProse" class="muted">101 on-chain guns on PulseChain. Every one is a real weapon inside PEPE WICK, and every sale burns 15% into $WICK in the same transaction.</p>
+    <div class="burn" id="heroBurn">🔥 GUNS SOLD OUT — <b>KJP GEAR</b> IS LIVE, <b>1,000,000 PLS</b></div>
+    <p id="heroProse" class="muted">101 on-chain guns on PulseChain, every one a real weapon inside PEPE WICK. The guns are gone — trade them below. <b>KJP GEAR</b> is the drop that is still open.</p>
 
     <!-- KJP GEAR sits ABOVE the free mods mint: it is the paid drop, it is
          live now, and every sale burns KJP and WICK in the same transaction.
@@ -327,18 +327,23 @@ tbody tr:hover{background:#111823}
 
     <div id="cfgWarn" class="banner" style="display:none"></div>
 
+    <!-- The gun mint SOLD OUT — its qty box, MINT button and mint-progress
+         stats are gone. What is left is what still changes: what you hold,
+         what has burned, and the KJP GEAR drop that is actually live. -->
     <div class="stats">
-      <div class="stat"><span class="n" id="sMinted">–</span><span class="l">MINTED / 101</span></div>
-      <div class="stat"><span class="n" id="sPrice">–</span><span class="l">PRICE (PLS)</span></div>
-      <div class="stat"><span class="n" id="sOpen">–</span><span class="l">MINT STATUS</span></div>
       <div class="stat"><span class="n" id="sYours">–</span><span class="l">YOUR GUNS</span></div>
+      <div class="stat" title="KJP GEAR pieces minted so far — read live from the chain."><span class="n" id="sGear" style="color:#ffd27c">–</span><span class="l">KJP GEAR MINTED</span></div>
       <div class="stat" title="Total $WICK held at the burn address — read live from the chain."><span class="n" id="sBurned" style="color:#ff8a3d">–</span><span class="l">🔥 $WICK BURNED</span></div>
+      <div class="stat" title="Total KJP held at the burn address — read live from the chain."><span class="n" id="sKjpBurned" style="color:#ffd27c">–</span><span class="l">🔥 KJP BURNED</span></div>
     </div>
-
-    <div class="row" style="flex-wrap:wrap">
-      <input type="number" id="qty" min="1" max="5" value="1" style="width:74px">
-      <button id="mint" class="primary">MINT</button>
-      <span id="mintNote" class="muted"></span>
+    <!-- The sold-out gun mint's controls are RETAINED BUT HIDDEN, not deleted:
+         several code paths still write to #sMinted/#sPrice/#sOpen/#mint/#qty,
+         and removing the nodes turns every one of those into a null deref that
+         takes the whole stats refresh — and the burn tiles — down with it. -->
+    <div style="display:none" aria-hidden="true">
+      <span id="sMinted"></span><span id="sPrice"></span><span id="sOpen"></span>
+      <input type="number" id="qty" value="1"><button id="mint"></button>
+      <span id="mintNote"></span>
     </div>
     <div id="tierPanel"></div>
     <div id="playWithGuns"></div>
@@ -722,24 +727,40 @@ async function refreshStats(){
 })();
 
 const WICK_TOKEN = "0x8CDaf3d630Da9E1450832924D5701CC0500E9cfC";
+const KJP_TOKEN  = "0x3848D41D6f439Ca645e9193c7680629A86B739ED";
+const GEAR_ADDR  = "0x6BdED56bA6F0d8062e056062D47F41ac735d5d10";
 const BURN_ADDR  = "0x000000000000000000000000000000000000dEaD";
+const ERC20_MIN = [
+  "function balanceOf(address) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+];
 let _burnAt = 0;
 async function refreshBurned(){
   if (Date.now() - _burnAt < 60_000) return;            // the menu re-renders often; the number doesn't
   _burnAt = Date.now();
-  try{
-    const p = new ethers.JsonRpcProvider(cfg.rpcRead || cfg.chain.rpc, cfg.chain.id, { staticNetwork:true });
-    const t = new ethers.Contract(WICK_TOKEN, [
-      "function balanceOf(address) view returns (uint256)",
-      "function totalSupply() view returns (uint256)",
-    ], p);
-    const [burned, supply] = await Promise.all([t.balanceOf(BURN_ADDR), t.totalSupply()]);
-    const whole = burned / (10n ** 18n);
-    $("#sBurned").textContent = whole.toLocaleString("en-US");
-    const pct = supply > 0n ? Number(burned * 10000n / supply) / 100 : 0;
-    const lbl = $("#sBurned").parentElement.querySelector(".l");
-    if (lbl) lbl.textContent = "🔥 $WICK BURNED · " + pct.toFixed(2) + "%";
-  }catch(e){ /* a dead RPC must not blank the tile — leave the dash */ }
+  const p = new ethers.JsonRpcProvider(cfg.rpcRead || cfg.chain.rpc, cfg.chain.id, { staticNetwork:true });
+  /* one tile per token, each in its own try — a dead read on one must never
+     blank the other, and a dash is honest where a zero would be a lie */
+  const tile = async (tok, id, label) => {
+    try{
+      const t = new ethers.Contract(tok, ERC20_MIN, p);
+      const [burned, supply] = await Promise.all([t.balanceOf(BURN_ADDR), t.totalSupply()]);
+      $(id).textContent = (burned / (10n ** 18n)).toLocaleString("en-US");
+      const pct = supply > 0n ? Number(burned * 10000n / supply) / 100 : 0;
+      const lbl = $(id).parentElement.querySelector(".l");
+      if (lbl) lbl.textContent = label + " · " + pct.toFixed(2) + "%";
+    }catch(e){ /* leave the dash */ }
+  };
+  await Promise.all([
+    tile(WICK_TOKEN, "#sBurned", "🔥 $WICK BURNED"),
+    tile(KJP_TOKEN, "#sKjpBurned", "🔥 KJP BURNED"),
+    (async () => {                                       // KJP GEAR mint progress
+      try{
+        const g = new ethers.Contract(GEAR_ADDR, ["function totalSupply() view returns (uint256)"], p);
+        $("#sGear").textContent = Number(await g.totalSupply()) + " / 100";
+      }catch(e){}
+    })()
+  ]);
 }
 
 // The hero fan. CSFloat's stage floats real items rather than a rendered mockup, so this
