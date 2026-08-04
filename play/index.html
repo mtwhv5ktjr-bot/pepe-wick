@@ -383,6 +383,21 @@ const MODDEFS={
   6:{name:"DRAGON'S BREATH",tag:"DRAGON",apply:s=>{ s.pellets=(s.pellets||1)+1; }},
 };
 let ownedModTypes=[];                                  // every mod token held, WITH repeats — 2 lasers = two entries
+/* ---- KJP GEAR (KJPGear.sol, 100 pieces) — the cross-game mint. Bought on
+   kjp.wick.pics, it works HERE too: gear rides the operative, so it needs no
+   mod slot and no gun. Each mint burns 75% KJP + 25% WICK automatically. ---- */
+let ownedGearTypes=[];
+const hasGear=t=>ownedGearTypes.includes(t);
+const GEARDEFS={
+  1:{name:"SUPPRESSOR",   here:"subsonic tune: tighter spread, +5% rate", gun:s=>{ s.spread*=0.8; s.rps*=1.05; }},
+  2:{name:"KEVLAR WEAVE", here:"+1 ♥"},
+  3:{name:"TACTICAL BOOTS",here:"+8% move speed"},
+  4:{name:"EXTENDED MAGS",here:"+12% fire rate", gun:s=>{ s.rps*=1.12; }},
+  5:{name:"NIGHT OPTICS", here:"+40% i-frames after a hit"},
+  6:{name:"K9 TREATS",    here:"HOUNDS rush 25% slower"},
+  7:{name:"SKELETON KEY", here:"+40% CASE from crates"},
+  8:{name:"GOLD BRIEFCASE",here:"+10% score"}
+};
 const MOD_SLOTS=3;
 const CARRY_MAX=2;                                     // you walk in with two weapons. That's the whole rule.
 let modCfg={};                                         // gunType -> [modTypes] chosen in the GUNSMITH
@@ -497,12 +512,14 @@ function baseSpecFor(type){
 let _specKey="", _specVal=null;
 function specFor(type){
   const am=activeModsFor(type);   // the TYPE's mods, not the equipped gun's — callers pass arbitrary types
-  if(!am.length)return baseSpecFor(type);
-  const key=type+"|"+am.join(",");
+  const gr=ownedGearTypes.filter(t=>GEARDEFS[t]&&GEARDEFS[t].gun);   // gear needs no slot
+  if(!am.length&&!gr.length)return baseSpecFor(type);
+  const key=type+"|"+am.join(",")+"|g"+gr.join(",");
   if(key===_specKey)return _specVal;
   const s=Object.assign({},baseSpecFor(type));
   for(const t of am)MODDEFS[t].apply(s);
-  s.mods=am;                                           // HUD shows what's bolted on
+  for(const t of gr)GEARDEFS[t].gun(s);
+  s.mods=am; s.gear=gr;                                // HUD shows what's bolted on
   _specKey=key; _specVal=s;
   return s;
 }
@@ -1868,6 +1885,7 @@ function pwHit(k){
 }
 const GUNS_ADDR="0x188848DdB42fA8Ca2EB05649c944e05dfA2158FD";        // WickGuns — LIVE on PulseChain 2026-07-30
 const MODS_ADDR="0x004E6610ff47c6A6510DA446257822B37D26CD73";        // WickMods (free-mint attachments) — paste after LAUNCH-MODS.cmd
+const GEAR_ADDR="0x0000000000000000000000000000000000000000";        // KJPGear (100-piece cross-game mint) — paste after deploy-gear.mjs
 const PULSE_RPC="https://rpc.pulsechain.com";
 /* Reown (WalletConnect) — projectId is a PUBLIC client identifier, safe to ship.
    Empty string = injected-wallet-only behavior (the pre-Reown flow). */
@@ -1985,7 +2003,8 @@ async function connectWallet(){
          if(r.ok&&d.ok){ types=[...new Set((d.guns||[]).map(x=>x.type))];
                          mods=[...new Set((d.mods||[]).map(x=>x.type))]; } }catch(e){}
     if(types===null){ types=await rpcGunsOf(addr); mods=await rpcModsOf(addr); }  // API down → straight to PulseChain
-    applyGuns(types, addr, false, false, mods);        // signed-capable: submitScore re-signs anyway
+    const gear=await rpcGearOf(addr);                  // KJP GEAR is KJP-native: always straight from chain
+    applyGuns(types, addr, false, false, mods, gear);  // signed-capable: submitScore re-signs anyway
   }catch(e){ walletAddr=null; watchMode=false;         // never leave a half-"connected" session behind
     walletStatus=(e&&(e.message||e.code))?("error: "+(e.shortMessage||e.message||e.code)):"connect cancelled"; }
   walletBusy=false;
@@ -2004,10 +2023,12 @@ function syncRotMsg(){
   }
 }
 /* apply verified guns + remember them (24h cache) so returning players stay unlocked.
-   mods (attachments) ride along as an optional 5th arg — same trust path as the guns */
-function applyGuns(types, addr, watch, quiet, mods){
+   mods (attachments, 5th arg) and KJP GEAR (6th) ride along — same trust path as
+   the guns, and gear works here even with no gun in the wallet. */
+function applyGuns(types, addr, watch, quiet, mods, gear){
   types=Array.isArray(types)?types.filter(n=>typeof n==="number"&&isFinite(n)):[];   // poisoned cache can't half-apply
   ownedModTypes=Array.isArray(mods)?mods.filter(n=>typeof n==="number"&&isFinite(n)&&MODDEFS[n]):[];
+  ownedGearTypes=Array.isArray(gear)?gear.filter(n=>typeof n==="number"&&isFinite(n)&&GEARDEFS[n]):[];
   ownedGunTypes=types; watchMode=!!watch;
   bumpMods();                                         // spec memo AND the mod allocation are stale the moment the loadout universe changes
   reconcileSkin();                                    // a skin whose gate no longer passes comes straight off
@@ -2018,10 +2039,11 @@ function applyGuns(types, addr, watch, quiet, mods){
        else if(s!==null&&s!==""&&!isNaN(+s)){ saved=+s; sawPref=true; } }catch(e){}
   loadoutType=(sawPref&&(saved==null||types.includes(saved)))?saved:(types[0]!=null?types[0]:null);
   if(!carrySet().includes(loadoutType))loadoutType=carrySet()[0];     // a gun that left the wallet can't stay slung
-  walletStatus=types.length
-    ? (watch?"👁 watch: ":"✓ ")+types.length+" gun"+(types.length>1?"s":"")+" unlocked"+(watch?" — connect to submit scores":"")
+  const gearBit=ownedGearTypes.length?" · "+ownedGearTypes.length+" KJP gear":"";
+  walletStatus=(types.length||ownedGearTypes.length)
+    ? (watch?"👁 watch: ":"✓ ")+(types.length?types.length+" gun"+(types.length>1?"s":"")+" unlocked":"no guns")+gearBit+(watch?" — connect to submit scores":"")
     : (watch?"👁 watching — no WICK guns at that address":"✓ connected — no WICK guns in wallet");
-  try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,mods:ownedModTypes,watch:!!watch,ts:Date.now()})); }catch(e){}
+  try{ localStorage.setItem("pw_nft",JSON.stringify({addr,types,mods:ownedModTypes,gear:ownedGearTypes,watch:!!watch,ts:Date.now()})); }catch(e){}
   syncRotMsg();
   nftGen++;                                             // invalidates any pending boot-time cache refresh (see restoreNft)
   if(types.length&&!quiet)SFX.unlock();                 // quiet = boot-time restore: no gesture yet, don't birth a suspended AudioContext
@@ -2038,15 +2060,16 @@ async function verifyWatch(addrRaw){
   walletBusy=true; walletStatus="looking up guns on-chain…";
   let applied=null;
   try{
+    const gear=await rpcGearOf(addr);
     const r=await fetchT(NFT_VERIFY_URL+"?address="+addr); const data=await r.json();
     if(r.ok&&data.ok){ const types=[...new Set((data.guns||[]).map(x=>x.type))];
       const mods=[...new Set((data.mods||[]).map(x=>x.type))];
-      applyGuns(types, addr, true, false, mods); walletBusy=false; return {addr,types}; }
+      applyGuns(types, addr, true, false, mods, gear); walletBusy=false; return {addr,types}; }
     if(/not configured/.test((data&&data.error)||"")){ walletStatus="⏳ guns contract goes live at mint — watch mode will work then"; walletBusy=false; return null; }
     throw new Error((data&&data.error)||"api-down");
   }catch(e){
-    try{ const types=await rpcGunsOf(addr); const mods=await rpcModsOf(addr);
-      applyGuns(types, addr, true, false, mods); applied={addr,types}; }   // independent path: straight to PulseChain
+    try{ const types=await rpcGunsOf(addr); const mods=await rpcModsOf(addr); const gear2=await rpcGearOf(addr);
+      applyGuns(types, addr, true, false, mods, gear2); applied={addr,types}; }   // independent path: straight to PulseChain
     catch(e2){ walletStatus=ownedGunTypes.length?"👁 watch (cached — refresh failed)":"lookup failed — try again or use CONNECT"; }
   }
   walletBusy=false;
@@ -2065,14 +2088,15 @@ async function rpcGunsOf(addr){
   for(let i=0;i<tLen;i++){ const v=word(tOff+1+i); if(isFinite(v))types.push(v); }
   return [...new Set(types)];
 }
-/* same shape for the attachments — but mods are a bonus, so failures return []
-   instead of throwing: a mods hiccup must never block gun verification */
-async function rpcModsOf(addr){
+/* same (uint256[] ids, uint8[] types) shape as the guns — but mods and gear are
+   BONUSES, so failures return [] instead of throwing: a hiccup on either must
+   never block gun verification. One decoder, two contracts. */
+async function rpcTypesOf(contract,selector,addr){
   try{
-    if(/^0x0{40}$/.test(MODS_ADDR))return [];
-    const data="0x8d56809a"+addr.slice(2).toLowerCase().padStart(64,"0");   // modsOfOwner(address)
+    if(/^0x0{40}$/.test(contract))return [];
+    const data=selector+addr.slice(2).toLowerCase().padStart(64,"0");
     const r=await fetchT(PULSE_RPC,{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:MODS_ADDR,data},"latest"]})});
+      body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:contract,data},"latest"]})});
     const j=await r.json(); if(!j.result||j.result==="0x")return [];
     const hex=j.result.slice(2), word=i=>parseInt(hex.slice(i*64,i*64+64),16);
     const tOff=word(1)/32, tLen=word(tOff), types=[];
@@ -2081,6 +2105,8 @@ async function rpcModsOf(addr){
     return [...new Set(types)];
   }catch(e){ return []; }
 }
+const rpcModsOf=addr=>rpcTypesOf(MODS_ADDR,"0x8d56809a",addr);   // modsOfOwner(address)
+const rpcGearOf=addr=>rpcTypesOf(GEAR_ADDR,"0xfce8c498",addr);   // gearOfOwner(address)
 /* window.prompt() is blocked outright in Telegram/Instagram webviews and is miserable
    to paste into on a phone in landscape — so this is a real DOM sheet instead. */
 function enterAddress(){
@@ -2145,11 +2171,12 @@ async function refreshGuns(addr, watch){
        if(r.ok&&d.ok){ types=[...new Set((d.guns||[]).map(x=>x.type))];
                        mods=[...new Set((d.mods||[]).map(x=>x.type))]; } }catch(e){}
   if(types===null){ try{ types=await rpcGunsOf(addr); mods=await rpcModsOf(addr); }catch(e){ return; } }   // BOTH lookups failed → keep the cache
+  const gear=await rpcGearOf(addr);                   // never throws — [] on any trouble
   if(gen!==nftGen)return;                             // session changed mid-flight — this result is about the wrong wallet
   // types!==null here means a lookup SUCCEEDED — a verified zero applies (they
   // really sold everything); only failures above keep the cache alive
   const before=ownedGunTypes.join(",");
-  applyGuns(types, addr, watch, true, mods||ownedModTypes);
+  applyGuns(types, addr, watch, true, mods||ownedModTypes, gear);
   if(before!==types.join(",")&&types.some(t=>t>0))
     walletStatus="✨ GUNS REVEALED — "+specFor(loadoutType).name;   // the menu draws walletStatus; floats never render there
 }
@@ -2160,9 +2187,9 @@ async function refreshGuns(addr, watch){
   if(URL_WALLET)return;              // a ?w= hand-off names the wallet explicitly — the
                                      // stale cache must not race in and overwrite it 2.5s later
   const c=JSON.parse(localStorage.getItem("pw_nft")||"null");
-  if(!c||!c.types||!c.types.length)return;
-  const sealed=c.types.every(t=>!t);                                          // cache from before the reveal
-  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch, true, c.mods); // quiet: no gesture yet — a chime here births a dead AudioContext
+  if(!c||!c.types||!(c.types.length||(c.gear||[]).length))return;             // gear-only wallets are real players too
+  const sealed=c.types.length&&c.types.every(t=>!t);                          // cache from before the reveal
+  if(!sealed&&Date.now()-c.ts<24*3600*1000)applyGuns(c.types, c.addr, c.watch, true, c.mods, c.gear); // quiet: no gesture yet — a chime here births a dead AudioContext
   const gen=nftGen;                                  // captured NOW — if any other wallet applies before the timer fires, gen goes stale
   setTimeout(()=>{ if(gen===nftGen)refreshGuns(c.addr, c.watch); }, sealed?300:2500);  // sealed caches refresh straight away
   }catch(e){} })();
@@ -2480,6 +2507,166 @@ const LEVELS=[
            {t:"shield",x:2640},{t:"hound",x:2900},{t:"hound",x:2960},{t:"heavy",x:3220},{t:"blade",x:3560},
            {t:"butcher",x:4300}],
   cage:4900, door:5200, rank:{s:120,a:180,b:280} },
+{ name:"11 — SAFEHOUSE BURN", sign:"SAFEHOUSE",
+  lore:"BISCUIT is home. At 04:12 the safehouse burns — they want the file, not the dog.",
+  len:6600,
+  floors:[[-100,621],[813,1692],[1782,2572],[2862,3530],[3669,4322],[4464,5147],[5423,6236],[6364,7000]],
+  ledges:[{"x":20,"y":397,"w":157},{"x":933,"y":394,"w":144},{"x":1902,"y":384,"w":134},{"x":2982,"y":385,"w":138},{"x":3789,"y":393,"w":146},{"x":4584,"y":382,"w":138},{"x":5543,"y":400,"w":153},{"x":5892,"y":367,"w":164},{"x":6484,"y":383,"w":111}],
+  crates:[{"x":1455,"y":378},{"x":1630,"y":378},{"x":2257,"y":378},{"x":3354,"y":378},{"x":4618,"y":378},{"x":4830,"y":378},{"x":1969,"y":326},{"x":5974,"y":309}],
+  bone:{"x":5974,"y":333},
+  lamps:[380,1455,2257,3180,3984,4830,5719],
+  checkpoints:[2177,3196,4806,5830],
+  kegs:[{"x":5914},{"x":5486},{"x":2409},{"x":3354},{"x":3805},{"x":380}],
+  vents:[995,2039,3180,4198,5486],
+  puddles:[[1243,82],[2039,91],[2980,87],[3805,81],[4618,78],[5486,71],[6129,77]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"goon","x":2515},{"t":"goon","x":878},{"t":"goon","x":4174},{"t":"heavy","x":4027},{"t":"goon","x":1561},{"t":"blade","x":4274},{"t":"goon","x":1005,"y":394},{"t":"goon","x":4891},{"t":"goon","x":4207},{"t":"goon","x":3839},{"t":"goon","x":1005,"y":394},{"t":"goon","x":1005,"y":394},{"t":"goon","x":5922},{"t":"blade","x":3055},{"t":"goon","x":2343},{"t":"goon","x":5583},{"t":"goon","x":2932},{"t":"goon","x":2527},{"t":"goon","x":1969,"y":384},{"t":"goon","x":5474},{"t":"heavy","x":5937},{"t":"goon","x":3004},{"t":"heavy","x":3189},{"t":"goon","x":3137},{"t":"goon","x":3359},{"t":"goon","x":3273},{"t":"goon","x":4862},{"t":"goon","x":3158},{"t":"goon","x":98,"y":397},{"t":"blade","x":5619,"y":400}],
+  door:6540, rank:{"s":162,"a":213,"b":296} },
+
+{ name:"12 — THE COURTHOUSE STEPS", sign:"COURTHOUSE",
+  lore:"KJP's old courthouse. The locks are Agency issue — a SKELETON KEY opens what a crowbar won't.",
+  len:6800,
+  floors:[[-100,562],[652,1478],[1687,2536],[2802,3491],[3764,4578],[4818,5607],[5824,7100]],
+  ledges:[{"x":20,"y":381,"w":138},{"x":772,"y":384,"w":160},{"x":1807,"y":386,"w":112},{"x":2922,"y":397,"w":153},{"x":3196,"y":284,"w":147},{"x":3884,"y":380,"w":162},{"x":4938,"y":397,"w":145},{"x":5294,"y":284,"w":156},{"x":5944,"y":399,"w":146}],
+  crates:[{"x":380,"y":378},{"x":773,"y":378},{"x":977,"y":378},{"x":1811,"y":378},{"x":2048,"y":378},{"x":2864,"y":378},{"x":3103,"y":378},{"x":3327,"y":378},{"x":5524,"y":378},{"x":6103,"y":378},{"x":6268,"y":378},{"x":6494,"y":378},{"x":89,"y":323},{"x":3965,"y":322}],
+  bone:{"x":3269,"y":250},
+  lamps:[380,1164,2048,2864,3908,4941,5524,6268],
+  checkpoints:[2112,3147,4171,5213],
+  kegs:[{"x":977},{"x":2048},{"x":6268},{"x":1164},{"x":6494}],
+  vents:[773,1811,2864,4136,5350,6268],
+  puddles:[[977,90],[1811,74],[2485,70],[3327,76],[4319,72],[5350,67],[6103,88]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"shield","x":1391},{"t":"blade","x":2902},{"t":"heavy","x":928},{"t":"goon","x":801},{"t":"goon","x":1812},{"t":"shield","x":5355},{"t":"shield","x":1142},{"t":"blade","x":2352},{"t":"heavy","x":3891},{"t":"heavy","x":6198},{"t":"heavy","x":5010,"y":397},{"t":"shield","x":6267},{"t":"goon","x":1381},{"t":"goon","x":5987},{"t":"goon","x":2963},{"t":"heavy","x":422},{"t":"shield","x":6017,"y":399},{"t":"blade","x":1958},{"t":"heavy","x":3317},{"t":"shield","x":4352},{"t":"goon","x":4492},{"t":"goon","x":89,"y":381},{"t":"shield","x":1118},{"t":"blade","x":89,"y":381},{"t":"heavy","x":5976},{"t":"shield","x":6306},{"t":"goon","x":5222},{"t":"goon","x":852,"y":384},{"t":"goon","x":813},{"t":"shield","x":3965,"y":380},{"t":"heavy","x":2951}],
+  door:6740, rank:{"s":166,"a":218,"b":302} },
+
+{ name:"13 — THE BLACKOUT WING", sign:"BLACKOUT",
+  lore:"They cut the power to blind you. NIGHT OPTICS sees the hit coming anyway.",
+  len:6600,
+  dark:true,
+  floors:[[-100,687],[907,1633],[1867,2508],[2605,3275],[3440,4084],[4358,5193],[5408,6262],[6466,7000]],
+  ledges:[{"x":20,"y":398,"w":132},{"x":298,"y":300,"w":117},{"x":1027,"y":384,"w":134},{"x":1389,"y":264,"w":124},{"x":1987,"y":399,"w":150},{"x":2725,"y":382,"w":124},{"x":3027,"y":370,"w":115},{"x":3560,"y":395,"w":114},{"x":3880,"y":276,"w":163},{"x":4478,"y":400,"w":137},{"x":4878,"y":302,"w":134},{"x":5528,"y":396,"w":129},{"x":6586,"y":398,"w":133}],
+  crates:[{"x":551,"y":378},{"x":1043,"y":378},{"x":1213,"y":378},{"x":1427,"y":378},{"x":2044,"y":378},{"x":2400,"y":378},{"x":3607,"y":378},{"x":5142,"y":378},{"x":5561,"y":378},{"x":5972,"y":378},{"x":3961,"y":218},{"x":4945,"y":244}],
+  bone:{"x":1451,"y":230},
+  lamps:[380,1213,2206,2807,3832,4754,5561,6148],
+  checkpoints:[2188,2940,4776,5835],
+  kegs:[{"x":380},{"x":1213},{"x":4981},{"x":4754},{"x":3607}],
+  vents:[551,2044,2807,3986,5142,6148],
+  puddles:[[1043,75],[2044,79],[2651,89],[3607,78],[4543,66],[5142,75],[5972,69]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"heavy","x":3235},{"t":"blade","x":623},{"t":"blade","x":2787,"y":382},{"t":"blade","x":1451,"y":264},{"t":"marksman","x":4945,"y":302},{"t":"marksman","x":5882},{"t":"heavy","x":3525},{"t":"blade","x":4666},{"t":"goon","x":2970},{"t":"marksman","x":3961,"y":276},{"t":"heavy","x":3657},{"t":"marksman","x":86,"y":398},{"t":"heavy","x":4607},{"t":"goon","x":1500},{"t":"marksman","x":1226},{"t":"marksman","x":6652,"y":398},{"t":"blade","x":2787,"y":382},{"t":"marksman","x":3084,"y":370},{"t":"heavy","x":356,"y":300},{"t":"heavy","x":1016},{"t":"blade","x":962},{"t":"marksman","x":5909},{"t":"blade","x":2956},{"t":"heavy","x":986},{"t":"heavy","x":4403},{"t":"goon","x":627},{"t":"goon","x":5134},{"t":"marksman","x":1118},{"t":"marksman","x":6116},{"t":"blade","x":3961,"y":276}],
+  door:6540, rank:{"s":170,"a":223,"b":308} },
+
+{ name:"14 — K9 SUBLEVEL", sign:"K9 SUBLEVEL",
+  lore:"Kennel Row was practice. K9 TREATS buy you the half-second the dogs cost you.",
+  len:6400,
+  floors:[[-100,687],[850,1477],[1773,2580],[2800,3421],[3578,4326],[4587,5220],[5331,6097],[6216,6800]],
+  ledges:[{"x":20,"y":394,"w":147},{"x":970,"y":393,"w":147},{"x":1893,"y":381,"w":112},{"x":2920,"y":380,"w":137},{"x":3204,"y":284,"w":163},{"x":3698,"y":384,"w":154},{"x":4707,"y":390,"w":130},{"x":5451,"y":387,"w":157},{"x":5844,"y":258,"w":161},{"x":6336,"y":381,"w":115}],
+  crates:[{"x":1055,"y":378},{"x":1226,"y":378},{"x":1434,"y":378},{"x":2246,"y":378},{"x":5440,"y":378},{"x":5918,"y":378},{"x":1043,"y":335},{"x":2988,"y":322},{"x":5529,"y":329},{"x":5924,"y":200}],
+  bone:{"x":5924,"y":224},
+  lamps:[380,1226,2066,2942,3783,4795,5682],
+  checkpoints:[2177,3111,3952,5714],
+  kegs:[{"x":4795},{"x":4795},{"x":2484},{"x":5014}],
+  vents:[582,1825,2942,3951,5440],
+  puddles:[[1055,82],[1825,67],[2484,82],[3326,71],[4172,78],[5440,90]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"shield","x":5940},{"t":"hound","x":4681},{"t":"goon","x":5110},{"t":"shield","x":1043,"y":393},{"t":"hound","x":5020},{"t":"hound","x":4625},{"t":"hound","x":486},{"t":"hound","x":3193},{"t":"hound","x":6393,"y":381},{"t":"hound","x":5010},{"t":"hound","x":1192},{"t":"hound","x":2838},{"t":"hound","x":3963},{"t":"goon","x":2127},{"t":"goon","x":3285,"y":284},{"t":"hound","x":5924,"y":258},{"t":"goon","x":892},{"t":"shield","x":5851},{"t":"shield","x":5632},{"t":"hound","x":5074},{"t":"hound","x":2830},{"t":"shield","x":2438},{"t":"hound","x":1949,"y":381},{"t":"shield","x":1942},{"t":"hound","x":5530},{"t":"goon","x":2219},{"t":"shield","x":3015},{"t":"hound","x":3687},{"t":"hound","x":5850},{"t":"hound","x":575},{"t":"hound","x":5957},{"t":"hound","x":5066},{"t":"hound","x":892},{"t":"hound","x":3939}],
+  door:6340, rank:{"s":174,"a":228,"b":314} },
+
+{ name:"15 — THE WIRE ROOM", sign:"WIRE ROOM",
+  lore:"Every shot you fire paints you. A SUPPRESSOR keeps the marksmen guessing.",
+  len:6800,
+  floors:[[-100,576],[672,1527],[1758,2537],[2689,3388],[3591,4472],[4585,5337],[5455,6254],[6482,7129]],
+  ledges:[{"x":20,"y":387,"w":146},{"x":792,"y":393,"w":154},{"x":1215,"y":313,"w":149},{"x":1878,"y":382,"w":121},{"x":2809,"y":384,"w":123},{"x":3067,"y":380,"w":155},{"x":3711,"y":391,"w":111},{"x":4705,"y":394,"w":149},{"x":5575,"y":381,"w":163},{"x":6602,"y":389,"w":153}],
+  crates:[{"x":1429,"y":378},{"x":2249,"y":378},{"x":3675,"y":378},{"x":4020,"y":378},{"x":4684,"y":378},{"x":5142,"y":378},{"x":1289,"y":255},{"x":1938,"y":324}],
+  bone:{"x":1289,"y":279},
+  lamps:[380,1198,2050,2757,3675,4279,5142,5950],
+  checkpoints:[2148,3039,4961,5855],
+  kegs:[{"x":2757},{"x":4020},{"x":1198},{"x":1198},{"x":4020}],
+  vents:[807,1871,2757,3867,4921,5950],
+  puddles:[[1010,80],[1871,78],[2404,90],[3215,91],[4020,92],[4921,83],[5719,67],[6525,67]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"marksman","x":5618},{"t":"marksman","x":5656,"y":381},{"t":"goon","x":2073},{"t":"blade","x":5161},{"t":"marksman","x":5106},{"t":"blade","x":869,"y":393},{"t":"goon","x":3766,"y":391},{"t":"heavy","x":912},{"t":"goon","x":2259},{"t":"marksman","x":3954},{"t":"heavy","x":5781},{"t":"marksman","x":5121},{"t":"marksman","x":2870,"y":384},{"t":"marksman","x":5759},{"t":"goon","x":4228},{"t":"heavy","x":2870,"y":384},{"t":"goon","x":5604},{"t":"blade","x":1938,"y":382},{"t":"goon","x":5656,"y":381},{"t":"marksman","x":6678,"y":389},{"t":"blade","x":4160},{"t":"goon","x":5187},{"t":"marksman","x":6022},{"t":"heavy","x":733},{"t":"goon","x":3326},{"t":"marksman","x":4889},{"t":"heavy","x":5656,"y":381},{"t":"marksman","x":826},{"t":"marksman","x":2422}],
+  door:6740, rank:{"s":178,"a":233,"b":320} },
+
+{ name:"16 — DEAD DROP", sign:"DEAD DROP",
+  lore:"Rooftop to rooftop, and the gap does not care how brave you are. TACTICAL BOOTS help.",
+  len:6600,
+  floors:[[-100,727],[850,1685],[1779,2515],[2780,3524],[3618,4410],[4664,5288],[5450,6189],[6345,7000]],
+  ledges:[{"x":20,"y":385,"w":138},{"x":328,"y":266,"w":135},{"x":970,"y":385,"w":163},{"x":1301,"y":329,"w":149},{"x":1899,"y":396,"w":114},{"x":2223,"y":392,"w":112},{"x":2900,"y":397,"w":152},{"x":3228,"y":326,"w":165},{"x":3738,"y":399,"w":141},{"x":4116,"y":363,"w":121},{"x":4784,"y":395,"w":140},{"x":5056,"y":347,"w":114},{"x":5570,"y":394,"w":112},{"x":5902,"y":299,"w":156},{"x":6465,"y":396,"w":144}],
+  crates:[{"x":1138,"y":378},{"x":1330,"y":378},{"x":1856,"y":378},{"x":2108,"y":378},{"x":3315,"y":378},{"x":3483,"y":378},{"x":3900,"y":378},{"x":6032,"y":378},{"x":2279,"y":334},{"x":3310,"y":268},{"x":4854,"y":337},{"x":5113,"y":289},{"x":5980,"y":241}],
+  bone:{"x":395,"y":232},
+  lamps:[380,1138,1856,2950,3483,4809,5856],
+  checkpoints:[2147,3152,4014,5820],
+  kegs:[{"x":1330},{"x":613},{"x":965},{"x":5856},{"x":5026},{"x":3124},{"x":2320}],
+  vents:[613,1481,2950,3900,5657],
+  puddles:[[965,92],[1481,91],[2320,75],[3315,85],[4146,78],[5657,82]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"goon","x":1550},{"t":"goon","x":533},{"t":"goon","x":5967},{"t":"goon","x":4057},{"t":"heavy","x":1124},{"t":"heavy","x":4874},{"t":"bomber","x":1327},{"t":"heavy","x":4833},{"t":"bomber","x":4176,"y":363},{"t":"goon","x":1230},{"t":"goon","x":1147},{"t":"heavy","x":5491},{"t":"heavy","x":1489},{"t":"heavy","x":1823},{"t":"goon","x":1972},{"t":"goon","x":3438},{"t":"bomber","x":5197},{"t":"heavy","x":3837},{"t":"goon","x":4101},{"t":"heavy","x":5056},{"t":"heavy","x":3261},{"t":"heavy","x":5626,"y":394},{"t":"goon","x":3088},{"t":"blade","x":5113,"y":347},{"t":"bomber","x":5113,"y":347},{"t":"goon","x":5707},{"t":"goon","x":1375,"y":329},{"t":"goon","x":595}],
+  door:6540, rank:{"s":182,"a":238,"b":326} },
+
+{ name:"17 — THE VAULT ROW", sign:"VAULT ROW",
+  lore:"Deposit boxes full of other people's leverage. The GOLD BRIEFCASE pays for the trouble.",
+  len:6800,
+  floors:[[-100,675],[869,1645],[1772,2618],[2767,3610],[3782,4574],[4777,5639],[5895,7100]],
+  ledges:[{"x":20,"y":384,"w":126},{"x":989,"y":393,"w":132},{"x":1277,"y":300,"w":152},{"x":1892,"y":397,"w":116},{"x":2887,"y":390,"w":110},{"x":3154,"y":378,"w":164},{"x":3902,"y":396,"w":127},{"x":4897,"y":380,"w":128},{"x":6015,"y":382,"w":144}],
+  crates:[{"x":380,"y":378},{"x":532,"y":378},{"x":4901,"y":378},{"x":6432,"y":378},{"x":83,"y":326},{"x":1055,"y":335},{"x":3236,"y":320},{"x":3965,"y":338},{"x":4961,"y":322},{"x":6087,"y":324}],
+  bone:{"x":1353,"y":266},
+  lamps:[380,1346,2149,3040,3862,4495,5349,6282],
+  checkpoints:[2195,3189,4178,5208],
+  kegs:[{"x":5124},{"x":3280},{"x":1090},{"x":4081},{"x":4495},{"x":4495}],
+  vents:[532,1919,3040,4081,5124,6282],
+  puddles:[[1090,78],[1919,68],[2465,64],[3489,91],[4324,72],[5124,75],[6109,85]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"goon","x":1609},{"t":"goon","x":5604},{"t":"bomber","x":3965,"y":396},{"t":"goon","x":3464},{"t":"shield","x":1820},{"t":"goon","x":1055,"y":393},{"t":"bomber","x":3965,"y":396},{"t":"heavy","x":3357},{"t":"goon","x":4533},{"t":"blade","x":4056},{"t":"heavy","x":2430},{"t":"shield","x":3373},{"t":"goon","x":3863},{"t":"bomber","x":5065},{"t":"goon","x":5608},{"t":"shield","x":6430},{"t":"heavy","x":1547},{"t":"heavy","x":2214},{"t":"shield","x":1055,"y":393},{"t":"heavy","x":2511},{"t":"bomber","x":2545},{"t":"blade","x":6168},{"t":"heavy","x":2942,"y":390},{"t":"heavy","x":533},{"t":"heavy","x":2950},{"t":"blade","x":1861},{"t":"heavy","x":3950},{"t":"heavy","x":1376},{"t":"bomber","x":1506},{"t":"shield","x":6176},{"t":"shield","x":4512}],
+  door:6740, rank:{"s":186,"a":243,"b":332} },
+
+{ name:"18 — THE ANALYST FLOOR", sign:"ANALYSTS",
+  lore:"The people who wrote the file. They are not soldiers — their guards are.",
+  len:6600,
+  floors:[[-100,602],[780,1629],[1893,2554],[2695,3353],[3544,4168],[4422,5078],[5373,6239],[6412,7000]],
+  ledges:[{"x":20,"y":400,"w":160},{"x":900,"y":389,"w":139},{"x":2013,"y":387,"w":118},{"x":2815,"y":392,"w":131},{"x":3664,"y":386,"w":134},{"x":4542,"y":389,"w":129},{"x":5493,"y":396,"w":151},{"x":5850,"y":285,"w":125},{"x":6532,"y":388,"w":155}],
+  crates:[{"x":380,"y":378},{"x":855,"y":378},{"x":1079,"y":378},{"x":1458,"y":378},{"x":3739,"y":378},{"x":5808,"y":378},{"x":5994,"y":378},{"x":3731,"y":328},{"x":6609,"y":330}],
+  bone:{"x":5912,"y":251},
+  lamps:[380,1291,2262,3073,3907,4827,5605,6153],
+  checkpoints:[2224,3024,4750,5806],
+  kegs:[{"x":5808},{"x":5026},{"x":3312},{"x":3739},{"x":1079}],
+  vents:[855,2057,3073,4126,5427,6153],
+  puddles:[[1079,89],[2057,92],[2913,78],[3739,81],[4601,69],[5427,74],[5994,75]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"heavy","x":2394},{"t":"heavy","x":5444},{"t":"blade","x":1551},{"t":"marksman","x":3712},{"t":"heavy","x":2880,"y":392},{"t":"shield","x":4048},{"t":"shield","x":5869},{"t":"heavy","x":2135},{"t":"marksman","x":3731,"y":386},{"t":"goon","x":2174},{"t":"heavy","x":2128},{"t":"heavy","x":100,"y":400},{"t":"marksman","x":4645},{"t":"marksman","x":4606,"y":389},{"t":"shield","x":5696},{"t":"heavy","x":4802},{"t":"shield","x":2417},{"t":"blade","x":1050},{"t":"heavy","x":4658},{"t":"marksman","x":2359},{"t":"shield","x":5912,"y":285},{"t":"shield","x":5688},{"t":"goon","x":4492},{"t":"blade","x":563},{"t":"shield","x":4539},{"t":"goon","x":2189},{"t":"marksman","x":100,"y":400},{"t":"heavy","x":2735},{"t":"heavy","x":2176},{"t":"heavy","x":1588},{"t":"shield","x":5568,"y":396},{"t":"marksman","x":4606,"y":389}],
+  door:6540, rank:{"s":190,"a":248,"b":338} },
+
+{ name:"19 — THE BLACK FILE", sign:"BLACK FILE",
+  lore:"ZERO is waiting in the stacks. He read the file. He knows how it ends.",
+  len:6400,
+  floors:[[-100,590],[765,1520],[1713,2592],[2765,3429],[3698,4329],[4466,5280],[5417,6700]],
+  ledges:[{"x":20,"y":387,"w":141},{"x":360,"y":358,"w":155},{"x":885,"y":393,"w":143},{"x":1181,"y":336,"w":157},{"x":1833,"y":382,"w":151},{"x":2212,"y":307,"w":123},{"x":2885,"y":394,"w":126},{"x":3818,"y":399,"w":134},{"x":4586,"y":396,"w":165},{"x":5537,"y":383,"w":142}],
+  crates:[{"x":380,"y":378},{"x":921,"y":378},{"x":1394,"y":378},{"x":1756,"y":378},{"x":1967,"y":378},{"x":2528,"y":378},{"x":3101,"y":378},{"x":3894,"y":378},{"x":4955,"y":378},{"x":5879,"y":378},{"x":956,"y":335},{"x":1259,"y":278},{"x":2273,"y":249},{"x":2948,"y":336},{"x":3885,"y":341},{"x":4668,"y":338}],
+  bone:{"x":2273,"y":273},
+  lamps:[380,1077,1756,2318,3101,3894,4955,5879],
+  checkpoints:[2153,3097,4014,6059],
+  kegs:[{"x":380},{"x":532},{"x":4731},{"x":2318},{"x":2528}],
+  vents:[532,1394,2318,3326,4731,5879],
+  puddles:[[921,88],[1394,73],[2168,80],[2907,83],[3736,87],[4731,69],[5672,88]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"blade","x":4618},{"t":"blade","x":1880},{"t":"blade","x":3334},{"t":"marksman","x":1156},{"t":"blade","x":2948,"y":394},{"t":"shield","x":2297},{"t":"heavy","x":2273,"y":307},{"t":"marksman","x":5893},{"t":"hound","x":1746},{"t":"shield","x":984},{"t":"marksman","x":5464},{"t":"heavy","x":2170},{"t":"hound","x":877},{"t":"heavy","x":4949},{"t":"blade","x":2032},{"t":"shield","x":3885,"y":399},{"t":"hound","x":2362},{"t":"heavy","x":1974},{"t":"shield","x":5017},{"t":"shield","x":5608,"y":383},{"t":"heavy","x":5608,"y":383},{"t":"blade","x":90,"y":387},{"t":"marksman","x":90,"y":387},{"t":"blade","x":4561},{"t":"shield","x":6065},{"t":"shield","x":494},{"t":"heavy","x":4726},{"t":"shield","x":4702},{"t":"marksman","x":3885,"y":399},{"t":"hound","x":1876},{"t":"zero","x":5760}],
+  door:6340, rank:{"s":194,"a":253,"b":344} },
+
+{ name:"20 — LANGLEY ROOF", sign:"LANGLEY",
+  lore:"Rotor wash and the last page. Burn it and go home.",
+  len:6600,
+  floors:[[-100,542],[736,1584],[1795,2575],[2692,3578],[3709,4446],[4683,5380],[5550,6349],[6529,7000]],
+  ledges:[{"x":20,"y":394,"w":165},{"x":856,"y":387,"w":163},{"x":1156,"y":318,"w":149},{"x":1915,"y":397,"w":161},{"x":2237,"y":370,"w":138},{"x":2812,"y":388,"w":163},{"x":3829,"y":394,"w":151},{"x":4803,"y":394,"w":155},{"x":5670,"y":389,"w":126}],
+  crates:[{"x":380,"y":378},{"x":1992,"y":378},{"x":2806,"y":378},{"x":3237,"y":378},{"x":5591,"y":378},{"x":5819,"y":378},{"x":6053,"y":378},{"x":1230,"y":260},{"x":3904,"y":336},{"x":4880,"y":336},{"x":5733,"y":331}],
+  bone:{"x":1230,"y":284},
+  lamps:[380,1284,2191,2990,3933,4730,5591,6252],
+  checkpoints:[2185,3135,4078,5950],
+  kegs:[{"x":4957},{"x":5591},{"x":1080},{"x":2990},{"x":5176},{"x":3237}],
+  vents:[836,1992,2990,4126,5176,6252],
+  puddles:[[1080,67],[1992,77],[2806,79],[3495,85],[4283,75],[5176,76],[6053,80]],
+  bar:{"x":210,"w":350},
+  enemies:[{"t":"marksman","x":4880,"y":394},{"t":"bomber","x":4880,"y":394},{"t":"marksman","x":3275},{"t":"heavy","x":3904,"y":394},{"t":"blade","x":2825},{"t":"shield","x":6187},{"t":"shield","x":3904,"y":394},{"t":"bomber","x":1995,"y":397},{"t":"marksman","x":2185},{"t":"marksman","x":1230,"y":318},{"t":"bomber","x":1383},{"t":"shield","x":2783},{"t":"marksman","x":1230,"y":318},{"t":"bomber","x":4297},{"t":"heavy","x":6053},{"t":"shield","x":3152},{"t":"marksman","x":1230,"y":318},{"t":"heavy","x":4396},{"t":"blade","x":2028},{"t":"bomber","x":5137},{"t":"heavy","x":856},{"t":"marksman","x":4401},{"t":"shield","x":2306,"y":370},{"t":"bomber","x":3376},{"t":"shield","x":2073},{"t":"heavy","x":3904,"y":394},{"t":"shield","x":5918},{"t":"blade","x":1109},{"t":"shield","x":4849},{"t":"bomber","x":5784},{"t":"butcher","x":5940}],
+  door:6540, rank:{"s":198,"a":258,"b":350} }
 ];
 
 /* ---------- game state ---------- */
@@ -2514,7 +2701,7 @@ const GAUNTLET_LV={ name:"THE GAUNTLET", sign:"THE GAUNTLET", lore:"50 waves. No
   ledges:[{x:360,y:372,w:220},{x:1820,y:372,w:220},{x:1010,y:300,w:280}],
   crates:[], kegs:[], lamps:[200,700,1200,1700,2200], checkpoints:[], enemies:[],
   puddles:[[400,80],[1200,90],[2000,80]], vents:[], rank:{s:1,a:2,b:3} };
-const holderHearts=()=>3+((ownedGunTypes.length&&!watchMode)?1:0);   // the 4th ♥ is a CONNECTED-holder perk — watch mode shows guns only
+const holderHearts=()=>3+((ownedGunTypes.length&&!watchMode)?1:0)+(hasGear(2)?1:0);   // 4th ♥ = CONNECTED holder; 5th = KEVLAR WEAVE gear
 function newPlayer(x){
   return {x, y:GY, vx:0, vy:0, w:11, grounded:true, face:1, hp:holderHearts(), maxhp:holderHearts(),
     ifr:0, cool:0, muzzle:0, coyote:0, jbuf:0, dropT:0, dead:false, jumpHeld:false};
@@ -2895,7 +3082,7 @@ function killEnemy(e,dx){
   const BON={heavy:150,shield:120,marksman:90,bomber:60,hound:40,zero:900,butcher:2600};
   if(e.noReward){ /* suicide detonation: no score, no combo */ }
   else if(e.summoned){ combo++; comboT=2.2; lvScore+=25; }   // boss adds are chaff — no farming the signed board
-  else { combo++; comboT=2.2; lvScore+=(100+combo*15+(BON[e.t]||0)); }
+  else { combo++; comboT=2.2; lvScore+=Math.round((100+combo*15+(BON[e.t]||0))*(hasGear(8)?1.1:1)); }   // GOLD BRIEFCASE
   if(e.t==="bomber"&&!e.boomed){ e.boomed=true; fuses.push({x:e.x,y:e.y-14,t:0.12}); }
   const boss=e.t==="zero"||e.t==="butcher";
   if(boss){ shake=Math.max(shake,0.8); hitstop=Math.max(hitstop,0.18); flash=Math.max(flash,0.32); flashRGB="255,220,120";
@@ -2946,7 +3133,7 @@ function poundShock(x){ // butcher ground-slam — jump to avoid
 function spawnGoon(x){ enemies.push({t:"goon",x:clamp(x,60,lvl.len-60),y:GY,hp:28,maxhp:28,face:-1,dead:false,cd:rand(0.6,1.2),tel:0,muzzle:0,walk:0,px:x,dir:-1,patrol:70,fuse:0,block:0,phase:1,summoned:1}); }
 function hurtPlayer(knock){
   if(P.dead||P.ifr>0||state!=="play")return;
-  P.hp--; P.ifr=1.2; combo=0; buzz(P.hp<=0?[90,50,160]:70);
+  P.hp--; P.ifr=hasGear(5)?1.68:1.2; combo=0; buzz(P.hp<=0?[90,50,160]:70);   // NIGHT OPTICS: you see it coming
   P.vx=(knock||-P.face)*260; P.vy=-240; P.grounded=false;
   shake=Math.max(shake,0.45); SFX.hurt();
   for(let i=0;i<8;i++)parts.push({x:P.x,y:P.y-18,vx:rand(-160,160),vy:rand(-220,30),t:rand(0.3,0.5),c:pick(["#6aa84f","#e8e8ea"]),r:rand(1.5,3),g:1});
@@ -2962,8 +3149,9 @@ function pitFall(){
   P.x=checkpointX; P.y=GY-40; P.vx=0; P.vy=0; P.ifr=1.4;
 }
 function popCoins(x,y,n){ // cases pay out score straight up
-  lvScore+=240;
-  floats.push({x,y:y-14,txt:"CASE +240",t:0.8,size:12,c:"#ffd75e"});
+  const cash=hasGear(7)?336:240;                       // SKELETON KEY cracks them properly
+  lvScore+=cash;
+  floats.push({x,y:y-14,txt:"CASE +"+cash,t:0.8,size:12,c:"#ffd75e"});
   for(let i=0;i<8;i++)parts.push({x,y,vx:rand(-160,160),vy:rand(-260,-80),t:rand(0.3,0.55),c:"#ffd75e",r:rand(1.5,2.6),g:1});
   if(Math.random()<0.55)hearts.push({x,y:y-6,vx:rand(-60,60),vy:-280});
 }
@@ -3006,7 +3194,7 @@ function update(dt){
   if(keys.has("KeyA")||keys.has("ArrowLeft"))mx-=1;
   if(keys.has("KeyD")||keys.has("ArrowRight"))mx+=1;
   if(MOBILE&&tiltOn){ const ts=tiltMove(); if(ts)mx=clamp(mx+ts,-1,1); }
-  if(mx!==0){ P.vx=clamp(P.vx+mx*2800*dt,-330,330); P.face=mx; }
+  if(mx!==0){ const top=330*(hasGear(3)?1.08:1); P.vx=clamp(P.vx+mx*2800*dt,-top,top); P.face=mx; }   // TACTICAL BOOTS
   else { const s2=Math.sign(P.vx); P.vx-=s2*Math.min(Math.abs(P.vx),2200*dt); }
   // jumping: buffer + coyote + variable height (generous windows so edge presses always register)
   if(P.jbuf>0&&(P.grounded||P.coyote>0)){
@@ -3176,7 +3364,7 @@ function update(dt){
       } else if(adx>640){ e.x+=e.dir*74*dt; if(Math.abs(e.x-e.px)>(e.patrol||90))e.dir*=-1; e.face=e.dir; }
       else { e.face=Math.sign(dx)||1;
         if(adx<40&&Math.abs(P.y-e.y)<44&&e.swCd<=0){ e.lunge=0.16; SFX.tel(); }
-        else if(Math.abs(P.y-e.y)<74){ e.x+=e.face*310*dt; } }
+        else if(Math.abs(P.y-e.y)<74){ e.x+=e.face*(hasGear(6)?232:310)*dt; } }   // K9 TREATS slow the rush
     } else if(e.t==="zero"){ // rival assassin duel — telegraphed katana slash
       e.walk+=dt*10; e.swCd=Math.max(0,(e.swCd||0)-dt); e.moving=false;
       if(e.slash>0){ e.slash-=dt;
@@ -3761,7 +3949,7 @@ function drawLaunch(t){
   const left=LAUNCH_TS-Date.now();
   g.font="900 50px Verdana"; g.fillStyle="#fff";
   g.shadowColor="#7cf9a5"; g.shadowBlur=18; g.fillText(fmtDur(left),W/2,242); g.shadowBlur=0;
-  const cards=[["10 CONTRACTS","the full campaign","#cfd6e0"],["ARSENAL MINT","1,000,000 PLS / case","#ffd75e"],["PRIZE BOARD","top 3 win 50/35/15 USDC","#7cf9a5"]];
+  const cards=[["20 CONTRACTS","the full campaign","#cfd6e0"],["ARSENAL MINT","1,000,000 PLS / case","#ffd75e"],["PRIZE BOARD","top 3 win 50/35/15 USDC","#7cf9a5"]];
   for(let i=0;i<3;i++){ const cx=W/2+(i-1)*252, cy=322;
     g.fillStyle="rgba(20,26,42,0.62)"; rr(cx-118,cy-30,236,60,10); g.fill();
     g.globalAlpha=0.5; g.strokeStyle=cards[i][2]; g.lineWidth=1.4; rr(cx-118,cy-30,236,60,10); g.stroke(); g.globalAlpha=1;
@@ -5237,7 +5425,8 @@ window.PW=!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?undefined:{
   key(k,down){ if(down)keys.add(k); else keys.delete(k); },
   jump(){ if(P){P.jbuf=0.16;P.jumpHeld=true;setTimeout(()=>{if(P)P.jumpHeld=false;},260);} },
   fire(){ fireGun(); }, hold(v){ firing=!!v; },
-  setLoadout(types,tp,mods,carryList){ ownedGunTypes=types||[]; ownedModTypes=mods||[];
+  setLoadout(types,tp,mods,carryList,gear){ ownedGunTypes=types||[]; ownedModTypes=mods||[];
+    ownedGearTypes=gear||[];
     carry=Array.isArray(carryList)?carryList.slice(0,CARRY_MAX):[]; bumpMods();
     loadoutType=tp!=null?tp:(types&&types[0]);
     if(!carrySet().includes(loadoutType))loadoutType=carrySet()[0];
