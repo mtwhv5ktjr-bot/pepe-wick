@@ -18,6 +18,8 @@ window.WICK_CFG = {
   marketOld: "0x1457C17A7132fCbCb2034337368050563DeD91e3",
   mods:       "0x004E6610ff47c6A6510DA446257822B37D26CD73",   // WICK MODS free mint — paste after LAUNCH-MODS.cmd
   modsMarket: "0xDDb963D1bb874d4ac5697550F513568c657E977E",   // mods marketplace — 50% royalty, 100% burned as $WICK
+  gear:       "0x0000000000000000000000000000000000000000",   // KJPGear — paste after tools/deploy-gear.mjs
+  gearMarket: "0x0000000000000000000000000000000000000000",   // KJPGearMarket — 15% royalty, burned 50/50 KJP+WICK
   // LIVE on PulseChain. A non-zero address here is also what UNHIDES the
   // ADVERTISE tab (bbConfigured()) — set only after the production E2E passed.
   billboards: "0x84587C185CAcE68CC559e86936F61812609548DF",
@@ -50,4 +52,17 @@ window.WICK_GUNS = {
   14: { name: "Tabula Rasa",       cls: "1/1 Platinum", rarity: "Platinum Holo", supply: 1, color: "#c8ffe0", holo: true, blurb: "A clean slate, one line at a time.", perk: "Holo Marksman: pierces 2, 41 dmg" },
   15: { name: "Baba Yaga",         cls: "1/1 Platinum", rarity: "Platinum Holo", supply: 1, color: "#ffe9a8", holo: true, blurb: "The one you send to kill the Boogeyman.", perk: "Holo Excommunicado: 18 dmg full-auto" },
   16: { name: "Tangential Reaper", cls: "1/1 Ultra Platinum", rarity: "Ultra Platinum Holo", supply: 1, color: "#7cf9a5", holo: true, blurb: "Forged for tangent.pls. A green AR-15 that answers every question three ways. No 000/100 — never mintable.", perk: "Tri-arc: 3 rounds, every direction" },
+};
+
+/* KJP GEAR — the 100-piece cross-game FIELD ISSUE. Works in KJP and PEPE WICK.
+   Mint burns 50% KJP + 50% WICK; resale royalty is 15%, burned the same way. */
+window.WICK_GEAR = {
+  1:{name:"SUPPRESSOR",    rarity:"Common",    pool:22, color:"#7cf9a5", fx:"silences every lethal gun you carry"},
+  2:{name:"KEVLAR WEAVE",  rarity:"Common",    pool:20, color:"#7cf9a5", fx:"+1 heart, and the first hit of each op is absorbed"},
+  3:{name:"TACTICAL BOOTS",rarity:"Uncommon",  pool:16, color:"#8fc7ff", fx:"+8% movement, running 25% quieter"},
+  4:{name:"EXTENDED MAGS", rarity:"Uncommon",  pool:14, color:"#8fc7ff", fx:"+33% magazine on every firearm"},
+  5:{name:"NIGHT OPTICS",  rarity:"Rare",      pool:12, color:"#c792ff", fx:"TAC-MAP never jams, even in COMBAT"},
+  6:{name:"K9 TREATS",     rarity:"Rare",      pool:8,  color:"#c792ff", fx:"guard dogs take twice as long to place your scent"},
+  7:{name:"SKELETON KEY",  rarity:"Epic",      pool:5,  color:"#ff9d5b", fx:"opens ANY locked door — no keycard needed"},
+  8:{name:"GOLD BRIEFCASE",rarity:"Legendary", pool:3,  color:"#ffd27c", fx:"x1.25 score, and every exhibit pays double"}
 };

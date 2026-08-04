@@ -460,6 +460,21 @@ tbody tr:hover{background:#111823}
     <h2 id="modsHdr" style="display:none;margin-top:26px">Your Mods</h2>
     <div id="modsHint" class="muted" style="display:none"></div>
     <div id="modsGrid" class="grid"></div>
+    <h2 id="gearHdr" style="display:none;margin-top:26px">Your KJP Gear</h2>
+    <div id="gearHint" class="muted" style="display:none"></div>
+    <div id="gearGrid" class="grid"></div>
+    <h2 id="gearMktHdr" style="display:none;margin-top:34px">KJP Gear Market</h2>
+    <div id="gearMktHint" class="muted" style="display:none"></div>
+    <div id="gearMktBar" style="display:none;margin:10px 0 14px" class="row">
+      <select id="gearOfferType">
+        <option value="0">any type — bid on a specific piece below</option>
+      </select>
+      <input type="text" id="gearOfferAmt" placeholder="offer in PLS">
+      <button id="gearOfferBtn">MAKE OFFER</button>
+    </div>
+    <div id="gearMktGrid" class="grid"></div>
+    <h3 id="gearOffersHdr" style="display:none;margin-top:22px">Open Offers</h3>
+    <div id="gearOffersGrid" class="grid"></div>
   </section>
 
   <section id="tBoard" class="tab">
@@ -558,6 +573,28 @@ const BB_ABI=[
 ];
 const bbConfigured=()=>cfg.billboards&&!/^0x0{40}$/i.test(cfg.billboards);
 let bbRO=null, bbC=null;
+const GEAR_ABI=[
+  "function balanceOf(address) view returns (uint256)",
+  "function ownerOf(uint256) view returns (address)",
+  "function totalSupply() view returns (uint256)",
+  "function gearOfOwner(address) view returns (uint256[] ids, uint8[] types)",
+  "function setApprovalForAll(address,bool)",
+  "function isApprovedForAll(address,address) view returns (bool)",
+  "function transferFrom(address,address,uint256)"
+];
+const GEAR_MARKET_ABI=[
+  "function listings(uint256) view returns (address seller, uint256 price)",
+  "function list(uint256,uint256)",
+  "function delist(uint256)",
+  "function buy(uint256) payable",
+  "function makeOffer(uint256,uint8) payable returns (uint256)",
+  "function cancelOffer(uint256)",
+  "function acceptOffer(uint256,uint256)",
+  "function ROYALTY_BPS() view returns (uint256)"
+];
+const gearConfigured   = ()=>cfg.gear       && !/^0x0{40}$/.test(cfg.gear);
+const gearMktConfigured= ()=>cfg.gearMarket && !/^0x0{40}$/.test(cfg.gearMarket);
+let gearRO=null, gearMktRO=null, gearC=null, gearMktC=null;
 const MODS_MARKET_ABI=[
   "function list(uint256 id, uint256 price)",
   "function cancel(uint256 id)",
@@ -583,6 +620,8 @@ function readOnly(){
     gunsRO=new ethers.Contract(cfg.guns,GUNS_ABI,p); marketRO=new ethers.Contract(cfg.market,MARKET_ABI,p);
     if(modsConfigured())modsRO=new ethers.Contract(cfg.mods,MODS_ABI,p);
     if(modsMktConfigured())modsMktRO=new ethers.Contract(cfg.modsMarket,MODS_MARKET_ABI,p);
+    if(gearConfigured())gearRO=new ethers.Contract(cfg.gear,GEAR_ABI,p);
+    if(gearMktConfigured())gearMktRO=new ethers.Contract(cfg.gearMarket,GEAR_MARKET_ABI,p);
     if(bbConfigured())bbRO=new ethers.Contract(cfg.billboards,BB_ABI,p);
   }
   return { gunsRO, marketRO, modsRO, modsMktRO };
@@ -639,6 +678,8 @@ async function connect(){
     market = new ethers.Contract(cfg.market, MARKET_ABI, signer);
     if(modsConfigured())modsC = new ethers.Contract(cfg.mods, MODS_ABI, signer);
     if(modsMktConfigured())modsMktC = new ethers.Contract(cfg.modsMarket, MODS_MARKET_ABI, signer);
+    if(gearConfigured())gearC = new ethers.Contract(cfg.gear, GEAR_ABI, signer);
+    if(gearMktConfigured())gearMktC = new ethers.Contract(cfg.gearMarket, GEAR_MARKET_ABI, signer);
     if(bbConfigured())bbC = new ethers.Contract(cfg.billboards, BB_ABI, signer);
     $("#connect").textContent = account.slice(0,6)+"…"+account.slice(-4);
     const net = await provider.getNetwork();
@@ -850,7 +891,7 @@ async function loadArsenal(){
   box.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=()=>cancelGun(+b.dataset.cancel));
   box.querySelectorAll("[data-send]").forEach(b=>b.onclick=()=>sendGun(+b.dataset.send));
   showApprovalState();
-  loadMyMods();
+  loadMyMods(); loadMyGear(); loadGearMarket();
 }
 
 // the mods half of YOUR ARSENAL — separate so a mods hiccup never blanks the guns
@@ -963,6 +1004,195 @@ function renderModMarket(){
   }).join("");
   box.querySelectorAll("[data-modbuy]").forEach(b=>b.onclick=()=>buyMod(+b.dataset.modbuy,BigInt(b.dataset.price)));
   box.querySelectorAll("[data-modcancel2]").forEach(b=>b.onclick=()=>cancelMod(+b.dataset.modcancel2));
+}
+
+
+/* ---------------- KJP GEAR: the 100-piece cross-game FIELD ISSUE ----------------
+   Mirrors the mods half, including the rule that a gear hiccup must never blank
+   the guns. Every piece works in BOTH games — it rides the operative, not the
+   gun, so there are no slots to manage. */
+let gearTypeCache={};
+async function loadMyGear(){
+  const grid=$("#gearGrid"), hdr=$("#gearHdr"), hint=$("#gearHint");
+  if(!grid)return;
+  const hide=()=>{ grid.innerHTML=""; hdr.style.display="none"; hint.style.display="none"; };
+  if(!gearConfigured()||!account){ hide(); return; }
+  try{
+    const [ids,types]=await gearRO.gearOfOwner(account);
+    if(!ids.length){ hide(); return; }
+    hdr.style.display="block"; hint.style.display="block";
+    hint.textContent="Live in KJP and PEPE WICK automatically — no slots, no limit. Resale burns 15%: half KJP, half WICK.";
+    const lst = gearMktRO ? await Promise.all([...ids].map(id=>gearMktRO.listings(Number(id)).catch(()=>[ZERO,0n]))) : [...ids].map(()=>[ZERO,0n]);
+    grid.innerHTML=[...ids].map((id,i)=>{
+      const t=Number(types[i]); id=Number(id); gearTypeCache[id]=t;
+      const seller=lst[i][0], price=lst[i][1];
+      const listed = seller!==ZERO && price>0n;
+      const sell = !gearMktRO ? "" : (listed
+        ? '<div class="row"><span class="muted">Listed: '+fmt(price)+' PLS</span><button data-gearcancel="'+id+'">CANCEL</button></div>'
+        : '<div class="row"><input type="text" id="gp'+id+'" placeholder="price in PLS"><button data-gearlist="'+id+'">SELL</button></div>');
+      return gearCardHTML(t,id,sell);
+    }).join("");
+    grid.querySelectorAll("[data-gearlist]").forEach(b=>b.onclick=()=>listGear(+b.dataset.gearlist));
+    grid.querySelectorAll("[data-gearcancel]").forEach(b=>b.onclick=()=>cancelGear(+b.dataset.gearcancel));
+  }catch(e){ hide(); }
+}
+function gearCardHTML(type,id,actions){
+  const g=(window.WICK_GEAR||{})[type]||{name:"GEAR #"+id,rarity:"?",color:"#8a93a5",fx:"unknown",pool:0};
+  return '<div class="card" style="border-color:'+g.color+'">'
+    + '<div style="padding:12px;text-align:center">'
+    + '<div style="font-size:11px;letter-spacing:2px;color:'+g.color+'">KJP GEAR &middot; '+g.rarity.toUpperCase()+'</div>'
+    + '<div style="font-family:Impact,Arial,sans-serif;font-size:21px;color:#fff;margin:8px 0 2px">'+g.name+'</div>'
+    + '<div class="muted" style="font-size:12px;margin-bottom:8px">'+g.fx+'</div>'
+    + '<div class="muted" style="font-size:11px">#'+id+' / 100 &middot; '+g.pool+' of this type &middot; works in <b>both games</b></div>'
+    + '</div><div style="padding:0 12px 12px">'+(actions||"")+'</div></div>';
+}
+async function ensureGearMktApproval(){
+  if(await gearC.isApprovedForAll(account, cfg.gearMarket)) return;
+  toast("Approving the market to move your gear…");
+  await (await gearC.setApprovalForAll(cfg.gearMarket, true)).wait();
+}
+async function listGear(id){
+  try{
+    const el=document.getElementById("gp"+id);
+    const raw=el?el.value:"";
+    let priceWei; try{ priceWei=ethers.parseEther(String(raw).trim()); }catch(e){ return toast("Enter a price in PLS."); }
+    if(priceWei<=0n) return toast("Enter a price in PLS.");
+    const g=(window.WICK_GEAR||{})[gearTypeCache[id]]||{name:"Gear #"+id};
+    const roy=priceWei*15n/100n;
+    if(!confirm("List "+g.name+" (gear #"+id+") for "+fmt(priceWei)+" PLS?\n\n"
+      +"RESALE DEAL: a 15% royalty is burned automatically — half buys & burns KJP, half buys & burns WICK.\n"
+      +"You receive "+fmt(priceWei-roy)+" PLS when it sells.")) return;
+    await ensureGearMktApproval();
+    await (await gearMktC.list(id, priceWei)).wait();
+    toast("Listed."); await loadMyGear(); await loadGearMarket(true);
+  }catch(e){ toast("List failed: "+(e.shortMessage||e.message||e)); }
+}
+async function cancelGear(id){
+  try{ await (await gearMktC.delist(id)).wait(); toast("Listing cancelled."); await loadMyGear(); await loadGearMarket(true); }
+  catch(e){ toast("Cancel failed: "+(e.shortMessage||e.message||e)); }
+}
+
+
+/* ---------------- KJP GEAR MARKET — the public storefront ----------------
+   Everything anyone has listed, everything anyone has bid, and the buttons to
+   act on both. Reads come from listingsIn()/openOffers() so the page never has
+   to index events. Every price shown includes the line that matters: 15% of it
+   is burned, half KJP half WICK. */
+let gearMktRows=[], gearOfferRows=[];
+async function loadGearMarket(force){
+  const hdr=$("#gearMktHdr"), hint=$("#gearMktHint"), bar=$("#gearMktBar");
+  const grid=$("#gearMktGrid"), oh=$("#gearOffersHdr"), og=$("#gearOffersGrid");
+  if(!grid)return;
+  const hide=()=>{ [hdr,hint,bar,oh].forEach(e=>e&&(e.style.display="none")); grid.innerHTML=""; og.innerHTML=""; };
+  if(!gearConfigured()||!gearMktConfigured()){ hide(); return; }
+  try{
+    hdr.style.display="block"; hint.style.display="block"; bar.style.display="flex";
+    hint.textContent="Every sale burns 15% automatically — half buys & burns KJP, half buys & burns WICK. The seller keeps 85%.";
+    fillGearOfferTypes();
+    const [ids,sellers,prices,types]=await gearMktRO.listingsIn(1,100);
+    gearMktRows=[...ids].map((id,i)=>({id:Number(id),seller:sellers[i],price:prices[i],type:Number(types[i])}));
+    grid.innerHTML = gearMktRows.length
+      ? gearMktRows.map(r=>{
+          const g=(window.WICK_GEAR||{})[r.type]||{name:"GEAR #"+r.id,rarity:"?",color:"#8a93a5",fx:""};
+          const mine = account && r.seller.toLowerCase()===account.toLowerCase();
+          const roy = r.price*15n/100n;
+          const act = mine
+            ? '<div class="row"><span class="muted">your listing</span><button data-gearcancel2="'+r.id+'">CANCEL</button></div>'
+            : '<div class="row"><button data-gearbuy="'+r.id+'">BUY &middot; '+fmt(r.price)+' PLS</button></div>';
+          return '<div class="card" style="border-color:'+g.color+'">'
+            + '<div style="padding:12px;text-align:center">'
+            + '<div style="font-size:11px;letter-spacing:2px;color:'+g.color+'">KJP GEAR &middot; '+g.rarity.toUpperCase()+'</div>'
+            + '<div style="font-family:Impact,Arial,sans-serif;font-size:21px;color:#fff;margin:8px 0 2px">'+g.name+'</div>'
+            + '<div class="muted" style="font-size:12px;margin-bottom:6px">'+g.fx+'</div>'
+            + '<div style="font-family:Impact,Arial,sans-serif;font-size:19px;color:#ffd27c">'+fmt(r.price)+' PLS</div>'
+            + '<div class="muted" style="font-size:10px">#'+r.id+' &middot; '+fmt(roy)+' PLS of this burns</div>'
+            + '</div><div style="padding:0 12px 12px">'+act+'</div></div>';
+        }).join("")
+      : '<div class="muted" style="padding:8px">Nothing listed yet. If you hold gear, list it above.</div>';
+    grid.querySelectorAll("[data-gearbuy]").forEach(b=>b.onclick=()=>buyGear(+b.dataset.gearbuy));
+    grid.querySelectorAll("[data-gearcancel2]").forEach(b=>b.onclick=()=>cancelGear(+b.dataset.gearcancel2));
+
+    const [oids,bidders,amounts,otok,otyp]=await gearMktRO.openOffers();
+    gearOfferRows=[...oids].map((id,i)=>({id:Number(id),bidder:bidders[i],amount:amounts[i],tokenId:Number(otok[i]),type:Number(otyp[i])}));
+    oh.style.display = gearOfferRows.length ? "block" : "none";
+    og.innerHTML = gearOfferRows.map(o=>{
+      const g=(window.WICK_GEAR||{})[o.type]||{name:"any",color:"#8a93a5"};
+      const want = o.tokenId ? ("piece #"+o.tokenId) : ("any "+g.name);
+      const mine = account && o.bidder.toLowerCase()===account.toLowerCase();
+      const act = mine
+        ? '<div class="row"><span class="muted">your bid</span><button data-offcancel="'+o.id+'">CANCEL</button></div>'
+        : '<div class="row"><button data-offaccept="'+o.id+'">SELL INTO THIS</button></div>';
+      return '<div class="card" style="border-color:'+g.color+'">'
+        + '<div style="padding:12px;text-align:center">'
+        + '<div style="font-size:11px;letter-spacing:2px;color:'+g.color+'">OFFER</div>'
+        + '<div style="font-family:Impact,Arial,sans-serif;font-size:20px;color:#ffd27c;margin:8px 0 2px">'+fmt(o.amount)+' PLS</div>'
+        + '<div class="muted" style="font-size:12px">for '+want+'</div>'
+        + '<div class="muted" style="font-size:10px;margin-top:4px">'+o.bidder.slice(0,6)+'…'+o.bidder.slice(-4)+'</div>'
+        + '</div><div style="padding:0 12px 12px">'+act+'</div></div>';
+    }).join("");
+    og.querySelectorAll("[data-offcancel]").forEach(b=>b.onclick=()=>cancelGearOffer(+b.dataset.offcancel));
+    og.querySelectorAll("[data-offaccept]").forEach(b=>b.onclick=()=>acceptGearOffer(+b.dataset.offaccept));
+  }catch(e){ hide(); }
+}
+function fillGearOfferTypes(){
+  const sel=$("#gearOfferType"); if(!sel||sel.dataset.filled)return;
+  const G=window.WICK_GEAR||{};
+  sel.innerHTML='<option value="0">— pick a gear type to bid on —</option>'
+    + Object.keys(G).map(t=>'<option value="'+t+'">'+G[t].name+' ('+G[t].rarity+')</option>').join("");
+  sel.dataset.filled="1";
+  const btn=$("#gearOfferBtn"); if(btn) btn.onclick=makeGearOffer;
+}
+async function buyGear(id){
+  try{
+    if(!gearMktC) return toast("Connect a wallet first.");
+    const row=gearMktRows.find(r=>r.id===id); if(!row) return toast("Listing vanished — refreshing."), loadGearMarket(true);
+    const g=(window.WICK_GEAR||{})[row.type]||{name:"Gear #"+id};
+    const roy=row.price*15n/100n;
+    if(!confirm("Buy "+g.name+" (#"+id+") for "+fmt(row.price)+" PLS?\n\n"
+      +fmt(roy)+" PLS of that is burned on the spot — half KJP, half WICK.\n"
+      +"The seller receives "+fmt(row.price-roy)+" PLS.")) return;
+    await (await gearMktC.buy(id,{value:row.price})).wait();
+    toast("Bought. It is already live in both games.");
+    await loadGearMarket(true); await loadMyGear();
+  }catch(e){ toast("Buy failed: "+(e.shortMessage||e.message||e)); }
+}
+async function makeGearOffer(){
+  try{
+    if(!gearMktC) return toast("Connect a wallet first.");
+    const t=+(($("#gearOfferType")||{}).value||0);
+    const raw=(($("#gearOfferAmt")||{}).value||"").trim();
+    if(!t) return toast("Pick a gear type to bid on.");
+    let amt; try{ amt=ethers.parseEther(raw); }catch(e){ return toast("Enter an amount in PLS."); }
+    if(amt<=0n) return toast("Enter an amount in PLS.");
+    const g=(window.WICK_GEAR||{})[t]||{name:"type "+t};
+    if(!confirm("Offer "+fmt(amt)+" PLS for any "+g.name+"?\n\n"
+      +"The PLS is escrowed by the market contract and is yours until you cancel or a seller accepts.")) return;
+    await (await gearMktC.makeOffer(0,t,{value:amt})).wait();
+    toast("Offer posted."); await loadGearMarket(true);
+  }catch(e){ toast("Offer failed: "+(e.shortMessage||e.message||e)); }
+}
+async function cancelGearOffer(id){
+  try{ await (await gearMktC.cancelOffer(id)).wait(); toast("Offer cancelled, PLS refunded."); await loadGearMarket(true); }
+  catch(e){ toast("Cancel failed: "+(e.shortMessage||e.message||e)); }
+}
+async function acceptGearOffer(id){
+  try{
+    if(!gearMktC) return toast("Connect a wallet first.");
+    const o=gearOfferRows.find(r=>r.id===id); if(!o) return;
+    const [ids,types]=await gearRO.gearOfOwner(account);
+    let tok=0;
+    for(let i=0;i<ids.length;i++){
+      const tid=Number(ids[i]), ty=Number(types[i]);
+      if(o.tokenId ? tid===o.tokenId : ty===o.type){ tok=tid; break; }
+    }
+    if(!tok) return toast("You do not hold a piece that satisfies this offer.");
+    const roy=o.amount*15n/100n;
+    if(!confirm("Sell your piece #"+tok+" into this "+fmt(o.amount)+" PLS offer?\n\n"
+      +fmt(roy)+" PLS burns (half KJP, half WICK). You receive "+fmt(o.amount-roy)+" PLS.")) return;
+    await ensureGearMktApproval();
+    await (await gearMktC.acceptOffer(id,tok)).wait();
+    toast("Sold."); await loadGearMarket(true); await loadMyGear();
+  }catch(e){ toast("Accept failed: "+(e.shortMessage||e.message||e)); }
 }
 
 /* ---------------- WICK MODS: free-mint attachments ---------------- */
