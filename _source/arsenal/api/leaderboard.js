@@ -9,6 +9,7 @@ import { put, list } from "@vercel/blob";
 import { verifyMessage, JsonRpcProvider, Contract, Network, getAddress } from "ethers";
 
 const PATH = "lb.json";
+const PREV = "lb-prev.json";      // rolling one-deep backup, written before every overwrite
 const MAX_AGE_MS = 5 * 60 * 1000;
 const CAP = 200;                    // keep this many entries server-side
 const MAX_SCORE = 2_000_000;        // absolute backstop; the per-mode ceilings below are what actually bite
@@ -54,15 +55,60 @@ async function gunsHeld(addr) {
   return Number(await guns.balanceOf(getAddress(addr)));
 }
 
+/* THROWS on failure — it must not return [].
+   This used to swallow every error and return an empty array. The POST path does
+   read -> modify -> put(allowOverwrite:true), so one transient Blob hiccup made
+   the handler believe the board was empty and then overwrite the real board with
+   a single row. That is how a populated leaderboard becomes an empty one.
+   An ABSENT blob is genuinely empty and still returns []; anything else throws
+   and the caller decides, and the writer refuses to write. */
+/* Read the blob body. We used to hit blobs[0].url bare, which assumes the store
+   serves it publicly — that started returning 403 while list() kept working, i.e.
+   the token is fine and the data is there, only anonymous URL access stopped.
+   So: try downloadUrl, then the plain url, and retry authenticated on 401/403. */
+async function fetchBlobJSON(b) {
+  const tok = process.env.BLOB_READ_WRITE_TOKEN;
+  const bust = "?v=" + Date.now();
+  const attempts = [];
+  for (const base of [b.downloadUrl, b.url].filter(Boolean)) {
+    attempts.push([base + bust, {}]);
+    if (tok) attempts.push([base + bust, { headers: { authorization: "Bearer " + tok } }]);
+  }
+  let lastStatus = 0;
+  const trace = [];
+  for (const [u, opt] of attempts) {
+    try {
+      const r = await fetch(u, { cache: "no-store", ...opt });
+      trace.push((opt.headers ? "auth" : "anon") + ":" + r.status);
+      if (r.ok) return await r.json();
+      lastStatus = r.status;
+    } catch (e) { trace.push((opt.headers ? "auth" : "anon") + ":ERR"); }
+  }
+  // host+path only — the pathname is the filename we chose, nothing secret
+  let where = "?";
+  try { const p = new URL(b.url); where = p.host + p.pathname; } catch {}
+  console.error("BLOB TRACE:", where, "| downloadUrl:" + (b.downloadUrl ? "yes" : "no"),
+    "| tok:" + (tok ? "set" : "MISSING"), "|", trace.join(" "));
+  throw new Error("blob read " + (lastStatus || "unreachable"));
+}
+
 async function readBoard() {
+  const { blobs } = await list({ prefix: PATH, limit: 1 });
+  if (!blobs.length) return [];                       // never written yet — legitimately empty
+  const j = await fetchBlobJSON(blobs[0]);
+  if (!Array.isArray(j)) throw new Error("blob is not an array");
+  return j;
+}
+
+/* Keep the previous copy before every overwrite. Blob has no version history, so
+   without this a bad write is unrecoverable — which is exactly what bit us. */
+async function backupBoard(board) {
   try {
-    const { blobs } = await list({ prefix: PATH, limit: 1 });
-    if (!blobs.length) return [];
-    const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return Array.isArray(j) ? j : [];
-  } catch { return []; }
+    await put(PREV, JSON.stringify(board), {
+      access: "public", addRandomSuffix: false, allowOverwrite: true,
+      contentType: "application/json", cacheControlMaxAge: 0,
+    });
+  } catch { /* a failed backup must not block a legitimate score */ }
 }
 
 export default async function handler(req, res) {
@@ -83,7 +129,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, ghost: r.ok ? await r.json() : null });
       } catch { return res.status(200).json({ ok: true, ghost: null }); }
     }
-    const board = await readBoard();
+    // an unreadable board must not look like an empty one — say so
+    let board;
+    try { board = await readBoard(); }
+    catch (e) {
+      // server-side only: the cause can name the store/token, so it never goes in the response
+      console.error("LB READ FAILED:", (e && e.name) + " :: " + (e && e.message));
+      return res.status(200).json({ ok: true, top: [], total: 0, degraded: true,
+        error: "leaderboard temporarily unreadable — scores are NOT lost" });
+    }
     const want = String((req.query && req.query.mode) || "").slice(0, 20);
     if (want) {                                   // e.g. ?mode=daily-20260731 — that day's board only
       const rows = board.filter(e => (e.mode || "") === want);
@@ -132,7 +186,13 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "holders only — you need a WICK ARSENAL gun NFT to post a score. Mint at mint.wick.pics" });
 
     const a = String(address).toLowerCase();
-    const board = await readBoard();
+    // If we cannot READ the board we must not WRITE it — writing here would
+    // replace everyone's scores with this one row. Ask them to retry instead.
+    let board;
+    try { board = await readBoard(); }
+    catch (e) {
+      return res.status(503).json({ error: "leaderboard is temporarily unreadable — your score was NOT saved, try again in a moment" });
+    }
     const i = board.findIndex(e => e.a === a && (e.mode || "story") === cleanMode);   // one PB per wallet PER MODE — gauntlet can't erase a story career
     if (i >= 0 && board[i].score >= s) {
       const rank = board.indexOf(board[i]) + 1;
@@ -145,6 +205,8 @@ export default async function handler(req, res) {
     if (i >= 0) board[i] = entry; else board.push(entry);
     board.sort((x, y) => y.score - x.score);
     board.length = Math.min(board.length, CAP);
+    // snapshot the pre-write state first — Blob keeps no history of its own
+    await backupBoard(board.filter(e => !(e.a === a && (e.mode || "story") === cleanMode)));
     await put(PATH, JSON.stringify(board), {
       access: "public", addRandomSuffix: false, allowOverwrite: true,
       contentType: "application/json", cacheControlMaxAge: 0

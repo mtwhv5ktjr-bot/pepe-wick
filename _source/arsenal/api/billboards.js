@@ -25,7 +25,7 @@ const ABI = [
 const HOUSE = {
   from: 20667, to: 20667,            // unix-day ids, inclusive (1 day)
   name: "$WARTIME",
-  tag: "IT'S WARTIME",               // their own slogan, off their art
+  tag: "DEV SUPPLY BURNED",          // 17 bytes; the chain caps tags at 28
   url: "",                           // no link line until they give us a real one
   color: "#e03131",
   // 16x16 one-bit heavy bomber. Their poster art thresholds to noise at this

@@ -22,7 +22,7 @@ try {
   }
 }
 
-const files = ["WickGuns.sol", "WickMarket.sol", "WickGunArt.sol", "WickGunBodies.sol", "WickMods.sol", "WickModsMarket.sol", "WickBillboards.sol", "TestMocks.sol"];
+const files = ["WickGuns.sol", "WickMarket.sol", "WickGunArt.sol", "WickGunBodies.sol", "WickMods.sol", "WickModsMarket.sol", "WickModsAir.sol", "WickBillboards.sol", "TestMocks.sol"];
 const sources = {};
 for (const f of files) sources[f] = { content: readFileSync(join(root, "contracts", f), "utf8") };
 
@@ -46,7 +46,7 @@ for (const e of out.errors ?? []) {
 if (fatal) process.exit(1);
 
 mkdirSync(join(root, "out"), { recursive: true });
-for (const [file, name] of [["WickGuns.sol", "WickGuns"], ["WickMarket.sol", "WickMarket"], ["WickGunArt.sol", "WickGunArt"], ["WickGunBodies.sol", "WickGunBodies"], ["WickMods.sol", "WickMods"], ["WickModsMarket.sol", "WickModsMarket"], ["WickBillboards.sol", "WickBillboards"], ["TestMocks.sol", "MockWICK"], ["TestMocks.sol", "MockGuns"], ["TestMocks.sol", "MockRouter"], ["TestMocks.sol", "MockRouterRevert"]]) {
+for (const [file, name] of [["WickGuns.sol", "WickGuns"], ["WickMarket.sol", "WickMarket"], ["WickGunArt.sol", "WickGunArt"], ["WickGunBodies.sol", "WickGunBodies"], ["WickMods.sol", "WickMods"], ["WickModsMarket.sol", "WickModsMarket"], ["WickModsAir.sol", "WickModsAir"], ["WickBillboards.sol", "WickBillboards"], ["TestMocks.sol", "MockWICK"], ["TestMocks.sol", "MockGuns"], ["TestMocks.sol", "MockRouter"], ["TestMocks.sol", "MockRouterRevert"]]) {
   const c = out.contracts[file][name];
   writeFileSync(join(root, "out", name + ".json"),
     JSON.stringify({ abi: c.abi, bytecode: "0x" + c.evm.bytecode.object, metadata: c.metadata }, null, 2));

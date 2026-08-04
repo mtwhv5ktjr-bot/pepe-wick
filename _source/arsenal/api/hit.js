@@ -21,15 +21,18 @@ const MAX_DAYS = 400;
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
+/* THROWS on failure — same lesson as the leaderboard. This is a read-modify-write
+   against an overwriting put(); if a failed read returned an empty object we would
+   overwrite the entire history with today's single tick. An ABSENT blob is a true
+   cold start and still returns empty. */
 async function read() {
-  try {
-    const { blobs } = await list({ prefix: PATH, limit: 1 });
-    if (!blobs.length) return { days: {}, since: today() };
-    const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) return { days: {}, since: today() };
-    const j = await r.json();
-    return (j && typeof j === "object" && j.days) ? j : { days: {}, since: today() };
-  } catch { return { days: {}, since: today() }; }
+  const { blobs } = await list({ prefix: PATH, limit: 1 });
+  if (!blobs.length) return { days: {}, since: today() };     // never written — real cold start
+  const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error("blob read " + r.status);
+  const j = await r.json();
+  if (!j || typeof j !== "object" || !j.days) throw new Error("blob malformed");
+  return j;
 }
 
 async function write(data) {
@@ -46,7 +49,10 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
 
   if (req.method === "GET") {
-    const d = await read();
+    let d;
+    try { d = await read(); }
+    catch { return res.status(200).json({ ok: true, days: {}, totals: { load: 0, play: 0 }, degraded: true,
+      note: "counters temporarily unreadable — history is NOT lost" }); }
     const totals = { load: 0, play: 0 };
     for (const k in d.days) { totals.load += d.days[k].load || 0; totals.play += d.days[k].play || 0; }
     return res.status(200).json({ ok: true, days: d.days, totals, since: d.since,
@@ -63,7 +69,10 @@ export default async function handler(req, res) {
   if (!KEYS.has(k)) return res.status(400).json({ error: "bad k" });
 
   try {
-    const d = await read();
+    // cannot read -> must not write, or one tick replaces the whole history
+    let d;
+    try { d = await read(); }
+    catch { return res.status(200).json({ ok: true, skipped: true }); }
     const t = today();
     d.days[t] = d.days[t] || { load: 0, play: 0 };
     d.days[t][k] = (d.days[t][k] || 0) + 1;

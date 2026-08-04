@@ -1949,7 +1949,7 @@ const INAPP=/Telegram|Instagram|FBAN|FBAV|Twitter|Line\/|MicroMessenger/i.test(n
   ||!!window.TelegramWebviewProxy||/[?&]inapp/.test(location.search);   // ?inapp mirrors the ?mobile test override
 function fetchT(url,opts,ms){ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms||12000);
   return fetch(url,Object.assign({},opts||{},{signal:c.signal})).finally(()=>clearTimeout(t)); }  // nothing may hang the UI forever
-let lbTop=null, lbFetchT=0, lbMsg="", lbBusy=false;
+let lbTop=null, lbFetchT=0, lbMsg="", lbBusy=false, lbDown=false;
 let playerName=""; try{ playerName=(localStorage.getItem("pw_name")||"").slice(0,16); }catch(e){}
 function setPlayerName(){
   const n=prompt("Choose a display name for the leaderboard (max 16 chars).\nLeave blank to show your wallet address instead:", playerName);
@@ -2182,7 +2182,12 @@ async function fetchBoard(force){
   const now=performance.now()/1000;
   if(!force&&lbTop&&now-lbFetchT<60)return;
   lbFetchT=now;
-  try{ const r=await fetchT(LB_URL+(lbDaily?("?mode=daily-"+dayStr()):"")); const j=await r.json(); if(j.ok)lbTop=j.top||[]; }
+  try{ const r=await fetchT(LB_URL+(lbDaily?("?mode=daily-"+dayStr()):"")); const j=await r.json();
+       // degraded = the store is unreadable, NOT "nobody has scored". Showing an
+       // empty board there reads as "your score vanished", which is worse than
+       // saying the board is down.
+       lbDown = !!j.degraded;
+       if(j.ok)lbTop=j.top||[]; }
   catch(e){ if(!lbTop)lbTop=null; }
   lbTried=true;
 }
@@ -5159,7 +5164,14 @@ function drawBoard(){
       g.textAlign="right";
       g.fillText((e.score||0).toLocaleString(),W/2+260,y);
     }
-    if(!board.length){ g.font="bold 13px Verdana"; g.textAlign="center"; g.fillStyle="#8fa3bf"; g.fillText("no scores yet — be the first",W/2,240); }
+    if(!board.length){ g.textAlign="center";
+      if(lbDown){   // the board is unreadable — do NOT imply the scores are gone
+        g.font="bold 13px Verdana"; g.fillStyle="#ffd75e";
+        g.fillText("⚠ leaderboard is temporarily unavailable",W/2,232);
+        g.font="bold 11px Verdana"; g.fillStyle="#8fa3bf";
+        g.fillText("existing scores are safe — this is a storage outage, not a reset",W/2,252);
+        g.fillText("new scores can't be saved until it's back",W/2,270);
+      } else { g.font="bold 13px Verdana"; g.fillStyle="#8fa3bf"; g.fillText("no scores yet — be the first",W/2,240); } }
   }
   g.textAlign="center"; g.font="bold 12px Verdana"; g.fillStyle="#ffd75e";
   g.fillText("YOUR CAREER SCORE: "+totalScore().toLocaleString(),W/2,H-98);   // clear of row #10's baseline
