@@ -298,6 +298,24 @@ tbody tr:hover{background:#111823}
     <div class="burn" id="heroBurn">🔥 SOLD OUT — <b>100 CASES</b> AT <b>1,000,000 PLS</b> EACH</div>
     <p id="heroProse" class="muted">101 on-chain guns on PulseChain. Every one is a real weapon inside PEPE WICK, and every sale burns 15% into $WICK in the same transaction.</p>
 
+    <!-- KJP GEAR sits ABOVE the free mods mint: it is the paid drop, it is
+         live now, and every sale burns KJP and WICK in the same transaction.
+         Reads supply straight off the contract; hides itself if the chain is
+         unreachable rather than showing a dead panel. -->
+    <div id="gearPanel" style="margin-top:14px;padding:16px;border:1px solid #8a6d2f;border-radius:12px;text-align:left;background:rgba(255,210,124,.06)">
+      <div style="font:900 15px Arial Black;color:#ffd27c;letter-spacing:.5px">KJP GEAR — FIELD ISSUE</div>
+      <div class="muted" style="margin:6px 0 10px">
+        100 pieces of cross-game equipment — suppressors, kevlar, night optics, a skeleton key.
+        Works in <b>PEPE WICK</b> and <b>KJP</b>. <b>1,000,000 PLS</b> each.
+        Every mint burns <b>50% KJP</b> + <b>50% WICK</b> in the mint transaction — there is no withdraw function.
+      </div>
+      <div class="row" style="flex-wrap:wrap;align-items:center">
+        <a class="primary" href="https://kjp-game.wick.pics/mint"
+           style="text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block">MINT KJP GEAR ↗</a>
+        <span id="gearLeft" class="muted">reading the chain…</span>
+      </div>
+    </div>
+
     <div id="modsPanel" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--green);border-radius:12px;text-align:left">
       <div id="modsPool" class="muted" style="margin:0 0 10px"></div>
       <div class="row" style="flex-wrap:wrap">
@@ -1922,6 +1940,29 @@ function init(){
   }
 }
 init();
+
+/* ---- KJP GEAR panel: live supply, read straight off PulseChain.
+   Deliberately standalone — it must not depend on the wallet being connected
+   or on this page's ethers setup, and a dead RPC must degrade to a quiet
+   panel rather than a broken one. ---- */
+(async function gearPanel(){
+  const GEAR = "0x6BdED56bA6F0d8062e056062D47F41ac735d5d10";
+  const el = document.getElementById("gearLeft");
+  if (!el) return;
+  try{
+    const r = await fetch("https://rpc.pulsechain.com", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call",
+        params: [{ to: GEAR, data: "0x18160ddd" }, "latest"] })          // totalSupply()
+    });
+    const j = await r.json();
+    const minted = parseInt(j.result, 16);
+    if (!isFinite(minted)) throw new Error("bad read");
+    const left = 100 - minted;
+    el.textContent = left > 0 ? (left + " of 100 left") : "SOLD OUT";
+    el.style.color = left > 0 ? "#ffd27c" : "#ff8f8f";
+  }catch(e){ el.textContent = ""; }
+})();
 
 </script>
 </body></html>
