@@ -3849,6 +3849,13 @@ function fetchPaidAds(){
    floor won't go. The board is a fixed 248*s wide, but name/tag/url are bought
    at up to 20/28/32 chars — at the maxima they used to run straight off the
    panel and across the sky. Someone paying 1,000,000 PLS gets text on the sign. */
+// "#7cf9a5" -> "124,249,165" for the softGlow()/rgba() call sites that want channels
+function hexRGB(h){
+  const m=/^#?([0-9a-f]{6})$/i.exec(String(h||""));
+  if(!m)return "124,249,165";
+  const n=parseInt(m[1],16);
+  return ((n>>16)&255)+","+((n>>8)&255)+","+(n&255);
+}
 function fitText(str,maxW,weight,basePx,minPx){
   let px=Math.max(1,basePx|0);
   g.font=weight+" "+px+"px Verdana";
@@ -4332,10 +4339,15 @@ function render(){
     g.beginPath(); g.moveTo(bx+bw/2-52,GY-190); g.lineTo(bx+bw/2-44,GY-178);
     g.moveTo(bx+bw/2+52,GY-190); g.lineTo(bx+bw/2+44,GY-178); g.stroke();
     g.fillStyle="#0d1224"; rr(bx+bw/2-70,GY-180,140,26,5); g.fill();
+    /* The sign text was hardcoded to "THE LILYPAD", so every act-2 warehouse and
+       alley was flying act-1's bar neon. It reads off the level now, tinted with
+       the level's own accent so the frontage belongs to its venue. */
+    const sgn=lvl.sign||"THE LILYPAD", sgc=cfg.sign||"#7cf9a5";
     g.save(); g.globalAlpha=fl; g.globalCompositeOperation="lighter";
-    softGlow(bx+bw/2,GY-167,66,"124,249,165",0.3);
-    g.font="900 15px Verdana"; g.textAlign="center"; g.fillStyle="#7cf9a5";
-    g.fillText("THE LILYPAD",bx+bw/2,GY-162);
+    softGlow(bx+bw/2,GY-167,66,hexRGB(sgc),0.3);
+    g.textAlign="center"; g.fillStyle=sgc;
+    const st=fitText(sgn,126,"900",15,9);      // 140px plate, 7px padding each side
+    g.fillText(st,bx+bw/2,GY-162);
     g.restore();
     // door
     g.fillStyle=gv(0,GY-118,118,"#151a2e","#0c0f1c"); rr(bx+bw-66,GY-118,44,118,4); g.fill();
