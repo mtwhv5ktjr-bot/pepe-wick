@@ -1,15 +1,20 @@
-// Global TOP-10 leaderboard keyed by wallet address (Vercel Blob persistence).
+// Global TOP-10 leaderboard keyed by wallet address (git-file persistence).
 //
 // GET  -> { ok, top: [{a, score, level, mode, ts}] }        (top 10)
 // POST { address, score, level, mode, message, signature }
 //   message must contain the address, "score:<n>" and "ts:<epoch-ms>" (fresh).
 //   The signature must recover to the address — you can only post scores for
 //   a wallet you control. One entry per wallet (its personal best).
-import { put, list } from "@vercel/blob";
+//
+// STORAGE (changed 2026-08-04): was Vercel Blob, which got SUSPENDED with the
+// data intact-but-unreadable and took the board down for weeks with no code-side
+// fix. Now a JSON file in a git repo — free, un-suspendable, and every write is
+// a commit, so the version history IS the backup. That is strictly better than
+// the "lb-prev.json" one-deep snapshot this file used to keep by hand.
+import { readJSON, mutateJSON, writeJSON, storeConfigured } from "./_gitstore.js";
 import { verifyMessage, JsonRpcProvider, Contract, Network, getAddress } from "ethers";
 
 const PATH = "lb.json";
-const PREV = "lb-prev.json";      // rolling one-deep backup, written before every overwrite
 const MAX_AGE_MS = 5 * 60 * 1000;
 const CAP = 200;                    // keep this many entries server-side
 const MAX_SCORE = 2_000_000;        // absolute backstop; the per-mode ceilings below are what actually bite
@@ -57,58 +62,16 @@ async function gunsHeld(addr) {
 
 /* THROWS on failure — it must not return [].
    This used to swallow every error and return an empty array. The POST path does
-   read -> modify -> put(allowOverwrite:true), so one transient Blob hiccup made
-   the handler believe the board was empty and then overwrite the real board with
-   a single row. That is how a populated leaderboard becomes an empty one.
-   An ABSENT blob is genuinely empty and still returns []; anything else throws
+   read -> modify -> write, so one transient storage hiccup made the handler
+   believe the board was empty and then overwrite the real board with a single
+   row. That is how a populated leaderboard becomes an empty one.
+   An ABSENT file is genuinely empty and still returns []; anything else throws
    and the caller decides, and the writer refuses to write. */
-/* Read the blob body. We used to hit blobs[0].url bare, which assumes the store
-   serves it publicly — that started returning 403 while list() kept working, i.e.
-   the token is fine and the data is there, only anonymous URL access stopped.
-   So: try downloadUrl, then the plain url, and retry authenticated on 401/403. */
-async function fetchBlobJSON(b) {
-  const tok = process.env.BLOB_READ_WRITE_TOKEN;
-  const bust = "?v=" + Date.now();
-  const attempts = [];
-  for (const base of [b.downloadUrl, b.url].filter(Boolean)) {
-    attempts.push([base + bust, {}]);
-    if (tok) attempts.push([base + bust, { headers: { authorization: "Bearer " + tok } }]);
-  }
-  let lastStatus = 0;
-  const trace = [];
-  for (const [u, opt] of attempts) {
-    try {
-      const r = await fetch(u, { cache: "no-store", ...opt });
-      trace.push((opt.headers ? "auth" : "anon") + ":" + r.status);
-      if (r.ok) return await r.json();
-      lastStatus = r.status;
-    } catch (e) { trace.push((opt.headers ? "auth" : "anon") + ":ERR"); }
-  }
-  // host+path only — the pathname is the filename we chose, nothing secret
-  let where = "?";
-  try { const p = new URL(b.url); where = p.host + p.pathname; } catch {}
-  console.error("BLOB TRACE:", where, "| downloadUrl:" + (b.downloadUrl ? "yes" : "no"),
-    "| tok:" + (tok ? "set" : "MISSING"), "|", trace.join(" "));
-  throw new Error("blob read " + (lastStatus || "unreachable"));
-}
-
-async function readBoard() {
-  const { blobs } = await list({ prefix: PATH, limit: 1 });
-  if (!blobs.length) return [];                       // never written yet — legitimately empty
-  const j = await fetchBlobJSON(blobs[0]);
-  if (!Array.isArray(j)) throw new Error("blob is not an array");
-  return j;
-}
-
-/* Keep the previous copy before every overwrite. Blob has no version history, so
-   without this a bad write is unrecoverable — which is exactly what bit us. */
-async function backupBoard(board) {
-  try {
-    await put(PREV, JSON.stringify(board), {
-      access: "public", addRandomSuffix: false, allowOverwrite: true,
-      contentType: "application/json", cacheControlMaxAge: 0,
-    });
-  } catch { /* a failed backup must not block a legitimate score */ }
+async function readBoard(opts) {
+  const { data } = await readJSON(PATH, opts);
+  if (data === null) return [];                       // never written yet — legitimately empty
+  if (!Array.isArray(data)) throw new Error("stored board is not an array");
+  return data;
 }
 
 export default async function handler(req, res) {
@@ -123,10 +86,8 @@ export default async function handler(req, res) {
     const ghostMode = String((req.query && req.query.ghost) || "").slice(0, 20);
     if (/^daily-\d{8}$/.test(ghostMode)) {
       try {
-        const { blobs } = await list({ prefix: "ghost-" + ghostMode + ".json", limit: 1 });
-        if (!blobs.length) return res.status(200).json({ ok: true, ghost: null });
-        const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
-        return res.status(200).json({ ok: true, ghost: r.ok ? await r.json() : null });
+        const { data } = await readJSON("ghost-" + ghostMode + ".json");
+        return res.status(200).json({ ok: true, ghost: data || null });
       } catch { return res.status(200).json({ ok: true, ghost: null }); }
     }
     // an unreadable board must not look like an empty one — say so
@@ -186,31 +147,36 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "holders only — you need a WICK ARSENAL gun NFT to post a score. Mint at mint.wick.pics" });
 
     const a = String(address).toLowerCase();
-    // If we cannot READ the board we must not WRITE it — writing here would
-    // replace everyone's scores with this one row. Ask them to retry instead.
-    let board;
-    try { board = await readBoard(); }
-    catch (e) {
-      return res.status(503).json({ error: "leaderboard is temporarily unreadable — your score was NOT saved, try again in a moment" });
-    }
-    const i = board.findIndex(e => e.a === a && (e.mode || "story") === cleanMode);   // one PB per wallet PER MODE — gauntlet can't erase a story career
-    if (i >= 0 && board[i].score >= s) {
-      const rank = board.indexOf(board[i]) + 1;
-      return res.status(200).json({ ok: true, rank, unchanged: true, top: board.slice(0, 10) });
-    }
     // optional display name (cosmetic; not signed — only labels this wallet's own entry)
     const cleanName = String(name || "").replace(/[^\w .\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 16);
-    // guns = NFTs held at submit time; kept for prize review / display
-    const entry = { a, name: cleanName, score: s, level: cleanLevel, mode: cleanMode, guns: held == null ? 0 : held, ts: Date.now() };
-    if (i >= 0) board[i] = entry; else board.push(entry);
-    board.sort((x, y) => y.score - x.score);
-    board.length = Math.min(board.length, CAP);
-    // snapshot the pre-write state first — Blob keeps no history of its own
-    await backupBoard(board.filter(e => !(e.a === a && (e.mode || "story") === cleanMode)));
-    await put(PATH, JSON.stringify(board), {
-      access: "public", addRandomSuffix: false, allowOverwrite: true,
-      contentType: "application/json", cacheControlMaxAge: 0
-    });
+
+    /* Read → apply → commit, re-running against a fresh read if another player
+       committed first. The PB comparison lives INSIDE the callback on purpose:
+       on a retry it must be judged against the board that actually won the race,
+       not the stale copy we first read. If we cannot READ we must not WRITE —
+       that would replace everyone's scores with this one row. */
+    let board, unchanged = false;
+    try {
+      const out = await mutateJSON(PATH, [], (cur) => {
+        const i = cur.findIndex(e => e.a === a && (e.mode || "story") === cleanMode);   // one PB per wallet PER MODE — gauntlet can't erase a story career
+        if (i >= 0 && cur[i].score >= s) { unchanged = true; return null; }             // null = nothing to commit
+        // guns = NFTs held at submit time; kept for prize review / display
+        const entry = { a, name: cleanName, score: s, level: cleanLevel, mode: cleanMode, guns: held == null ? 0 : held, ts: Date.now() };
+        const next = cur.slice();
+        if (i >= 0) next[i] = entry; else next.push(entry);
+        next.sort((x, y) => y.score - x.score);
+        next.length = Math.min(next.length, CAP);
+        return next;
+      }, () => "score: " + (cleanName || a.slice(0, 8)) + " " + s + " (" + cleanMode + ")");
+      board = out.data;
+    } catch (e) {
+      console.error("LB WRITE FAILED:", (e && e.name) + " :: " + (e && e.message));
+      return res.status(503).json({ error: "leaderboard is temporarily unreadable — your score was NOT saved, try again in a moment" });
+    }
+    if (unchanged) {
+      const i = board.findIndex(e => e.a === a && (e.mode || "story") === cleanMode);
+      return res.status(200).json({ ok: true, rank: i + 1, unchanged: true, top: board.slice(0, 10) });
+    }
     const rank = board.findIndex(e => e.a === a) + 1;
     // 👑 daily world ghost: if this run now LEADS its daily, store its recording so
     // everyone else races it. Validated hard — positions only, bounded size.
@@ -220,9 +186,11 @@ export default async function handler(req, res) {
           && ghost.every(p => Array.isArray(p) && p.length === 3 && p.every(v => typeof v === "number" && isFinite(v)))) {
         const dayRows = board.filter(e => (e.mode || "") === cleanMode);
         if (dayRows.length && dayRows[0].a === a) {          // board is score-sorted → [0] is the day's #1
-          await put("ghost-" + cleanMode + ".json",
-            JSON.stringify({ a, name: cleanName, score: s, pts: ghost.map(p => [Math.round(p[0]), Math.round(p[1]), p[2] >= 0 ? 1 : -1]) }),
-            { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 0 });
+          const gpath = "ghost-" + cleanMode + ".json";
+          const { sha } = await readJSON(gpath, { fresh: true });
+          await writeJSON(gpath,
+            { a, name: cleanName, score: s, pts: ghost.map(p => [Math.round(p[0]), Math.round(p[1]), p[2] >= 0 ? 1 : -1]) },
+            { sha, message: "ghost: " + cleanMode + " " + s });
         }
       }
     } catch { /* the ghost is garnish — never fail a score over it */ }

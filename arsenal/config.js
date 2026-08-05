@@ -22,7 +22,7 @@ window.WICK_CFG = {
   // KJPGearMarket is compiled but NOT deployed. Zero here is load-bearing, not a
   // TODO: it hides the gear market and makes the owned-gear cards render SEND
   // only. Do not paste an address until the market is actually live on-chain.
-  gearMarket: "0x0000000000000000000000000000000000000000",   // KJPGearMarket — 15% royalty, burned 50/50 KJP+WICK
+  gearMarket: "0x09A53d8B339f6fa8A027851B1ab8402a426FB99d",   // KJPGearMarket — 15% royalty, burned 50/50 KJP+WICK
   // LIVE on PulseChain. A non-zero address here is also what UNHIDES the
   // ADVERTISE tab (bbConfigured()) — set only after the production E2E passed.
   billboards: "0x84587C185CAcE68CC559e86936F61812609548DF",

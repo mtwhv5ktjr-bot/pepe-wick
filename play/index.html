@@ -307,10 +307,30 @@ const THEMES=[
   {weather:"snow",   pal:{skyTop:"#0a121c",skyBot:"#1e3550",horizon:"#3e6488",far:"#14263a",mid:"#1a3048",midLit:"#dff0ff",farLit:"#bfe4ff",lamp:"#bfe4ff",sign:"#cfeeff",accent:"#dff0ff",fog:"rgba(170,200,230,0.20)"}},
   {weather:"embers", pal:{skyTop:"#150a0a",skyBot:"#341616",horizon:"#5a2c22",far:"#241010",mid:"#2c1614",midLit:"#ffa07a",farLit:"#ff8a5a",lamp:"#ff8a5a",sign:"#ff6b5a",accent:"#ff8a6a",fog:"rgba(150,70,50,0.14)"}},
   {weather:"ash",    pal:{skyTop:"#120507",skyBot:"#2c0c10",horizon:"#4a141a",far:"#1c0608",mid:"#240a0c",midLit:"#ff6b6b",farLit:"#ff4d4d",lamp:"#ff6b5a",sign:"#ff3d4d",accent:"#ff5555",fog:"rgba(140,30,30,0.16)"}},
+  /* ---- ACT 2: THE BLACK FILE ----
+     applyTheme() indexes THEMES[i] directly, so before these existed levels
+     11-20 ALL fell through to BASE_PAL and the default rain — ten maps in one
+     identical grade, which is most of why the act read as a repeat. Act 1 is
+     street-neon (green/blue/magenta/gold); act 2 is institutional — burning
+     safehouse, marble, emergency-green dark, sodium basement, steel, altitude,
+     brass vault, fluorescent office, red archive, and a sunrise to finish. */
+  {weather:"embers", pal:{skyTop:"#1a0703",skyBot:"#4a1a06",horizon:"#7a2f0c",far:"#2a0d04",mid:"#361405",midLit:"#ffb277",farLit:"#ff7a2f",lamp:"#ff9a4a",sign:"#ff6a2a",accent:"#ff8c3a",fog:"rgba(180,80,30,0.17)"}},   // 11 safehouse burn
+  {weather:"mist",   pal:{skyTop:"#0d0f14",skyBot:"#2b3040",horizon:"#5b6478",far:"#181c26",mid:"#232838",midLit:"#e6e2d2",farLit:"#cfc6a6",lamp:"#e8dcae",sign:"#d8c98c",accent:"#e6dcc0",fog:"rgba(190,185,165,0.17)"}},   // 12 courthouse marble
+  {weather:"fog",    pal:{skyTop:"#02060a",skyBot:"#071410",horizon:"#0e2a1e",far:"#040d0a",mid:"#08160f",midLit:"#4affa0",farLit:"#22d97a",lamp:"#2bff95",sign:"#19c46a",accent:"#35e88a",fog:"rgba(20,80,50,0.22)"}},      // 13 blackout emergency glow
+  {weather:"ash",    pal:{skyTop:"#0d1206",skyBot:"#1e2a0c",horizon:"#374a12",far:"#141c08",mid:"#1a240a",midLit:"#d8f06a",farLit:"#a8c22c",lamp:"#c8e04a",sign:"#8fa81e",accent:"#b8d43c",fog:"rgba(110,140,40,0.19)"}},   // 14 sodium basement
+  {weather:"mist",   pal:{skyTop:"#0a0810",skyBot:"#221c33",horizon:"#443a5e",far:"#120e1c",mid:"#191428",midLit:"#d4c8f0",farLit:"#9d8ac4",lamp:"#c0b0e0",sign:"#8272ac",accent:"#b3a2d8",fog:"rgba(150,130,190,0.20)"}},   // 15 wire room steel
+  {weather:"snow",   pal:{skyTop:"#01020a",skyBot:"#060a1c",horizon:"#101838",far:"#03050f",mid:"#060a18",midLit:"#ffffff",farLit:"#e8f4ff",lamp:"#ffffff",sign:"#cfe8ff",accent:"#f4faff",fog:"rgba(200,225,255,0.13)"}},   // 16 dead drop altitude
+  {weather:"fog",    pal:{skyTop:"#0d0904",skyBot:"#2a1e08",horizon:"#4a360e",far:"#150f05",mid:"#1e1607",midLit:"#f0cf7a",farLit:"#c99a2c",lamp:"#e8b94a",sign:"#b8891f",accent:"#dcb45a",fog:"rgba(140,110,40,0.20)"}},    // 17 vault brass
+  {weather:"mist",   pal:{skyTop:"#101006",skyBot:"#2e2e14",horizon:"#56561f",far:"#1a1a0b",mid:"#232310",midLit:"#ffffe0",farLit:"#f0f0a0",lamp:"#ffffc8",sign:"#dcdc78",accent:"#f6f6c0",fog:"rgba(215,215,150,0.20)"}},   // 18 fluorescent office
+  {weather:"ash",    pal:{skyTop:"#0c0210",skyBot:"#2a0632",horizon:"#4e0c5e",far:"#150318",mid:"#1e0424",midLit:"#ff9ae8",farLit:"#d42ec0",lamp:"#ff6ad8",sign:"#a81a98",accent:"#e84ad0",fog:"rgba(130,20,120,0.21)"}},     // 19 the archive
+  {weather:"rain",   pal:{skyTop:"#1a0d20",skyBot:"#5a2436",horizon:"#a8492f",far:"#2a1226",mid:"#3a1a2a",midLit:"#ffc79a",farLit:"#ff8a5c",lamp:"#ffb07a",sign:"#ff6f4a",accent:"#ffa070",fog:"rgba(180,100,80,0.15)"}},    // 20 langley dawn
 ];
-const MUSKEY=[0,2,-2,3,5,-3,2,-4,1,-5]; // per-district musical transpose (semitones)
+// Act 2 gets its own keys/moods. These wrap modulo their own length, so before
+// they were extended level 11 played in exactly level 1s key and mood — another
+// reason the second act sounded like a repeat of the first.
+const MUSKEY=[0,2,-2,3,5,-3,2,-4,1,-5, -1,4,-6,6,-2,7,-4,3,-7,5]; // per-district transpose (semitones)
 // per-district MOOD: 0 = street groove · 1 = neon double-time · 2 = cold half-time
-const MUSMOOD=[0,0,2,0,1,1,0,2,2,2];    // lilypad/glass groove · continental dark · bazaar+aqueduct neon · freezer→killing floor cold
+const MUSMOOD=[0,0,2,0,1,1,0,2,2,2, 1,2,2,1,2,2,0,1,2,1];  // act1 street/neon/cold · act2: panic, cold institutions, a driving finale
 function applyTheme(i){ const th=THEMES[i]; PAL={...BASE_PAL, ...((th&&th.pal)||{})}; curWeather=(th&&th.weather)||"rain";
   musKey=MUSKEY[((i%MUSKEY.length)+MUSKEY.length)%MUSKEY.length]||0;
   musMood=MUSMOOD[((i%MUSMOOD.length)+MUSMOOD.length)%MUSMOOD.length]||0; }
@@ -2508,165 +2528,165 @@ const LEVELS=[
            {t:"butcher",x:4300}],
   cage:4900, door:5200, rank:{s:120,a:180,b:280} },
 { name:"11 — SAFEHOUSE BURN", sign:"SAFEHOUSE",
-  lore:"BISCUIT is home. At 04:12 the safehouse burns — they want the file, not the dog.",
-  len:6600,
-  floors:[[-100,621],[813,1692],[1782,2572],[2862,3530],[3669,4322],[4464,5147],[5423,6236],[6364,7000]],
-  ledges:[{"x":20,"y":397,"w":157},{"x":933,"y":394,"w":144},{"x":1902,"y":384,"w":134},{"x":2982,"y":385,"w":138},{"x":3789,"y":393,"w":146},{"x":4584,"y":382,"w":138},{"x":5543,"y":400,"w":153},{"x":5892,"y":367,"w":164},{"x":6484,"y":383,"w":111}],
-  crates:[{"x":1455,"y":378},{"x":1630,"y":378},{"x":2257,"y":378},{"x":3354,"y":378},{"x":4618,"y":378},{"x":4830,"y":378},{"x":1969,"y":326},{"x":5974,"y":309}],
-  bone:{"x":5974,"y":333},
-  lamps:[380,1455,2257,3180,3984,4830,5719],
-  checkpoints:[2177,3196,4806,5830],
-  kegs:[{"x":5914},{"x":5486},{"x":2409},{"x":3354},{"x":3805},{"x":380}],
-  vents:[995,2039,3180,4198,5486],
-  puddles:[[1243,82],[2039,91],[2980,87],[3805,81],[4618,78],[5486,71],[6129,77]],
+  lore:"04:12. The safehouse is already burning and they are already inside. Move.",
+  len:3600,
+  floors:[[-100,3920]],
+  ledges:[],
+  crates:[{"x":509,"y":378},{"x":925,"y":378},{"x":1487,"y":378},{"x":1636,"y":378},{"x":2474,"y":378},{"x":2971,"y":378},{"x":3156,"y":378},{"x":3306,"y":378}],
+  bone:{"x":2232,"y":350},
+  lamps:[340,925,1487,1934,2474,2971],
+  checkpoints:[1910,1910],
+  kegs:[{"x":1487},{"x":2246},{"x":1487},{"x":693},{"x":1791},{"x":2971},{"x":1934}],
+  vents:[509,1252,1934,2680,3306],
+  puddles:[[693,70],[1252,64],[1791,80],[2246,65],[2830,86],[3306,78]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"heavy","x":439},{"t":"goon","x":528},{"t":"goon","x":435},{"t":"heavy","x":524},{"t":"goon","x":444},{"t":"heavy","x":1212},{"t":"goon","x":1005,"y":394},{"t":"goon","x":1242},{"t":"goon","x":1209},{"t":"goon","x":1192},{"t":"goon","x":1820},{"t":"goon","x":1975},{"t":"blade","x":1951},{"t":"goon","x":2496},{"t":"blade","x":2534},{"t":"goon","x":2445},{"t":"goon","x":2490},{"t":"goon","x":3260},{"t":"goon","x":3315},{"t":"blade","x":3343},{"t":"goon","x":3418},{"t":"goon","x":4011},{"t":"goon","x":3862,"y":393},{"t":"goon","x":3895},{"t":"goon","x":4011},{"t":"blade","x":3922},{"t":"heavy","x":4856},{"t":"heavy","x":4695},{"t":"goon","x":4829},{"t":"goon","x":4710}],
-  door:6540, rank:{"s":162,"a":213,"b":296} },
+  enemies:[{"t":"goon","x":363},{"t":"goon","x":474},{"t":"goon","x":417},{"t":"blade","x":441},{"t":"goon","x":333},{"t":"goon","x":810},{"t":"blade","x":912},{"t":"goon","x":882},{"t":"goon","x":772},{"t":"goon","x":1358},{"t":"goon","x":1265},{"t":"goon","x":1204},{"t":"goon","x":1752},{"t":"blade","x":1649},{"t":"goon","x":1611},{"t":"goon","x":1787},{"t":"goon","x":1963},{"t":"goon","x":1956},{"t":"goon","x":2146},{"t":"goon","x":2021},{"t":"blade","x":2133},{"t":"goon","x":2458},{"t":"goon","x":2596},{"t":"blade","x":2458},{"t":"goon","x":2955},{"t":"blade","x":2937},{"t":"goon","x":2797},{"t":"blade","x":3022},{"t":"blade","x":2873}],
+  door:3540, rank:{"s":86,"a":120,"b":181} },
 
-{ name:"12 — THE COURTHOUSE STEPS", sign:"COURTHOUSE",
-  lore:"KJP's old courthouse. The locks are Agency issue — a SKELETON KEY opens what a crowbar won't.",
-  len:6800,
-  floors:[[-100,741],[1022,1706],[1833,2495],[2731,3361],[3543,4336],[4554,5216],[5468,6091],[6363,7173]],
-  ledges:[{"x":20,"y":385,"w":114},{"x":1142,"y":383,"w":165},{"x":1953,"y":382,"w":156},{"x":2244,"y":272,"w":123},{"x":2851,"y":384,"w":117},{"x":3663,"y":385,"w":145},{"x":4674,"y":387,"w":124},{"x":4987,"y":282,"w":147},{"x":5588,"y":386,"w":126},{"x":6483,"y":397,"w":155}],
-  crates:[{"x":1326,"y":378},{"x":1524,"y":378},{"x":2077,"y":378},{"x":3284,"y":378},{"x":4015,"y":378},{"x":4242,"y":378},{"x":5611,"y":378},{"x":6059,"y":378},{"x":2031,"y":324},{"x":2305,"y":214},{"x":4736,"y":329},{"x":5060,"y":224}],
-  bone:{"x":2305,"y":238},
-  lamps:[380,1326,2077,3046,4015,4906,5838],
-  checkpoints:[2164,3046,4885,5780],
-  kegs:[{"x":4649},{"x":5611},{"x":1524},{"x":6059},{"x":4242}],
-  vents:[606,1925,3046,4242,5611],
-  puddles:[[1142,87],[1925,91],[2887,76],[3780,67],[4649,86],[5611,87],[6561,79]],
+{ name:"12 — THE COURTHOUSE", sign:"COURTHOUSE",
+  lore:"KJP's old courthouse. The file is on the top floor and the stairs are held.",
+  len:5200,
+  floors:[[-100,1080],[1344,2504],[2735,3868],[4143,5520]],
+  ledges:[{"x":75,"y":377,"w":141},{"x":258,"y":287,"w":128},{"x":508,"y":176,"w":123},{"x":1497,"y":374,"w":110},{"x":1667,"y":278,"w":137},{"x":1870,"y":170,"w":126},{"x":2021,"y":170,"w":109},{"x":2874,"y":382,"w":119},{"x":3074,"y":280,"w":114},{"x":3331,"y":170,"w":118},{"x":4292,"y":372,"w":134},{"x":4444,"y":282,"w":105},{"x":4702,"y":170,"w":122}],
+  crates:[{"x":3430,"y":378},{"x":4700,"y":378},{"x":4846,"y":378},{"x":145,"y":319},{"x":1735,"y":220},{"x":1933,"y":112},{"x":2075,"y":112},{"x":2933,"y":324},{"x":4359,"y":314}],
+  bone:{"x":1933,"y":136},
+  lamps:[340,826,1750,2282,3225,3756,4557],
+  checkpoints:[1924,1924,3302],
+  kegs:[{"x":3430},{"x":2791},{"x":826},{"x":340}],
+  vents:[550,1561,2282,3430,4393],
+  puddles:[[689,91],[1561,72],[2083,75],[3022,85],[3574,81],[4393,81],[4846,69]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"blade","x":493},{"t":"heavy","x":599},{"t":"heavy","x":77,"y":385},{"t":"shield","x":602},{"t":"goon","x":1117},{"t":"shield","x":1099},{"t":"goon","x":1213},{"t":"shield","x":1224,"y":383},{"t":"goon","x":1253},{"t":"heavy","x":1998},{"t":"heavy","x":2098},{"t":"shield","x":1877},{"t":"goon","x":2904},{"t":"shield","x":2909,"y":384},{"t":"goon","x":2909,"y":384},{"t":"shield","x":2865},{"t":"shield","x":3576},{"t":"blade","x":3599},{"t":"goon","x":3323},{"t":"goon","x":3735,"y":385},{"t":"goon","x":3628},{"t":"heavy","x":4094},{"t":"goon","x":4265},{"t":"goon","x":4236},{"t":"heavy","x":5025},{"t":"shield","x":4890},{"t":"blade","x":4847},{"t":"blade","x":4736,"y":387},{"t":"blade","x":4895},{"t":"goon","x":5644},{"t":"shield","x":5576}],
-  door:6740, rank:{"s":166,"a":218,"b":302} },
+  enemies:[{"t":"shield","x":551},{"t":"goon","x":452},{"t":"blade","x":358},{"t":"heavy","x":145,"y":377},{"t":"goon","x":991},{"t":"blade","x":1050},{"t":"blade","x":992},{"t":"blade","x":1931},{"t":"blade","x":1911},{"t":"goon","x":1841},{"t":"heavy","x":1896},{"t":"heavy","x":1933,"y":170},{"t":"shield","x":2809},{"t":"goon","x":2466},{"t":"shield","x":2933,"y":382},{"t":"goon","x":2933,"y":382},{"t":"shield","x":3383},{"t":"heavy","x":3560},{"t":"shield","x":3131,"y":280},{"t":"blade","x":3390,"y":170},{"t":"blade","x":4264},{"t":"goon","x":4359,"y":372}],
+  door:5140, rank:{"s":93,"a":130,"b":195} },
 
-{ name:"13 — THE BLACKOUT WING", sign:"BLACKOUT",
-  lore:"They cut the power to blind you. NIGHT OPTICS sees the hit coming anyway.",
-  len:6600,
+{ name:"13 — BLACKOUT WING", sign:"BLACKOUT",
+  lore:"They cut the power. Two rooms of nothing, then something. NIGHT OPTICS earns its slot here.",
+  len:7200,
   dark:true,
-  floors:[[-100,540],[750,1625],[1915,2679],[2966,3830],[3927,4685],[4976,5807],[5988,6900]],
-  ledges:[{"x":20,"y":396,"w":129},{"x":870,"y":398,"w":133},{"x":1144,"y":315,"w":120},{"x":2035,"y":397,"w":142},{"x":3086,"y":398,"w":132},{"x":4047,"y":381,"w":127},{"x":5096,"y":395,"w":120},{"x":6108,"y":398,"w":141},{"x":6445,"y":370,"w":154}],
-  crates:[{"x":811,"y":378},{"x":1145,"y":378},{"x":1508,"y":378},{"x":2039,"y":378},{"x":2292,"y":378},{"x":4349,"y":378},{"x":5178,"y":378},{"x":6055,"y":378},{"x":2106,"y":339},{"x":4110,"y":323},{"x":5156,"y":337},{"x":6178,"y":340}],
-  bone:{"x":1204,"y":281},
-  lamps:[380,1145,2039,3124,3784,4349,5398,6297],
-  checkpoints:[2297,3398,4306,5392],
-  kegs:[{"x":1325},{"x":1145},{"x":1508},{"x":5597},{"x":380}],
-  vents:[811,1508,3124,3989,5178,6297],
-  puddles:[[961,88],[1508,90],[2542,90],[3579,65],[4165,90],[5178,84],[6055,85]],
+  floors:[[-100,909],[1033,2044],[2192,3156],[3387,4468],[4636,5597],[5887,7520]],
+  ledges:[{"x":90,"y":389,"w":139},{"x":517,"y":367,"w":126},{"x":1166,"y":400,"w":155},{"x":2410,"y":384,"w":162},{"x":2854,"y":399,"w":161},{"x":3522,"y":377,"w":144},{"x":4850,"y":374,"w":126},{"x":6020,"y":383,"w":138}],
+  crates:[{"x":340,"y":378},{"x":1206,"y":378},{"x":2372,"y":378},{"x":2733,"y":378},{"x":3670,"y":378},{"x":4030,"y":378},{"x":4772,"y":378},{"x":4973,"y":378},{"x":5411,"y":378},{"x":580,"y":309}],
+  bone:{"x":580,"y":333},
+  lamps:[340,867,1637,2224,2733,3670,4224,5207,6289],
+  checkpoints:[1539,2674,3928,5117],
+  kegs:[{"x":3521},{"x":1206},{"x":1637}],
+  vents:[504,1442,2224,2944,4030,5207,6474],
+  puddles:[[662,87],[1442,77],[1998,90],[2581,78],[3521,76],[4030,66],[4973,90],[6107,92]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"marksman","x":375},{"t":"blade","x":349},{"t":"heavy","x":309},{"t":"goon","x":468},{"t":"blade","x":1237},{"t":"goon","x":1251},{"t":"blade","x":1204,"y":315},{"t":"blade","x":1980},{"t":"goon","x":1957},{"t":"heavy","x":2037},{"t":"blade","x":1974},{"t":"marksman","x":1977},{"t":"blade","x":2576},{"t":"heavy","x":2504},{"t":"marksman","x":2495},{"t":"blade","x":2513},{"t":"goon","x":2593},{"t":"blade","x":3328},{"t":"goon","x":3217},{"t":"blade","x":3400},{"t":"marksman","x":4002},{"t":"heavy","x":4157},{"t":"blade","x":4110,"y":381},{"t":"marksman","x":5040},{"t":"heavy","x":5036},{"t":"marksman","x":5012},{"t":"blade","x":5425},{"t":"heavy","x":5345},{"t":"blade","x":5458}],
-  door:6540, rank:{"s":170,"a":223,"b":308} },
+  enemies:[{"t":"heavy","x":494},{"t":"blade","x":325},{"t":"heavy","x":433},{"t":"blade","x":1958},{"t":"blade","x":1935},{"t":"blade","x":1954},{"t":"blade","x":3680},{"t":"blade","x":3584},{"t":"heavy","x":3772},{"t":"marksman","x":3596},{"t":"blade","x":5158},{"t":"heavy","x":4913,"y":374},{"t":"heavy","x":5265}],
+  door:7140, rank:{"s":102,"a":143,"b":214} },
 
 { name:"14 — K9 SUBLEVEL", sign:"K9 SUBLEVEL",
-  lore:"Kennel Row was practice. K9 TREATS buy you the half-second the dogs cost you.",
-  len:6400,
-  floors:[[-100,752],[900,1744],[2009,2796],[3035,3671],[3939,4722],[4847,5646],[5827,6700]],
-  ledges:[{"x":20,"y":387,"w":137},{"x":403,"y":285,"w":143},{"x":1020,"y":395,"w":125},{"x":1291,"y":340,"w":141},{"x":2129,"y":393,"w":158},{"x":3155,"y":381,"w":154},{"x":3443,"y":289,"w":121},{"x":4059,"y":399,"w":161},{"x":4393,"y":271,"w":120},{"x":4967,"y":384,"w":133},{"x":5346,"y":303,"w":117},{"x":5947,"y":382,"w":164},{"x":6338,"y":256,"w":130}],
-  crates:[{"x":380,"y":378},{"x":1655,"y":378},{"x":2689,"y":378},{"x":3147,"y":378},{"x":3539,"y":378},{"x":4258,"y":378},{"x":4461,"y":378},{"x":5417,"y":378},{"x":1361,"y":282},{"x":3503,"y":231},{"x":5404,"y":245}],
-  bone:{"x":6403,"y":222},
-  lamps:[380,1334,2057,2689,3539,4461,5183,6066],
-  checkpoints:[1322,3353,4331,5247],
-  kegs:[{"x":6066},{"x":2689},{"x":2296},{"x":2689}],
-  vents:[610,1655,2689,4048,5031,6066],
-  puddles:[[1095,66],[1655,72],[2472,91],[3328,89],[4258,79],[5031,71],[5862,76]],
+  lore:"No guards down here. Just the kennels, and they have been let out.",
+  len:4200,
+  floors:[[-100,4520]],
+  ledges:[],
+  crates:[{"x":858,"y":378},{"x":995,"y":378},{"x":1703,"y":378},{"x":2641,"y":378},{"x":3739,"y":378}],
+  bone:{"x":2604,"y":350},
+  lamps:[340,858,1322,1858,2422,3109,3739],
+  checkpoints:[2210,2210,2210],
+  kegs:[{"x":2641},{"x":2641},{"x":3537},{"x":2248},{"x":340}],
+  vents:[502,1152,1858,2641,3537],
+  puddles:[[716,77],[1152,84],[1703,79],[2248,84],[2881,67],[3537,74]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"goon","x":588},{"t":"goon","x":425},{"t":"shield","x":464},{"t":"hound","x":1045},{"t":"hound","x":1361,"y":340},{"t":"hound","x":950},{"t":"hound","x":1135},{"t":"hound","x":1711},{"t":"hound","x":1695},{"t":"goon","x":1361,"y":340},{"t":"shield","x":1671},{"t":"hound","x":1598},{"t":"goon","x":2373},{"t":"hound","x":2371},{"t":"goon","x":2411},{"t":"goon","x":3118},{"t":"goon","x":3128},{"t":"hound","x":3232,"y":381},{"t":"goon","x":3106},{"t":"hound","x":3496},{"t":"hound","x":3617},{"t":"hound","x":3569},{"t":"hound","x":4348},{"t":"shield","x":4294},{"t":"hound","x":4303},{"t":"shield","x":4279},{"t":"hound","x":4957},{"t":"hound","x":4593},{"t":"hound","x":4931},{"t":"hound","x":4584},{"t":"hound","x":5539},{"t":"goon","x":5386},{"t":"hound","x":5372},{"t":"hound","x":5329}],
-  door:6340, rank:{"s":174,"a":228,"b":314} },
+  enemies:[{"t":"hound","x":292},{"t":"hound","x":432},{"t":"hound","x":426},{"t":"hound","x":736},{"t":"hound","x":826},{"t":"hound","x":768},{"t":"hound","x":977},{"t":"hound","x":999},{"t":"hound","x":1059},{"t":"hound","x":1174},{"t":"hound","x":975},{"t":"hound","x":1563},{"t":"hound","x":1617},{"t":"hound","x":1573},{"t":"hound","x":1763},{"t":"hound","x":1801},{"t":"hound","x":1858},{"t":"hound","x":1860},{"t":"hound","x":2247},{"t":"hound","x":2204},{"t":"hound","x":2201},{"t":"hound","x":2156},{"t":"hound","x":2470},{"t":"hound","x":2436},{"t":"hound","x":2433},{"t":"hound","x":2380},{"t":"hound","x":2847},{"t":"hound","x":2993},{"t":"hound","x":2740},{"t":"hound","x":2952},{"t":"hound","x":3107},{"t":"hound","x":3161},{"t":"hound","x":3115},{"t":"hound","x":3102},{"t":"hound","x":3245},{"t":"hound","x":3474},{"t":"hound","x":3540},{"t":"hound","x":3544}],
+  door:4140, rank:{"s":107,"a":150,"b":225} },
 
 { name:"15 — THE WIRE ROOM", sign:"WIRE ROOM",
-  lore:"Every shot you fire paints you. A SUPPRESSOR keeps the marksmen guessing.",
-  len:6800,
-  floors:[[-100,728],[994,1858],[2156,2827],[3030,3903],[4055,4902],[5071,5877],[6077,7100]],
-  ledges:[{"x":20,"y":383,"w":126},{"x":1114,"y":382,"w":158},{"x":1469,"y":299,"w":148},{"x":2276,"y":385,"w":143},{"x":3150,"y":382,"w":132},{"x":4175,"y":388,"w":142},{"x":5191,"y":380,"w":146},{"x":5473,"y":364,"w":149},{"x":6197,"y":399,"w":155}],
-  crates:[{"x":380,"y":378},{"x":1071,"y":378},{"x":1437,"y":378},{"x":2252,"y":378},{"x":3383,"y":378},{"x":3814,"y":378},{"x":4814,"y":378},{"x":5236,"y":378},{"x":5683,"y":378},{"x":83,"y":325},{"x":2347,"y":327},{"x":6274,"y":341}],
-  bone:{"x":1543,"y":265},
-  lamps:[380,1267,2252,3165,3814,4578,5447,6538],
-  checkpoints:[1426,3467,4479,5474],
-  kegs:[{"x":4395},{"x":380},{"x":6303},{"x":3584},{"x":4578}],
-  vents:[635,1672,3165,4155,5236,6538],
-  puddles:[[1071,65],[1672,70],[2662,84],[3584,77],[4395,66],[5236,77],[6303,85]],
+  lore:"Every rifle in the building has a sightline on this floor. Stay low, stay quiet.",
+  len:6000,
+  floors:[[-100,979],[1104,2094],[2341,3447],[3647,4712],[4920,6320]],
+  ledges:[{"x":47,"y":387,"w":114},{"x":288,"y":288,"w":128},{"x":467,"y":174,"w":149},{"x":698,"y":170,"w":146},{"x":1268,"y":380,"w":117},{"x":1470,"y":243,"w":142},{"x":1730,"y":170,"w":115},{"x":2461,"y":386,"w":133},{"x":2630,"y":266,"w":129},{"x":2831,"y":170,"w":147},{"x":3762,"y":387,"w":121},{"x":3987,"y":273,"w":134},{"x":4182,"y":170,"w":124},{"x":5020,"y":386,"w":116},{"x":5204,"y":277,"w":127},{"x":5423,"y":182,"w":133},{"x":5599,"y":170,"w":118}],
+  crates:[{"x":709,"y":378},{"x":1461,"y":378},{"x":1994,"y":378},{"x":3799,"y":378},{"x":5567,"y":378},{"x":352,"y":230},{"x":1326,"y":322},{"x":1787,"y":112},{"x":2527,"y":328},{"x":2904,"y":112},{"x":3822,"y":329}],
+  bone:{"x":771,"y":136},
+  lamps:[340,848,1679,2390,2961,3972,4550,5567],
+  checkpoints:[1599,2894,4180],
+  kegs:[{"x":1310},{"x":3200},{"x":3972}],
+  vents:[579,1461,2390,3200,4343,5567],
+  puddles:[[709,83],[1461,80],[1994,81],[2769,90],[3799,83],[4343,70],[5368,80]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"blade","x":574},{"t":"goon","x":391},{"t":"marksman","x":464},{"t":"marksman","x":1242},{"t":"heavy","x":1360},{"t":"marksman","x":1454},{"t":"heavy","x":2205},{"t":"heavy","x":2234},{"t":"heavy","x":2214},{"t":"blade","x":2200},{"t":"marksman","x":3106},{"t":"goon","x":3142},{"t":"blade","x":3091},{"t":"marksman","x":3081},{"t":"marksman","x":3736},{"t":"heavy","x":4246,"y":388},{"t":"marksman","x":3703},{"t":"marksman","x":4761},{"t":"marksman","x":4713},{"t":"heavy","x":4631},{"t":"heavy","x":5642},{"t":"marksman","x":5491},{"t":"goon","x":5264,"y":380},{"t":"goon","x":5590},{"t":"marksman","x":5531}],
-  door:6740, rank:{"s":178,"a":233,"b":320} },
+  enemies:[{"t":"goon","x":346},{"t":"goon","x":240},{"t":"marksman","x":345},{"t":"goon","x":381},{"t":"goon","x":1758},{"t":"goon","x":1787,"y":170},{"t":"marksman","x":1541,"y":243},{"t":"marksman","x":1787,"y":170},{"t":"marksman","x":1787,"y":170},{"t":"goon","x":2972},{"t":"goon","x":2915},{"t":"goon","x":2900},{"t":"marksman","x":3081},{"t":"marksman","x":4436}],
+  door:5940, rank:{"s":89,"a":125,"b":187} },
 
 { name:"16 — DEAD DROP", sign:"DEAD DROP",
-  lore:"Rooftop to rooftop, and the gap does not care how brave you are. TACTICAL BOOTS help.",
-  len:6600,
-  floors:[[-100,582],[751,1418],[1531,2418],[2692,3553],[3756,4525],[4743,5602],[5696,6900]],
-  ledges:[{"x":20,"y":391,"w":149},{"x":364,"y":320,"w":160},{"x":871,"y":399,"w":122},{"x":1192,"y":315,"w":132},{"x":1651,"y":382,"w":137},{"x":2057,"y":311,"w":154},{"x":2812,"y":385,"w":128},{"x":3138,"y":382,"w":135},{"x":3876,"y":394,"w":121},{"x":4171,"y":359,"w":150},{"x":4863,"y":381,"w":156},{"x":5217,"y":329,"w":165},{"x":5816,"y":390,"w":146},{"x":6184,"y":312,"w":120},{"x":6450,"y":245,"w":111}],
-  crates:[{"x":380,"y":378},{"x":1077,"y":378},{"x":1891,"y":378},{"x":2150,"y":378},{"x":2789,"y":378},{"x":2997,"y":378},{"x":5091,"y":378},{"x":5543,"y":378},{"x":2876,"y":327},{"x":3936,"y":336},{"x":5889,"y":332}],
-  bone:{"x":6505,"y":211},
-  lamps:[380,1295,2150,2997,3903,4926,5543,6394],
-  checkpoints:[1975,3123,4141,5173],
-  kegs:[{"x":1077},{"x":5315},{"x":5091},{"x":4104},{"x":6394},{"x":5948},{"x":4104}],
-  vents:[868,1891,2997,4104,5315,6394],
-  puddles:[[1077,68],[1891,71],[2789,86],[3417,76],[4275,64],[5315,80],[6149,78]],
+  lore:"Roof to roof. The gap does not care how many contracts you have taken.",
+  len:6400,
+  floors:[[-100,225],[439,776],[994,1327],[1528,1790],[2001,2287],[2502,2831],[3093,3362],[3651,3928],[4179,4435],[4717,5046],[5330,5578],[5779,6044],[6255,6720]],
+  ledges:[{"x":277,"y":404,"w":110},{"x":830,"y":379,"w":110},{"x":1373,"y":391,"w":110},{"x":1841,"y":398,"w":110},{"x":2340,"y":392,"w":110},{"x":2907,"y":394,"w":110},{"x":3452,"y":375,"w":110},{"x":3999,"y":406,"w":110},{"x":4521,"y":391,"w":110},{"x":5133,"y":402,"w":110},{"x":5624,"y":375,"w":110},{"x":6095,"y":400,"w":110}],
+  crates:[{"x":1605,"y":378},{"x":2236,"y":378},{"x":3751,"y":378},{"x":5478,"y":378},{"x":885,"y":321},{"x":1896,"y":340},{"x":4054,"y":348},{"x":5188,"y":344}],
+  bone:{"x":3507,"y":341},
+  lamps:[561,2105,3205,4901],
+  checkpoints:[1659,3228,4882],
+  kegs:[{"x":3205},{"x":2105},{"x":2105},{"x":4901},{"x":5944},{"x":3751}],
+  vents:[1200,2701,4901],
+  puddles:[[1605,73],[2701,77],[4273,91],[5944,92]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"heavy","x":446},{"t":"goon","x":540},{"t":"bomber","x":392},{"t":"goon","x":1357},{"t":"heavy","x":1329},{"t":"blade","x":1355},{"t":"goon","x":2136},{"t":"bomber","x":2069},{"t":"goon","x":1961},{"t":"blade","x":3005},{"t":"blade","x":2997},{"t":"blade","x":3141},{"t":"blade","x":2874},{"t":"goon","x":3814},{"t":"goon","x":3936,"y":394},{"t":"heavy","x":3842},{"t":"goon","x":3936,"y":394},{"t":"goon","x":3842},{"t":"goon","x":4452},{"t":"goon","x":4429},{"t":"bomber","x":4461},{"t":"goon","x":4471},{"t":"goon","x":5385},{"t":"bomber","x":5315},{"t":"bomber","x":5338},{"t":"heavy","x":5297}],
-  door:6540, rank:{"s":182,"a":238,"b":326} },
+  enemies:[{"t":"blade","x":529},{"t":"blade","x":492},{"t":"goon","x":332,"y":404},{"t":"goon","x":545},{"t":"blade","x":488},{"t":"bomber","x":2083},{"t":"goon","x":1759},{"t":"goon","x":2084},{"t":"bomber","x":1728},{"t":"goon","x":1896,"y":398},{"t":"blade","x":3327},{"t":"bomber","x":3324},{"t":"bomber","x":3168},{"t":"goon","x":3188},{"t":"bomber","x":4816},{"t":"blade","x":4774},{"t":"goon","x":4576,"y":391}],
+  door:6340, rank:{"s":98,"a":137,"b":206} },
 
 { name:"17 — THE VAULT ROW", sign:"VAULT ROW",
-  lore:"Deposit boxes full of other people's leverage. The GOLD BRIEFCASE pays for the trouble.",
-  len:6400,
-  floors:[[-100,686],[860,1480],[1765,2560],[2844,3590],[3825,4457],[4589,5236],[5528,6700]],
-  ledges:[{"x":20,"y":400,"w":113},{"x":980,"y":398,"w":142},{"x":1885,"y":397,"w":110},{"x":2256,"y":358,"w":132},{"x":2964,"y":396,"w":143},{"x":3310,"y":286,"w":163},{"x":3945,"y":386,"w":137},{"x":4235,"y":325,"w":114},{"x":4709,"y":396,"w":156},{"x":5648,"y":386,"w":136}],
-  crates:[{"x":569,"y":378},{"x":1122,"y":378},{"x":1329,"y":378},{"x":2225,"y":378},{"x":2990,"y":378},{"x":3242,"y":378},{"x":3451,"y":378},{"x":4929,"y":378},{"x":76,"y":342},{"x":1051,"y":340},{"x":2322,"y":300},{"x":3391,"y":228},{"x":4013,"y":328}],
-  bone:{"x":3391,"y":252},
-  lamps:[380,1122,2225,3242,4234,5163,5992],
-  checkpoints:[2163,3217,4141,4913],
-  kegs:[{"x":4079},{"x":5563},{"x":1329},{"x":569},{"x":2990},{"x":3451}],
-  vents:[569,2010,3242,4704,5807],
-  puddles:[[898,64],[2010,80],[2990,68],[4079,87],[4929,81],[5807,69]],
+  lore:"Nine hundred deposit boxes of other people's leverage, and a long walk past all of them.",
+  len:9000,
+  floors:[[-100,807],[1019,1873],[2164,3125],[3246,4112],[4319,5212],[5473,6336],[6495,7441],[7667,9320]],
+  ledges:[{"x":26,"y":368,"w":160},{"x":411,"y":362,"w":156},{"x":1166,"y":373,"w":163},{"x":1469,"y":395,"w":138},{"x":2307,"y":389,"w":154},{"x":2591,"y":363,"w":160},{"x":3436,"y":373,"w":146},{"x":3864,"y":367,"w":142},{"x":4447,"y":383,"w":143},{"x":5675,"y":383,"w":151},{"x":6645,"y":377,"w":128},{"x":7863,"y":374,"w":146},{"x":8315,"y":389,"w":163}],
+  crates:[{"x":1171,"y":378},{"x":2664,"y":378},{"x":3375,"y":378},{"x":5782,"y":378},{"x":5925,"y":378},{"x":6623,"y":378},{"x":7175,"y":378},{"x":8014,"y":378},{"x":8642,"y":378},{"x":2384,"y":331},{"x":2671,"y":305},{"x":3935,"y":309},{"x":5750,"y":325},{"x":6709,"y":319}],
+  bone:{"x":489,"y":328},
+  lamps:[340,1171,1682,2664,3375,3988,4742,5573,6098],
+  checkpoints:[1446,3679,5905,6968],
+  kegs:[{"x":5782},{"x":1355},{"x":555},{"x":7815},{"x":4742},{"x":5573},{"x":340},{"x":1355}],
+  vents:[555,1531,2664,3583,4518,5573,6623],
+  puddles:[[713,67],[1531,83],[2477,71],[3071,87],[3781,76],[4518,67],[5099,79],[5925,81]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"bomber","x":415},{"t":"blade","x":409},{"t":"goon","x":559},{"t":"heavy","x":365},{"t":"goon","x":76,"y":400},{"t":"bomber","x":1205},{"t":"bomber","x":1102},{"t":"bomber","x":1136},{"t":"goon","x":1242},{"t":"shield","x":1208},{"t":"blade","x":1991},{"t":"shield","x":2063},{"t":"blade","x":2025},{"t":"shield","x":3012},{"t":"goon","x":3029},{"t":"heavy","x":2976},{"t":"goon","x":2958},{"t":"shield","x":3518},{"t":"heavy","x":3492},{"t":"bomber","x":3522},{"t":"blade","x":3558},{"t":"goon","x":3539},{"t":"shield","x":4323},{"t":"heavy","x":4274},{"t":"goon","x":4395},{"t":"bomber","x":5157},{"t":"shield","x":5151},{"t":"heavy","x":5132}],
-  door:6340, rank:{"s":186,"a":243,"b":332} },
+  enemies:[{"t":"heavy","x":577},{"t":"blade","x":439},{"t":"goon","x":433},{"t":"blade","x":106,"y":368},{"t":"goon","x":394},{"t":"shield","x":1555},{"t":"goon","x":1613},{"t":"blade","x":1444},{"t":"shield","x":2565},{"t":"heavy","x":2551},{"t":"heavy","x":2553},{"t":"blade","x":2523},{"t":"bomber","x":3471},{"t":"goon","x":3544},{"t":"heavy","x":3519},{"t":"heavy","x":3457},{"t":"shield","x":4474},{"t":"bomber","x":4578},{"t":"blade","x":4576},{"t":"goon","x":5764},{"t":"blade","x":5539},{"t":"shield","x":5642},{"t":"heavy","x":5750,"y":383},{"t":"shield","x":5569},{"t":"shield","x":6786},{"t":"goon","x":6606},{"t":"goon","x":6663},{"t":"bomber","x":7832},{"t":"goon","x":7804},{"t":"goon","x":7800}],
+  door:8940, rank:{"s":150,"a":210,"b":315} },
 
 { name:"18 — THE ANALYST FLOOR", sign:"ANALYSTS",
-  lore:"The people who wrote the file. They are not soldiers — their guards are.",
-  len:6600,
-  floors:[[-100,776],[971,1709],[1818,2695],[2988,3774],[3889,4753],[4999,5749],[5949,6900]],
-  ledges:[{"x":20,"y":390,"w":144},{"x":313,"y":342,"w":131},{"x":1091,"y":386,"w":155},{"x":1938,"y":382,"w":144},{"x":2230,"y":331,"w":152},{"x":3108,"y":393,"w":138},{"x":4009,"y":380,"w":123},{"x":4390,"y":277,"w":163},{"x":5119,"y":395,"w":113},{"x":6069,"y":400,"w":126},{"x":6426,"y":349,"w":138}],
-  crates:[{"x":380,"y":378},{"x":699,"y":378},{"x":1882,"y":378},{"x":3501,"y":378},{"x":4601,"y":378},{"x":5193,"y":378},{"x":5413,"y":378},{"x":5631,"y":378},{"x":6036,"y":378},{"x":2306,"y":273},{"x":4070,"y":322},{"x":6132,"y":342}],
-  bone:{"x":4471,"y":243},
-  lamps:[380,1066,1662,2286,3250,3955,4601,5413,6246],
-  checkpoints:[1340,3381,4321,5374],
-  kegs:[{"x":380},{"x":4414},{"x":1662},{"x":1295},{"x":3723}],
-  vents:[542,1487,2286,3501,4414,5413],
-  puddles:[[699,71],[1487,75],[2092,77],[3033,78],[3723,90],[4414,75],[5193,68],[6036,88]],
+  lore:"The people who wrote the file are not fighters. The floor between you and them is.",
+  len:5000,
+  floors:[[-100,5320]],
+  ledges:[],
+  crates:[{"x":1087,"y":378},{"x":2171,"y":378},{"x":2762,"y":378},{"x":2908,"y":378},{"x":3633,"y":378},{"x":4075,"y":378},{"x":4598,"y":378}],
+  bone:{"x":3100,"y":350},
+  lamps:[340,868,1420,2020,2565,3117,3633,4075,4598],
+  checkpoints:[2610,2610,2610],
+  kegs:[{"x":2908},{"x":1220},{"x":3932},{"x":2020}],
+  vents:[533,1220,2020,2762,3478,4075,4770],
+  puddles:[[711,80],[1220,65],[1795,84],[2360,69],[2908,89],[3478,68],[3932,82],[4432,86]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"heavy","x":358},{"t":"blade","x":500},{"t":"heavy","x":442},{"t":"marksman","x":1110},{"t":"shield","x":1203},{"t":"marksman","x":1273},{"t":"blade","x":1168,"y":386},{"t":"blade","x":1236},{"t":"shield","x":1917},{"t":"shield","x":1880},{"t":"shield","x":1912},{"t":"shield","x":2581},{"t":"blade","x":2527},{"t":"goon","x":2570},{"t":"goon","x":2585},{"t":"goon","x":3149},{"t":"shield","x":3278},{"t":"goon","x":3190},{"t":"heavy","x":4051},{"t":"shield","x":4471,"y":277},{"t":"heavy","x":4471,"y":277},{"t":"heavy","x":4159},{"t":"heavy","x":4644},{"t":"blade","x":5175,"y":395},{"t":"shield","x":4471,"y":277},{"t":"goon","x":4646},{"t":"blade","x":5455},{"t":"goon","x":5504},{"t":"goon","x":5594}],
-  door:6540, rank:{"s":190,"a":248,"b":338} },
+  enemies:[{"t":"heavy","x":316},{"t":"goon","x":408},{"t":"goon","x":471},{"t":"shield","x":267},{"t":"shield","x":960},{"t":"shield","x":1043},{"t":"shield","x":1136},{"t":"goon","x":950},{"t":"goon","x":1670},{"t":"heavy","x":1788},{"t":"goon","x":1572},{"t":"shield","x":1801},{"t":"shield","x":1619},{"t":"goon","x":2331},{"t":"goon","x":2200},{"t":"shield","x":2321},{"t":"shield","x":2426},{"t":"goon","x":2938},{"t":"shield","x":2929},{"t":"goon","x":2824},{"t":"heavy","x":2817},{"t":"goon","x":3555},{"t":"heavy","x":3318},{"t":"shield","x":3476},{"t":"goon","x":3306},{"t":"heavy","x":3537},{"t":"shield","x":4090},{"t":"goon","x":4054}],
+  door:4940, rank:{"s":100,"a":140,"b":210} },
 
 { name:"19 — THE BLACK FILE", sign:"BLACK FILE",
-  lore:"ZERO is waiting in the stacks. He read the file. He knows how it ends.",
-  len:6400,
-  floors:[[-100,547],[754,1610],[1838,2482],[2621,3451],[3568,4253],[4358,4985],[5285,5916],[6016,6800]],
-  ledges:[{"x":20,"y":391,"w":156},{"x":874,"y":384,"w":120},{"x":1242,"y":363,"w":150},{"x":1958,"y":382,"w":121},{"x":2741,"y":390,"w":138},{"x":3688,"y":400,"w":114},{"x":4478,"y":394,"w":128},{"x":4735,"y":323,"w":147},{"x":5405,"y":381,"w":158},{"x":6136,"y":398,"w":150}],
-  crates:[{"x":380,"y":378},{"x":854,"y":378},{"x":1012,"y":378},{"x":1432,"y":378},{"x":2010,"y":378},{"x":2181,"y":378},{"x":4412,"y":378},{"x":4626,"y":378},{"x":4829,"y":378},{"x":2810,"y":332},{"x":5484,"y":323},{"x":6211,"y":340}],
-  bone:{"x":4808,"y":289},
-  lamps:[380,1197,2181,2956,3815,4626,5702],
-  checkpoints:[2160,3036,4672,5601],
-  kegs:[{"x":2956},{"x":4829},{"x":3628},{"x":3628},{"x":1012}],
-  vents:[854,2010,2956,3987,5444],
-  puddles:[[1012,91],[2010,69],[2718,76],[3628,84],[4412,71],[5444,75]],
+  lore:"ZERO is in the stacks. He read your file before you did.",
+  len:4400,
+  floors:[[-100,1254],[1549,2904],[3034,4720]],
+  ledges:[{"x":43,"y":400,"w":135},{"x":1729,"y":363,"w":149},{"x":3240,"y":385,"w":141},{"x":3587,"y":368,"w":150}],
+  crates:[{"x":1599,"y":378},{"x":1998,"y":378},{"x":2354,"y":378},{"x":3838,"y":378},{"x":1803,"y":305}],
+  bone:{"x":1803,"y":329},
+  lamps:[340,854,1599,2159,2720,3467,4077],
+  checkpoints:[577,2227,3877],
+  kegs:[{"x":4077},{"x":1219},{"x":3117},{"x":3117}],
+  vents:[485,1219,2159,3117,3838],
+  puddles:[[705,89],[1219,80],[1998,64],[2527,86],[3326,74],[3838,83]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"blade","x":384},{"t":"heavy","x":402},{"t":"blade","x":365},{"t":"shield","x":481},{"t":"blade","x":1255},{"t":"heavy","x":1140},{"t":"marksman","x":1037},{"t":"shield","x":1028},{"t":"heavy","x":1914},{"t":"marksman","x":1974},{"t":"hound","x":1942},{"t":"marksman","x":1898},{"t":"marksman","x":2674},{"t":"shield","x":2810,"y":390},{"t":"heavy","x":2726},{"t":"hound","x":2667},{"t":"heavy","x":2810,"y":390},{"t":"marksman","x":3399},{"t":"blade","x":3369},{"t":"shield","x":3249},{"t":"shield","x":3298},{"t":"marksman","x":3348},{"t":"shield","x":3825},{"t":"shield","x":4013},{"t":"marksman","x":3926},{"t":"blade","x":4538},{"t":"shield","x":4616},{"t":"blade","x":4634},{"t":"heavy","x":5450},{"t":"hound","x":5484,"y":381},{"t":"zero","x":5760}],
-  door:6340, rank:{"s":194,"a":253,"b":344} },
+  enemies:[{"t":"heavy","x":479},{"t":"hound","x":370},{"t":"heavy","x":110,"y":400},{"t":"blade","x":352},{"t":"hound","x":1201},{"t":"blade","x":1203},{"t":"blade","x":1168},{"t":"heavy","x":1199},{"t":"blade","x":1147},{"t":"blade","x":2304},{"t":"heavy","x":2190},{"t":"heavy","x":2322},{"t":"hound","x":2227},{"t":"heavy","x":2316},{"t":"hound","x":3191},{"t":"heavy","x":3324},{"t":"zero","x":3872}],
+  door:4340, rank:{"s":74,"a":104,"b":155} },
 
 { name:"20 — LANGLEY ROOF", sign:"LANGLEY",
-  lore:"Rotor wash and the last page. Burn it and go home.",
-  len:6600,
-  floors:[[-100,549],[706,1423],[1682,2473],[2665,3292],[3589,4303],[4465,5232],[5462,6302],[6449,7000]],
-  ledges:[{"x":20,"y":397,"w":161},{"x":826,"y":395,"w":124},{"x":1802,"y":389,"w":147},{"x":2785,"y":382,"w":120},{"x":3709,"y":389,"w":143},{"x":4585,"y":389,"w":111},{"x":5582,"y":385,"w":139}],
-  crates:[{"x":380,"y":378},{"x":1870,"y":378},{"x":2249,"y":378},{"x":2783,"y":378},{"x":3228,"y":378},{"x":3790,"y":378},{"x":5668,"y":378},{"x":888,"y":337},{"x":1875,"y":331},{"x":3780,"y":331}],
-  bone:{"x":2845,"y":348},
-  lamps:[380,1253,2249,3016,3790,4652,5512,6107],
-  checkpoints:[2078,2979,4849,5882],
-  kegs:[{"x":1253},{"x":5512},{"x":3635},{"x":2424},{"x":3635},{"x":3016}],
-  vents:[795,2065,3016,3991,5021,6107],
-  puddles:[[1032,92],[2065,67],[2783,79],[3635,70],[4240,91],[5021,72],[5860,88]],
+  lore:"Rotor wash, the last page, and the biggest thing they have left. Burn it and go home.",
+  len:5600,
+  floors:[[-100,1230],[1495,2689],[2885,4090],[4214,5920]],
+  ledges:[{"x":65,"y":370,"w":139},{"x":287,"y":273,"w":109},{"x":447,"y":170,"w":141},{"x":623,"y":170,"w":117},{"x":1603,"y":386,"w":140},{"x":1802,"y":296,"w":107},{"x":2016,"y":173,"w":133},{"x":2253,"y":170,"w":119},{"x":3005,"y":380,"w":139},{"x":3203,"y":254,"w":115},{"x":3398,"y":170,"w":138},{"x":3570,"y":170,"w":131},{"x":4328,"y":375,"w":149},{"x":4567,"y":285,"w":149},{"x":4800,"y":178,"w":132},{"x":5010,"y":170,"w":144}],
+  crates:[{"x":340,"y":378},{"x":741,"y":378},{"x":968,"y":378},{"x":2550,"y":378},{"x":2937,"y":378},{"x":5160,"y":378},{"x":5395,"y":378},{"x":2082,"y":115},{"x":2312,"y":112},{"x":4402,"y":317},{"x":4866,"y":120}],
+  bone:{"x":517,"y":136},
+  lamps:[340,968,1746,2326,3067,3665,4357,4939],
+  checkpoints:[2092,3488,3488],
+  kegs:[{"x":3067},{"x":1178},{"x":4545},{"x":1178},{"x":1945}],
+  vents:[529,1564,2326,3231,4030,4939],
+  puddles:[[741,88],[1564,83],[2151,75],[2937,79],[3470,78],[4030,70],[4777,72],[5395,66]],
   bar:{"x":210,"w":350},
-  enemies:[{"t":"marksman","x":465},{"t":"heavy","x":410},{"t":"bomber","x":477},{"t":"blade","x":423},{"t":"blade","x":492},{"t":"marksman","x":1325},{"t":"shield","x":1271},{"t":"heavy","x":1091},{"t":"blade","x":1201},{"t":"shield","x":1910},{"t":"blade","x":1838},{"t":"marksman","x":1907},{"t":"heavy","x":2701},{"t":"shield","x":2843},{"t":"marksman","x":2739},{"t":"shield","x":2726},{"t":"bomber","x":3244},{"t":"blade","x":3117},{"t":"bomber","x":3192},{"t":"marksman","x":4041},{"t":"marksman","x":4070},{"t":"heavy","x":4215},{"t":"heavy","x":3780,"y":389},{"t":"bomber","x":4860},{"t":"blade","x":4739},{"t":"heavy","x":4826},{"t":"bomber","x":4691},{"t":"shield","x":4682},{"t":"heavy","x":5614},{"t":"heavy","x":5613},{"t":"butcher","x":5940}],
-  door:6540, rank:{"s":198,"a":258,"b":350} }
+  enemies:[{"t":"marksman","x":390},{"t":"blade","x":557},{"t":"marksman","x":359},{"t":"marksman","x":470},{"t":"blade","x":430},{"t":"heavy","x":1568},{"t":"blade","x":1190},{"t":"marksman","x":1577},{"t":"shield","x":2362},{"t":"marksman","x":2384},{"t":"blade","x":2525},{"t":"shield","x":2082,"y":173},{"t":"shield","x":3503},{"t":"shield","x":3411},{"t":"marksman","x":3490},{"t":"heavy","x":4359},{"t":"heavy","x":4641,"y":285},{"t":"blade","x":4641,"y":285},{"t":"butcher","x":4928}],
+  door:5540, rank:{"s":91,"a":127,"b":191} }
 ];
 
 /* ---------- game state ---------- */
@@ -4029,6 +4049,150 @@ function drawCityBand(camMul, baseY, o){
   }
   g.restore();
 }
+/* ================= ACT 2 VENUES =================
+   Act 1 is the city: three parallax skyline bands, a moon and a searchlight.
+   Repeating that for ten more levels is exactly why act 2 read as a re-skin,
+   so act 2 goes INDOORS. Same parallax discipline (far wall / mid furniture /
+   near foreground), same PAL hooks so every district grade still lands — but
+   nothing to do with a skyline.
+   VENUES is indexed like THEMES; anything unlisted stays "city".            */
+const VENUES=["city","city","city","city","city","city","city","city","city","city",
+              "warehouse","alley","warehouse","alley","club","alley","warehouse","club","warehouse","club"];
+const venueOf=i=>VENUES[i]||"city";
+
+// tile a band across the level with its own parallax speed
+function band(mul, step, fn){
+  g.save(); g.translate(-camX*mul,0);
+  const span=lvl.len*mul+W+step*2;
+  for(let x=-step,i=0; x<span; x+=step,i++) fn(x,i);
+  g.restore();
+}
+
+function drawWarehouseBG(t,cfg){
+  // FAR: corrugated back wall + clerestory windows letting the night in
+  g.fillStyle=shade(PAL.far,-0.10); g.fillRect(0,120,W,360);
+  band(0.16,26,(x)=>{ g.fillStyle=shade(PAL.far,0.05); g.fillRect(x,120,13,360); });
+  band(0.16,300,(x,i)=>{
+    if(i%2)return;
+    g.fillStyle=shade(PAL.skyBot,0.30); g.fillRect(x+40,150,190,74);
+    g.fillStyle=shade(PAL.far,0.10);
+    for(let k=1;k<4;k++)g.fillRect(x+40+k*47,150,3,74);
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.09*cfg.haze;
+    const sg=g.createLinearGradient(x+135,224,x+205,470);
+    sg.addColorStop(0,PAL.farLit); sg.addColorStop(1,"rgba(0,0,0,0)");
+    g.fillStyle=sg; g.beginPath(); g.moveTo(x+40,224); g.lineTo(x+230,224);
+    g.lineTo(x+320,470); g.lineTo(x+110,470); g.closePath(); g.fill(); g.restore();
+  });
+  // MID: pallet racking stacked with crates
+  band(0.5,340,(x)=>{
+    g.fillStyle=shade(PAL.mid,-0.30);
+    for(const uy of [250,330,410]) g.fillRect(x,uy,300,9);
+    g.fillRect(x,250,10,170); g.fillRect(x+290,250,10,170);
+    g.fillStyle=shade(PAL.mid,0.12);
+    for(const [cx,cy] of [[24,196],[104,196],[190,210],[36,276],[150,290],[212,276]])
+      g.fillRect(x+cx,cy,62,52);
+    g.fillStyle=shade(PAL.mid,-0.12);
+    for(const [cx,cy] of [[24,196],[190,210],[150,290]]) g.fillRect(x+cx,cy+22,62,5);
+  });
+  // NEAR: roof girders and caged lamps
+  band(0.8,430,(x)=>{
+    g.fillStyle="#0c0f18"; g.fillRect(x,96,430,16);
+    for(let k=0;k<4;k++){ const gx=x+30+k*110;
+      g.beginPath(); g.moveTo(gx,112); g.lineTo(gx+55,150); g.lineTo(gx+110,112); g.closePath();
+      g.strokeStyle="#0c0f18"; g.lineWidth=4; g.stroke(); }
+    const lx=x+215;
+    g.fillStyle="#0c0f18"; g.fillRect(lx-1,112,2,40);
+    g.fillStyle=PAL.lamp||PAL.farLit; g.beginPath(); g.arc(lx,158,9,0,TAU); g.fill();
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.20;
+    const lg=g.createLinearGradient(lx,158,lx,470);
+    lg.addColorStop(0,PAL.lamp||PAL.farLit); lg.addColorStop(1,"rgba(0,0,0,0)");
+    g.fillStyle=lg; g.beginPath(); g.moveTo(lx-13,162); g.lineTo(lx+13,162);
+    g.lineTo(lx+96,470); g.lineTo(lx-96,470); g.closePath(); g.fill(); g.restore();
+  });
+}
+
+function drawAlleyBG(t,cfg){
+  // FAR: the opposite wall, brick courses, a few lit windows
+  g.fillStyle=shade(PAL.far,-0.06); g.fillRect(0,90,W,390);
+  band(0.18,64,(x,i)=>{ g.fillStyle=shade(PAL.far,i%2?0.05:-0.02); g.fillRect(x,90,62,390); });
+  band(0.18,17,(x)=>{ g.fillStyle="rgba(0,0,0,0.13)"; g.fillRect(0,90+((x/17|0)%23)*17,W,1); });
+  band(0.28,260,(x,i)=>{
+    if(i%3===1){ g.fillStyle=shade(PAL.skyBot,0.34); g.fillRect(x+60,170,54,66);
+      g.fillStyle="rgba(0,0,0,0.35)"; g.fillRect(x+86,170,3,66); g.fillRect(x+60,201,54,3);
+      g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.14;
+      softGlow(x+87,203,64,"255,210,150",0.5); g.restore(); }
+  });
+  // MID: fire escapes, ducts and downpipes
+  band(0.55,300,(x,i)=>{
+    g.strokeStyle=shade(PAL.mid,-0.34); g.lineWidth=4;
+    for(const fy of [214,300]){
+      g.beginPath(); g.moveTo(x+30,fy); g.lineTo(x+150,fy); g.stroke();
+      g.beginPath(); g.moveTo(x+150,fy); g.lineTo(x+30,fy+64); g.stroke();
+      for(let k=0;k<5;k++){ g.beginPath(); g.moveTo(x+40+k*26,fy); g.lineTo(x+40+k*26,fy-16); g.stroke(); }
+    }
+    g.fillStyle=shade(PAL.mid,-0.24); g.fillRect(x+206,196,7,240);            // downpipe
+    if(i%2){ g.fillStyle=shade(PAL.mid,0.06); g.fillRect(x+232,236,52,40);    // AC unit
+      g.fillStyle=shade(PAL.mid,-0.30); g.fillRect(x+240,244,36,24); }
+  });
+  // NEAR: dumpsters, pallets, a sodium lamp with a real pool of light
+  band(0.82,380,(x,i)=>{
+    g.fillStyle="#0b0e16";
+    g.fillRect(x+40,398,104,58); g.fillRect(x+34,390,116,10);
+    for(let k=0;k<4;k++)g.fillRect(x+250+k*7,404,4,52);
+    const lx=x+318;
+    g.fillStyle="#0b0e16"; g.fillRect(lx,150,6,26); g.fillRect(lx-16,176,38,9);
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.22;
+    softGlow(lx+3,186,40,"255,200,120",0.8);
+    const lg=g.createLinearGradient(lx+3,186,lx+3,470);
+    lg.addColorStop(0,"rgba(255,205,130,0.55)"); lg.addColorStop(1,"rgba(0,0,0,0)");
+    g.fillStyle=lg; g.beginPath(); g.moveTo(lx-14,186); g.lineTo(lx+20,186);
+    g.lineTo(lx+96,470); g.lineTo(lx-90,470); g.closePath(); g.fill(); g.restore();
+  });
+}
+
+function drawClubBG(t,cfg){
+  // FAR: stage riser and a wall of speaker stacks
+  g.fillStyle=shade(PAL.far,-0.14); g.fillRect(0,130,W,350);
+  band(0.2,420,(x)=>{
+    g.fillStyle=shade(PAL.far,0.10); g.fillRect(x+40,300,340,26);            // riser
+    g.fillStyle="#08090f";
+    for(const sx of [x+56,x+300]){ g.fillRect(sx,176,64,124);
+      g.fillStyle=shade(PAL.mid,0.16);
+      for(let k=0;k<3;k++) g.beginPath(), g.arc(sx+32,196+k*40,15,0,TAU), g.fill();
+      g.fillStyle="#08090f"; }
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.10*cfg.haze;
+    softGlow(x+210,270,150,"255,255,255",0.20); g.restore();
+  });
+  // MID: the bar — bottle shelf glow and booths
+  band(0.52,360,(x,i)=>{
+    if(i%2){ g.fillStyle=shade(PAL.mid,-0.30); g.fillRect(x,336,250,96);     // bar block
+      g.fillStyle=shade(PAL.mid,0.10); g.fillRect(x,330,250,10);
+      g.save(); g.globalCompositeOperation="lighter";
+      for(let k=0;k<9;k++){ g.globalAlpha=0.13+0.05*Math.sin(t*1.3+k);
+        g.fillStyle=PAL.accent; g.fillRect(x+16+k*25,286,9,40); }
+      g.restore();
+    } else { g.fillStyle=shade(PAL.mid,-0.24);                                // booth
+      g.fillRect(x+40,352,150,72); g.fillRect(x+40,320,12,48); g.fillRect(x+178,320,12,48); }
+  });
+  // NEAR: lighting truss + sweeping beams + floor haze
+  band(0.86,300,(x)=>{
+    g.fillStyle="#0a0c14"; g.fillRect(x,88,300,12);
+    for(let k=0;k<4;k++){ const px=x+38+k*70;
+      g.fillRect(px-8,100,16,20);
+      g.save(); g.globalCompositeOperation="lighter";
+      const sw=Math.sin(t*0.9+k*1.7)*0.42;
+      g.translate(px,120); g.rotate(sw); g.globalAlpha=0.13+0.05*Math.sin(t*2.6+k);
+      const bg2=g.createLinearGradient(0,0,0,340);
+      bg2.addColorStop(0,k%2?PAL.accent:PAL.farLit); bg2.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=bg2; g.beginPath(); g.moveTo(-9,0); g.lineTo(9,0);
+      g.lineTo(74,340); g.lineTo(-74,340); g.closePath(); g.fill(); g.restore(); }
+  });
+  g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.05*cfg.cloud;
+  const hz=g.createLinearGradient(0,330,0,470);
+  hz.addColorStop(0,"rgba(0,0,0,0)"); hz.addColorStop(1,PAL.midLit);
+  g.fillStyle=hz; g.fillRect(0,330,W,140); g.restore();
+}
+
 function drawFogBank(y, h, drift, mul){ // graded volumetric fog sitting BETWEEN parallax planes
   const t=performance.now()/1000;
   const fg=g.createLinearGradient(0,y-h/2,0,y+h/2);
@@ -4055,6 +4219,9 @@ function render(){
   const sky=g.createLinearGradient(0,0,0,H*0.8);
   sky.addColorStop(0,PAL.skyTop); sky.addColorStop(0.75,PAL.skyBot); sky.addColorStop(1,PAL.horizon);
   g.fillStyle=sky; g.fillRect(0,0,W,H);
+  const VEN=venueOf(lvIdx);
+  // stars and a moon only make sense with sky above you — indoors there is a roof
+  if(VEN==="city"){
   g.save(); g.globalCompositeOperation="lighter";
   for(let i=0;i<40;i++){ const sx=(i*211-camX*0.05)%W, sy=(i*97)%190;
     g.globalAlpha=0.12+0.16*Math.abs(Math.sin(t*0.5+i));
@@ -4066,7 +4233,17 @@ function render(){
     g.fillStyle="rgba(170,182,220,0.35)";
     g.beginPath(); g.arc(mx-9,76,6,0,TAU); g.arc(mx+9,92,4.4,0,TAU); g.fill(); }   // craters ride the moon
   g.restore();
+  }
   const cfg=bg();
+  if(VEN!=="city"){
+    // ceiling: kill the sky gradient's top half so the room feels enclosed
+    const ce=g.createLinearGradient(0,0,0,190);
+    ce.addColorStop(0,"#04060a"); ce.addColorStop(1,"rgba(4,6,10,0)");
+    g.fillStyle=ce; g.fillRect(0,0,W,190);
+    if(VEN==="warehouse")drawWarehouseBG(t,cfg);
+    else if(VEN==="alley")drawAlleyBG(t,cfg);
+    else drawClubBG(t,cfg);
+  } else {
   // far-far ridge (deepest plane) — bracket the parallax so the city recedes for miles (desktop only; phones skip)
   if(!MOBILE)drawCityBand(0.14,300,{ seed:11+lvIdx*4, wmin:26,wmax:54, hmin:60,hmax:150, gap:5,
     winA:0.12, litCut:0.8, crown:shade(PAL.horizon,0.05), base:shade(PAL.horizon,-0.06), warm:PAL.farLit, cool:"#7fa8e8", beacon:false, haze:0.32*cfg.haze });
@@ -4101,6 +4278,7 @@ function render(){
   // mid skyline (detailed) — own translate inside drawCityBand
   drawCityBand(0.55,400,{ seed:7+lvIdx*4, wmin:92,wmax:152, hmin:132,hmax:238, gap:9,
     winA:0.5, litCut:0.7, crown:shade(PAL.mid,0.06), base:shade(PAL.mid,-0.42), warm:PAL.midLit, cool:"#8fb8ff", beacon:false, haze:0.05*cfg.haze });
+  }   // end city-only backdrop
   // $WICK + level sign (mid parallax, additive)
   g.save(); g.translate(-camX*0.55,0);
   g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.9;
@@ -5189,6 +5367,45 @@ function drawGunsmith(t){
       menuBtn(60+CARRY_MAX*186,158,120,34,"⊕ TAKE IN",()=>{
         setCarry([...cs,gsGun]); SFX.coin(2);                          // full → pushes the oldest out
       },"#7cf9a5","900 10px Verdana");
+  }
+
+  /* ---- KJP GEAR ----
+     Gear is fetched from the KJP mint and its effects were already live — a
+     holder silently got +1 heart, faster boots, calmer dogs — but nothing on
+     this screen ever said so. It takes no slot (it rides the OPERATIVE, not
+     the gun), so it gets its own row rather than competing with attachments. */
+  {
+    // KJP GEAR strip — a holder was getting a silent +1 heart with nothing on screen
+    // to explain it. Sits in the gap between the skin label and the stats block; the
+    // per-stat "was 6.5 ▲" deltas below already spell out the numeric effect, so this
+    // only has to NAME what is equipped.
+    // Bottom strip: the only band with real room. Left column ends at the stats
+    // (~508) and the DONE button starts at x760, so x60..710 / y511..531 is clear.
+    const gy=511, RIGHT=710, own=ownedGearTypes.filter(t=>GEARDEFS[t]);
+    g.textAlign="left"; g.font="900 9px Verdana"; g.fillStyle=own.length?"#ff8c3a":"#66707f";
+    g.fillText("KJP GEAR",60,gy+14);
+    let x=60+g.measureText("KJP GEAR").width+10;
+    if(!own.length){
+      g.font="bold 9px Verdana"; g.fillStyle="#5b6472";
+      g.fillText("none — 8 field pieces at mint.wick.pics, and they work on every gun",x,gy+14);
+    } else {
+      // Decide the fit BEFORE drawing. Drawing first and tagging the overflow after
+      // put "+N more" on top of the last chip, because by then x was already at the edge.
+      g.font="900 8px Verdana";
+      const ws=own.map(t=>g.measureText(GEARDEFS[t].name).width+14);
+      let fit=own.length, used=()=>ws.slice(0,fit).reduce((a,b)=>a+b+5,0);
+      while(fit>1 && x+used()+(fit<own.length?52:0)>RIGHT) fit--;
+      for(let i=0;i<fit;i++){
+        const w=ws[i];
+        g.save();
+        g.fillStyle="rgba(255,140,58,0.16)"; rr(x,gy,w,20,5); g.fill();
+        g.strokeStyle="#ff8c3a"; g.lineWidth=1.4; rr(x,gy,w,20,5); g.stroke();
+        g.restore();
+        g.fillStyle="#ffb277"; g.font="900 8px Verdana"; g.fillText(GEARDEFS[own[i]].name,x+7,gy+13);
+        x+=w+5;
+      }
+      if(fit<own.length){ g.font="bold 9px Verdana"; g.fillStyle="#8fa3bf"; g.fillText("+"+(own.length-fit)+" more",x,gy+14); }
+    }
   }
 
   // ---- stats: base → final, deltas lit green ----
