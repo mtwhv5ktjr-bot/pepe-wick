@@ -284,6 +284,24 @@ tbody tr:hover{background:#111823}
     <button data-tab="tBoard">Leaderboard</button>
   </nav>
 
+  <!-- v1 OFFER ESCROW.
+       When the market was upgraded on 1 Aug, open OFFERS stayed on v1 with the
+       bidder's PLS still held by that contract. Listings were fine — v1 is
+       approval-based and never took custody of a gun — but an offer is real
+       money, and the app only ever read offers from v2, so four wallets have
+       been sitting on 2,265,500 PLS with no screen that admits it exists.
+       This is the one thing that must never be buried in a tab: it appears
+       above everything, only for the wallet it belongs to, and the button
+       hands the money straight back. -->
+  <div id="v1Escrow" style="display:none;margin:14px auto;max-width:1180px;padding:16px 18px;
+       border:2px solid #ffd27c;border-radius:10px;background:rgba(60,44,10,0.55)">
+    <div style="font:900 15px/1.3 Impact,Arial,sans-serif;color:#ffd27c;letter-spacing:.5px">
+      💰 YOU HAVE PLS HELD IN THE OLD (v1) MARKETPLACE
+    </div>
+    <div id="v1EscrowBody" class="muted" style="margin:8px 0 12px;font-size:13px"></div>
+    <div id="v1EscrowRows"></div>
+  </div>
+
   <div class="grow"></div>
   <span id="net"></span>
   <span id="addrLine"></span>
@@ -298,10 +316,10 @@ tbody tr:hover{background:#111823}
     <div class="burn" id="heroBurn">🔥 GUNS SOLD OUT — <b>KJP GEAR</b> IS LIVE, <b>1,000,000 PLS</b></div>
     <p id="heroProse" class="muted">101 on-chain guns on PulseChain, every one a real weapon inside PEPE WICK. The guns are gone — trade them below. <b>KJP GEAR</b> is the drop that is still open.</p>
 
-    <!-- KJP GEAR sits ABOVE the free mods mint: it is the paid drop, it is
-         live now, and every sale burns KJP and WICK in the same transaction.
-         Reads supply straight off the contract; hides itself if the chain is
-         unreachable rather than showing a dead panel. -->
+    <!-- KJP GEAR is now the ONLY open drop on this page (the gun mint sold out,
+         the mods free mint is closed). Every sale burns KJP and WICK in the same
+         transaction. Reads supply straight off the contract; hides itself if the
+         chain is unreachable rather than showing a dead panel. -->
     <div id="gearPanel" style="margin-top:14px;padding:16px;border:1px solid #8a6d2f;border-radius:12px;text-align:left;background:rgba(255,210,124,.06)">
       <div style="font:900 15px Arial Black;color:#ffd27c;letter-spacing:.5px">KJP GEAR — FIELD ISSUE</div>
       <div class="muted" style="margin:6px 0 10px">
@@ -316,15 +334,11 @@ tbody tr:hover{background:#111823}
       </div>
     </div>
 
-    <div id="modsPanel" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--green);border-radius:12px;text-align:left">
-      <div id="modsPool" class="muted" style="margin:0 0 10px"></div>
-      <div class="row" style="flex-wrap:wrap">
-        <select id="modsQty"><option value="1">1 mod</option><option value="2">2 mods</option><option value="3" selected>3 mods</option></select>
-        <button id="modsMint" class="primary">MINT 3 FREE</button>
-        <span id="modsNote" class="muted"></span>
-      </div>
-      <div id="modsLeft" class="muted" style="margin-top:8px"></div>
-    </div>
+    <!-- The WICK MODS free mint is CLOSED and its panel is gone. Mods themselves
+         are untouched: holders still see them in ARSENAL, can send them, and can
+         trade them in MOD LISTINGS. Unlike the sold-out gun mint above, nothing
+         else writes to these nodes, so they are deleted rather than hidden —
+         loadModsPanel/syncModsBtn/mintMods went with them. -->
 
     <div id="cfgWarn" class="banner" style="display:none"></div>
 
@@ -1097,10 +1111,44 @@ function gearCardHTML(type,id,actions){
     + '<div class="muted" style="font-size:11px">#'+id+' / 100 &middot; '+g.pool+' of this type &middot; works in <b>both games</b></div>'
     + '</div><div style="padding:0 12px 12px">'+(actions||"")+'</div></div>';
 }
+/* ---------------- MARKET PREFLIGHT ----------------
+   Three things go wrong constantly and ALL THREE reach the user as the same
+   unreadable wallet error, so they are caught here and named plainly instead:
+     · wallet on the wrong chain — its PLS is on another network entirely, and
+       "insufficient funds" is a lie the wallet tells about the wrong account
+     · not enough PLS — the wallet error never mentions what the thing costs
+     · a listing that already sold — the tx reverts with nothing useful
+   The one thing that CANNOT be abstracted away is the ERC-721 approval: the
+   standard requires a separate transaction before a market can move a token.
+   So it is announced up front, in the confirm the user actually reads, rather
+   than appearing as a second scary wallet popup they never agreed to. */
+async function marketPreflight(costWei){
+  if(!account) { toast("Connect a wallet first."); return false; }
+  try{ await ensureChain(); }
+  catch(e){ toast((e && e.message) || ("Switch your wallet to "+cfg.chain.name+" and try again.")); return false; }
+  if(costWei!=null){
+    const bal = await provider.getBalance(account).catch(()=>null);
+    if(bal!==null && bal < costWei){
+      toast("Not enough PLS: this costs "+fmt(costWei)+" PLS and this wallet holds "+fmt(bal)+".");
+      return false;
+    }
+  }
+  return true;
+}
+/* Checked BEFORE the confirm so the dialog can warn about the extra step. */
+async function gearApproved(){
+  try{ return await gearC.isApprovedForAll(account, cfg.gearMarket); }catch(e){ return false; }
+}
+const APPROVAL_NOTE =
+  "\n\nFIRST TIME ONLY — this takes TWO wallet confirmations:\n"
++ "  1. a one-time approval letting the market move your gear\n"
++ "  2. the action itself\n"
++ "You keep the piece, and can still use it in both games, until it actually sells.\n";
 async function ensureGearMktApproval(){
   if(await gearC.isApprovedForAll(account, cfg.gearMarket)) return;
-  toast("Approving the market to move your gear…");
+  toast("Confirm 1 of 2: the one-time approval…");
   await (await gearC.setApprovalForAll(cfg.gearMarket, true)).wait();
+  toast("Approved. Confirm 2 of 2 in your wallet…");
 }
 async function listGear(id){
   try{
@@ -1110,16 +1158,20 @@ async function listGear(id){
     if(priceWei<=0n) return toast("Enter a price in PLS.");
     const g=(window.WICK_GEAR||{})[gearTypeCache[id]]||{name:"Gear #"+id};
     const roy=priceWei*15n/100n;
+    const approved=await gearApproved();
     if(!confirm("List "+g.name+" (gear #"+id+") for "+fmt(priceWei)+" PLS?\n\n"
       +"RESALE DEAL: a 15% royalty is burned automatically — half buys & burns KJP, half buys & burns WICK.\n"
-      +"You receive "+fmt(priceWei-roy)+" PLS when it sells.")) return;
+      +"You receive "+fmt(priceWei-roy)+" PLS when it sells."
+      +(approved?"":APPROVAL_NOTE))) return;
+    if(!await marketPreflight()) return;
     await ensureGearMktApproval();
     await (await gearMktC.list(id, priceWei)).wait();
     toast("Listed."); await loadMyGear(); await loadGearMarket(true);
   }catch(e){ toast("List failed: "+(e.shortMessage||e.message||e)); }
 }
 async function cancelGear(id){
-  try{ await (await gearMktC.delist(id)).wait(); toast("Listing cancelled."); await loadMyGear(); await loadGearMarket(true); }
+  try{ if(!await marketPreflight()) return;
+    await (await gearMktC.delist(id)).wait(); toast("Listing cancelled — the piece is yours again."); await loadMyGear(); await loadGearMarket(true); }
   catch(e){ toast("Cancel failed: "+(e.shortMessage||e.message||e)); }
 }
 
@@ -1201,7 +1253,21 @@ async function buyGear(id){
     const roy=row.price*15n/100n;
     if(!confirm("Buy "+g.name+" (#"+id+") for "+fmt(row.price)+" PLS?\n\n"
       +fmt(roy)+" PLS of that is burned on the spot — half KJP, half WICK.\n"
-      +"The seller receives "+fmt(row.price-roy)+" PLS.")) return;
+      +"The seller receives "+fmt(row.price-roy)+" PLS.\n\n"
+      +"It works in BOTH games the moment it lands — nothing to equip.")) return;
+    if(!await marketPreflight(row.price)) return;
+    /* Someone else may have bought it between the page loading and this click.
+       Re-read the listing first: a stale buy reverts with an opaque error, and
+       "it failed" for no visible reason is the worst thing a market can say. */
+    const fresh = await gearMktRO.listings(id).catch(()=>null);
+    if(!fresh || fresh[0]===ZERO || fresh[1]===0n){
+      toast("Someone just bought that one — refreshing the market.");
+      await loadGearMarket(true); return;
+    }
+    if(fresh[1]!==row.price){
+      toast("The seller changed the price to "+fmt(fresh[1])+" PLS — refreshing so you can decide again.");
+      await loadGearMarket(true); return;
+    }
     await (await gearMktC.buy(id,{value:row.price})).wait();
     toast("Bought. It is already live in both games.");
     await loadGearMarket(true); await loadMyGear();
@@ -1217,13 +1283,17 @@ async function makeGearOffer(){
     if(amt<=0n) return toast("Enter an amount in PLS.");
     const g=(window.WICK_GEAR||{})[t]||{name:"type "+t};
     if(!confirm("Offer "+fmt(amt)+" PLS for any "+g.name+"?\n\n"
-      +"The PLS is escrowed by the market contract and is yours until you cancel or a seller accepts.")) return;
+      +"YOUR PLS LEAVES YOUR WALLET NOW and is held by the market contract until\n"
+      +"either a holder accepts, or you press CANCEL OFFER and it comes straight back.\n"
+      +"It is yours the whole time — nobody, including us, can spend it.")) return;
+    if(!await marketPreflight(amt)) return;
     await (await gearMktC.makeOffer(0,t,{value:amt})).wait();
     toast("Offer posted."); await loadGearMarket(true);
   }catch(e){ toast("Offer failed: "+(e.shortMessage||e.message||e)); }
 }
 async function cancelGearOffer(id){
-  try{ await (await gearMktC.cancelOffer(id)).wait(); toast("Offer cancelled, PLS refunded."); await loadGearMarket(true); }
+  try{ if(!await marketPreflight()) return;
+    await (await gearMktC.cancelOffer(id)).wait(); toast("Offer cancelled — your PLS is back in your wallet."); await loadGearMarket(true); }
   catch(e){ toast("Cancel failed: "+(e.shortMessage||e.message||e)); }
 }
 async function acceptGearOffer(id){
@@ -1238,58 +1308,28 @@ async function acceptGearOffer(id){
     }
     if(!tok) return toast("You do not hold a piece that satisfies this offer.");
     const roy=o.amount*15n/100n;
-    if(!confirm("Sell your piece #"+tok+" into this "+fmt(o.amount)+" PLS offer?\n\n"
-      +fmt(roy)+" PLS burns (half KJP, half WICK). You receive "+fmt(o.amount-roy)+" PLS.")) return;
+    const gt=(window.WICK_GEAR||{})[gearTypeCache[tok]||0]||{name:"piece"};
+    const dupes=[...ids].filter((_,i)=>Number(types[i])===(gearTypeCache[tok]||Number(types[0]))).length;
+    const approvedA=await gearApproved();
+    /* Name the exact piece leaving the wallet. When you hold several of a type
+       the contract just takes the first match, and "sold your SUPPRESSOR" is
+       not good enough when you own three and one of them is serial #7. */
+    if(!confirm("Sell "+gt.name+" #"+tok+" into this "+fmt(o.amount)+" PLS offer?\n\n"
+      +(dupes>1?("You hold "+dupes+" of this type — #"+tok+" is the one that goes.\n"):"")
+      +fmt(roy)+" PLS burns (half KJP, half WICK). You receive "+fmt(o.amount-roy)+" PLS.\n"
+      +"It stops working in your games the moment it sells."
+      +(approvedA?"":APPROVAL_NOTE))) return;
+    if(!await marketPreflight()) return;
     await ensureGearMktApproval();
     await (await gearMktC.acceptOffer(id,tok)).wait();
     toast("Sold."); await loadGearMarket(true); await loadMyGear();
   }catch(e){ toast("Accept failed: "+(e.shortMessage||e.message||e)); }
 }
 
-/* ---------------- WICK MODS: free-mint attachments ---------------- */
-async function loadModsPanel(){
-  const panel=$("#modsPanel"); if(!panel||!modsConfigured())return;
-  panel.style.display="block";
-  try{
-    const { modsRO }=readOnly();
-    const [tot,open,pool]=await Promise.all([modsRO.totalSupply(),modsRO.mintOpen(),modsRO.poolLeft()]);
-    const left=300-Number(tot);
-    $("#modsLeft").innerHTML="<b>"+left+" / 300</b> left.";
-    $("#modsPool").innerHTML=[1,2,3,4,5,6].map(t=>{ const m=WICK_MODS[t];
-      return "<span style='color:"+m.color+"'>"+m.name+" "+Number(pool[t])+"</span>"; }).join(" · ");
-    const btn=$("#modsMint"), note=$("#modsNote"), qtySel=$("#modsQty");
-    if(!open||left<=0){ btn.disabled=true; note.textContent=left<=0?"minted out — trade or ask a holder":"mint paused"; return; }
-    if(!account){ btn.disabled=false; note.textContent="connect a wallet holding a WICK gun to mint"; return; }
-    // the gun gate: allowance = 3 × guns held, minus what those guns already minted
-    const [allow, gunCount]=await Promise.all([
-      modsRO.allowanceOf(account).then(Number),
-      readOnly().gunsRO.balanceOf(account).then(Number).catch(()=>null)]);
-    if(gunCount===0){ btn.disabled=true; note.innerHTML="you need a <b>WICK Arsenal gun</b> to mint — grab one on the MARKETPLACE tab"; return; }
-    if(allow<=0){ btn.disabled=true; note.textContent="your gun"+(gunCount>1?"s have":" has")+" used all "+(gunCount*3)+" mint"+(gunCount*3>1?"s":"")+" — no holding cap though: buy more in MOD LISTINGS"; return; }
-    btn.disabled=false;
-    note.textContent=(gunCount!=null?gunCount+" gun"+(gunCount>1?"s":"")+" → ":"")+allow+" free mint"+(allow>1?"s":"")+" available";
-    // qty options grow with the allowance (contract caps a tx at 30)
-    const max=Math.min(allow, 30, left);
-    qtySel.innerHTML=Array.from({length:max},(_,i)=>`<option value="${i+1}">${i+1} mod${i?"s":""}</option>`).join("");
-    qtySel.value=String(Math.min(3,max));
-    qtySel.onchange=syncModsBtn; syncModsBtn();
-  }catch(e){ $("#modsLeft").textContent="(couldn't read the mods contract — refresh)"; }
-}
-function syncModsBtn(){ const s=$("#modsQty"), b=$("#modsMint"); if(s&&b&&!b.disabled)b.textContent="MINT "+s.value+" FREE"; }
-async function mintMods(){
-  if(!signer) return connect();
-  if(!modsC) return toast("Mods contract not configured yet.");
-  const qty=Math.max(1,Math.min(30,+$("#modsQty").value||1));   // contract caps a tx at 30 (10 guns' worth)
-  try{
-    await ensureChain();
-    toast("Confirm in your wallet — the mint itself is FREE (gas only)…");
-    // sendBuffered matters here: type-draw randomness makes the gas estimate
-    // variable, exactly like the gun mint (the 30M-PLS lesson)
-    await (await sendBuffered(modsC,"mint",[qty])).wait();
-    toast("Minted "+qty+" mod"+(qty>1?"s":"")+"! Fit them to a gun in the in-game 🔧 GUNSMITH — one gun each.");
-    await loadModsPanel(); await loadArsenal();
-  }catch(e){ toast(e.shortMessage||e.reason||e.message||"mint failed"); }
-}
+/* ---------------- WICK MODS ----------------
+   The free mint is removed. loadModsPanel/syncModsBtn/mintMods lived here and
+   were the only readers of the mods mint ABI calls (mintOpen/poolLeft/
+   allowanceOf); everything below is ownership and trading, which stays. */
 // simple card for a mod (no gunart SVG needed — the on-chain art mirrors this)
 function modCardHTML(type,id,actions){
   const m=WICK_MODS[type]||{name:"MOD #"+id,rarity:"?",color:"#8a93a5",fx:"unknown"};
@@ -1690,6 +1730,61 @@ async function buyBillboard(){
     toast("📺 Booked! Your billboard runs "+dayLabel(day)+" — it goes live in-game within ~5 minutes of that day starting.");
     await loadAdvertise();
   }catch(e){ toast(e.shortMessage||e.reason||e.message||"purchase failed"); }
+}
+
+/* ---------------- v1 OFFER ESCROW — handing money back ----------------
+   Listings on v1 were never at risk: that market is approval-based and never
+   takes custody of a gun. OFFERS are different — the bidder's PLS is held by
+   the contract until the offer is accepted or cancelled. The 1 Aug upgrade
+   pointed the app at v2, and nothing has read v1's offers since, so four
+   wallets have been holding open bids worth 2,265,500 PLS with no screen that
+   admits the money exists.
+   Scanned per-wallet on connect, shown only to whoever it belongs to, and the
+   button calls v1's own cancelOffer — the refund is part of that same
+   transaction, so nothing custodial is introduced to fix a custody problem. */
+let v1EscrowRows=null;
+async function loadV1Escrow(){
+  const box=$("#v1Escrow"), body=$("#v1EscrowBody"), rows=$("#v1EscrowRows");
+  if(!box) return;
+  if(!account||!legacyConfigured()){ box.style.display="none"; return; }
+  const ro=legacyRead();
+  if(!ro){ box.style.display="none"; return; }
+  /* getOffer reverts past the last id, so walk until it has clearly run out
+     rather than guessing a count the contract never exposes */
+  const mine=[]; let misses=0;
+  for(let i=1;i<=60&&misses<6;i++){
+    let o=null;
+    try{ o=await ro.getOffer(i); }catch(e){ misses++; continue; }
+    misses=0;
+    if(o&&o[3]&&o[1]>0n&&String(o[0]).toLowerCase()===account.toLowerCase())
+      mine.push({id:i,amt:o[1],tok:Number(o[2])});
+  }
+  v1EscrowRows=mine;
+  if(!mine.length){ box.style.display="none"; return; }
+  const total=mine.reduce((s,o)=>s+o.amt,0n);
+  box.style.display="block";
+  body.innerHTML="<b>"+fmt(total)+" PLS</b> of yours is still held by the old marketplace contract, from "
+    +mine.length+" open offer"+(mine.length>1?"s":"")+" made before the 1 Aug upgrade. "
+    +"It was never spent and nobody else can reach it — the Market tab simply reads the new contract. "
+    +"Cancelling returns the PLS to your wallet in the same transaction.";
+  rows.innerHTML=mine.map(o=>
+    '<div class="row" style="align-items:center;gap:10px;margin-top:6px">'
+    +'<span style="font:900 15px Impact,Arial,sans-serif;color:#ffd27c">'+fmt(o.amt)+' PLS</span>'
+    +'<span class="muted" style="font-size:12px">offer #'+o.id+(o.tok?" on gun #"+o.tok:"")+'</span>'
+    +'<button data-v1reclaim="'+o.id+'" class="primary">RECLAIM</button></div>').join("");
+  rows.querySelectorAll("[data-v1reclaim]").forEach(b=>b.onclick=()=>reclaimV1(+b.dataset.v1reclaim));
+}
+async function reclaimV1(id){
+  try{
+    const o=(v1EscrowRows||[]).find(r=>r.id===id); if(!o) return;
+    if(!confirm("Cancel offer #"+id+" on the old marketplace and take back "+fmt(o.amt)+" PLS?\n\n"
+      +"The PLS returns to your wallet in this same transaction. Your offer is withdrawn.")) return;
+    if(!await marketPreflight()) return;
+    toast("Confirm in your wallet…");
+    await (await new ethers.Contract(cfg.marketOld, MARKET_ABI, signer).cancelOffer(id)).wait();
+    toast("Reclaimed "+fmt(o.amt)+" PLS.");
+    await loadV1Escrow();
+  }catch(e){ toast("Reclaim failed: "+(e.shortMessage||e.message||e)); }
 }
 
 /* ---------------- v1 (legacy) marketplace ----------------
@@ -2122,7 +2217,9 @@ async function refreshAll(){
   bidRows=null;                                       // lazy: re-fetched only when the bids tab is opened
   await refreshStats();
   modMarketRows=null;
-  const jobs=[loadArsenal(), loadMarket(true), loadOffers(), loadModsPanel(), loadModMarket(true)];
+  /* money the old contract still holds for this wallet — checked every refresh,
+     because it is the one thing a user must never have to go looking for */
+  const jobs=[loadArsenal(), loadMarket(true), loadOffers(), loadModMarket(true), loadV1Escrow()];
   if(document.getElementById("tBids")?.classList.contains("on")) jobs.push(loadBids(true));
   // the log scan costs ~3s; only pay it if the tab is actually on screen
   if(document.getElementById("tSales")?.classList.contains("on")) jobs.push(loadSales());
@@ -2175,9 +2272,7 @@ function init(){
     $("#offMake").textContent="OFFERS OPEN AT LAUNCH";
   } else { refreshStats().catch(()=>{}); loadMarket().catch(()=>{}); }
   loadOffers().catch(()=>{});
-  loadModsPanel().catch(()=>{});
   loadModMarket().catch(()=>{});
-  const mm=$("#modsMint"); if(mm)mm.onclick=mintMods;
   // 📺 stays INVISIBLE until the contract is wired (post-testing). ?ads=1 = crew door,
   // and ?ads=1&bb=0x… points the hidden tab at a live contract for prod E2E — the
   // public config stays zeroed until testing signs off.
