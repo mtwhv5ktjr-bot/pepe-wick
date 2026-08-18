@@ -21,9 +21,12 @@ const MAX_SCORE = 2_000_000;        // absolute backstop; the per-mode ceilings 
 
 // PER-MODE CEILINGS. The signature proves the WALLET, never the SCORE — the number
 // is chosen by the client. So the only real defence is refusing numbers the game
-// cannot produce. The campaign has exactly 249 enemies across its 10 levels; even
-// scoring every one at a sustained 40-combo, S-ranking all ten and taking every
-// secret lands near 225k, so 300k is generous headroom over a perfect run.
+// cannot produce. ACT TWO (Aug 2026) doubled the campaign: 20 contracts, ~449
+// enemies (249 across act 1 + ~200 across act 2). Scaling the old perfect-run
+// model (225k over 10 levels) to the new roster lands near 450k, so 600k keeps
+// the same ~33% headroom the 10-level board had. The old values stood at 10
+// contracts / 300k, which silently clamped every act-2 finisher's level to 10
+// and refused legitimate full-campaign scores.
 // The gauntlet is endless, so it scales with the wave reached instead.
 // The wave/level is CLIENT-SUPPLIED and feeds the ceiling, so it has to be bounded
 // by what each mode can actually reach — otherwise a tampered client just claims a
@@ -32,7 +35,7 @@ function maxLevelFor(mode) {
   if (mode === "gauntlet") return 50;                     // the gauntlet ends at wave 50
   if (mode === "bossrush") return 4;
   if (String(mode).startsWith("daily-")) return 1;
-  return 10;                                              // campaign: 10 contracts
+  return 20;                                              // campaign ("pepe-wick"): 20 contracts since act 2
 }
 function ceilingFor(mode, level) {
   // 20k/wave, not 12k. Modelled against the game's own scoring: a wave-50 run
@@ -43,7 +46,7 @@ function ceilingFor(mode, level) {
   if (mode === "gauntlet") return 5_000 + Math.max(1, level) * 20_000;   // wave 50 -> 1,005,000
   if (String(mode).startsWith("daily-")) return 60_000;   // one level, one attempt — a perfect single-level run sits near ~30k
   if (mode === "bossrush") return 40_000;                 // 4 boss rounds + clear bonuses tops out well under this
-  return 300_000;
+  return 600_000;                                         // 20-contract campaign (was 300k for 10)
 }
 
 // HOLDERS-ONLY BOARD: you must own at least one WICK ARSENAL gun to post a score.

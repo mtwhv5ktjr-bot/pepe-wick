@@ -612,7 +612,14 @@ const GEAR_MARKET_ABI=[
   "function makeOffer(uint256,uint8) payable returns (uint256)",
   "function cancelOffer(uint256)",
   "function acceptOffer(uint256,uint256)",
-  "function ROYALTY_BPS() view returns (uint256)"
+  "function ROYALTY_BPS() view returns (uint256)",
+  /* The two bulk reads the storefront is BUILT on — loadGearMarket() calls both
+     on every refresh. They were missing from this ABI, so the very first call
+     threw "no matching function" and the catch hid the entire market section:
+     listings, offers, bid box and all. Signatures derived from the compiled
+     KJPGearMarket ABI, not hand-written. */
+  "function listingsIn(uint256 from, uint256 to) view returns (uint256[] ids, address[] sellers, uint256[] prices, uint8[] types)",
+  "function openOffers() view returns (uint256[] ids, address[] bidders, uint256[] amounts, uint256[] tokenIds, uint8[] types)"
 ];
 const gearConfigured   = ()=>cfg.gear       && !/^0x0{40}$/.test(cfg.gear);
 const gearMktConfigured= ()=>cfg.gearMarket && !/^0x0{40}$/.test(cfg.gearMarket);
