@@ -12,7 +12,7 @@
 <meta property="og:image" content="https://games.wick.pics/icon-512.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="The PEPE WICK arcade on PulseChain. Three cabinets: PEPE WICK and KJP — THE BLACK FILE playable now, PEPE WICK vs HORDE powering up.">
+<meta name="description" content="The PEPE WICK arcade on PulseChain. Four cabinets: PEPE WICK, KJP — THE BLACK FILE and the members-only ARSENAL RANGE playable now, PEPE WICK vs HORDE powering up.">
 <meta name="theme-color" content="#0a0a0a">
 <link rel="icon" href="/icon-192.png">
 
@@ -110,7 +110,10 @@ nav{display:flex;gap:22px}
 nav a{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--mute);transition:color .09s linear}
 nav a:hover{color:var(--hot)}
-@media(max-width:760px){ .status{display:none} nav{gap:15px} }
+/* header .status, not bare .status: the machine placards also use .status and
+   their later display:flex was out-specifying this hide, so the readout wrapped
+   into three lines under the brand on phones */
+@media(max-width:760px){ header .status{display:none} nav{gap:15px} }
 /* below ~430 the brand suffix and the nav fight over the last 2px of the bar */
 @media(max-width:430px){ .brand span,.brand em{display:none} nav{gap:13px} }
 
@@ -173,6 +176,7 @@ section{position:relative}
   color:inherit;isolation:isolate}
 .machine.horde{--mc:var(--hot)}
 .machine.kjp{--mc:#ffd27c}                 /* the counselor's cabinet burns gold */
+.machine.range{--mc:#e8c576}               /* the range is brass — the members-only door */
 
 /* marquee — the backlit name board, tapered like the real thing */
 .marquee{position:relative;height:clamp(46px,5.8vw,58px);margin:0 10px;overflow:hidden;
@@ -344,9 +348,10 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
     <div class="brand">
       <b>WICK.PICS</b><span>/</span><em>ARCADE</em>
     </div>
-    <div class="status mono"><span class="dot"></span> THREE CABINETS · TWO ONLINE</div>
+    <div class="status mono"><span class="dot"></span> FOUR CABINETS · THREE ONLINE</div>
     <nav>
       <a href="/play/">Play</a>
+      <a href="/range/">Range</a>
       <a href="https://mint.wick.pics">Arsenal</a>
       <a href="/arsenal/">Collection</a>
     </nav>
@@ -362,9 +367,10 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
     </div>
     <h1 class="display">A back-alley arcade where the guns are&nbsp;<span class="o">yours</span> and the leaderboard never forgets.</h1>
     <div class="heroFoot">
-      <p class="lede">Three cabinets: get the dog back, or break into Langley for the file they wrote about you. Fully on-chain art, NFT weapons you actually carry into the game, gear that works in every cabinet, and a world leaderboard signed by your own wallet.</p>
+      <p class="lede">Four cabinets: get the dog back, break into Langley for the file they wrote about you, or take your iron to the members-only range and build the loadout you carry into every machine. Fully on-chain art, NFT weapons you actually hold, gear that works in every cabinet, and a world leaderboard signed by your own wallet.</p>
       <div class="cta">
         <a class="btn solid" href="/play/">Play Pepe Wick <span class="ar">↗</span></a>
+        <a class="btn" href="/range/">Arsenal Range <span class="ar">↗</span></a>
         <a class="btn" href="https://mint.wick.pics">Wick Arsenal <span class="ar">↗</span></a>
       </div>
     </div>
@@ -373,7 +379,7 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
 
   <section>
     <div class="rule mono">
-      <span class="idx">(01)</span><span class="ttl">Select your machine</span><span class="rt">02 units · 01 online</span>
+      <span class="idx">(01)</span><span class="ttl">Select your machine</span><span class="rt">04 units · 03 online</span>
     </div>
 
     <div class="floorbay">
@@ -442,6 +448,37 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
           <div class="status"><b>Play now</b><span class="ar">↗</span></div>
         </a>
 
+        <a class="machine range" href="/range/">
+          <div class="spill" aria-hidden="true"></div>
+          <div class="marquee"><b>ARSENAL RANGE</b></div>
+          <div class="hood" aria-hidden="true"></div>
+          <div class="bezel">
+            <div class="crt">
+              <img src="/range-cabinet.jpg" alt="ARSENAL RANGE — members-only 3D shooting range" loading="lazy" decoding="async">
+              <div class="sweep" aria-hidden="true"></div>
+              <div class="press">MEMBERS ONLY</div>
+            </div>
+          </div>
+          <div class="deck" aria-hidden="true">
+            <div class="stick"><i></i></div>
+            <div class="btns">
+              <b style="--b:#e8c576"></b><b style="--b:#7cf9a5"></b><b style="--b:#ff5c5c"></b>
+            </div>
+          </div>
+          <div class="coindoor">
+            <span class="slot" aria-hidden="true"></span>
+            <span class="cred">HOLDERS · CREDITS <b>∞</b></span>
+          </div>
+          <div class="base" aria-hidden="true"></div>
+          <dl class="plate">
+            <div><dt>Mode</dt><dd>3D live-fire · 7 drills · daily contract</dd></div>
+            <div><dt>Weapons</dt><dd>Your NFT guns, as printed on the card</dd></div>
+            <div><dt>Gunsmith</dt><dd>Bolt on WICK MODS — the build travels</dd></div>
+            <div><dt>Door</dt><dd>One Arsenal gun gets you in</dd></div>
+          </dl>
+          <div class="status"><b>Enter the range</b><span class="ar">↗</span></div>
+        </a>
+
         <a class="machine horde" href="/horde/">
           <div class="spill" aria-hidden="true"></div>
           <div class="marquee"><b>PEPE WICK <span style="opacity:.6">vs</span> HORDE</b></div>
@@ -483,7 +520,7 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
 
   <section>
     <div class="rule mono">
-      <span class="idx">(02)</span><span class="ttl">What's in the machine</span><span class="rt">06 systems</span>
+      <span class="idx">(02)</span><span class="ttl">What's in the machine</span><span class="rt">07 systems</span>
     </div>
     <div class="stack">
       <div class="row">
@@ -498,21 +535,26 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
       </div>
       <div class="row">
         <span class="n">03</span>
+        <h3>The range</h3>
+        <p>A members-only 3D proving ground — one Arsenal gun is the door. Live-fire your actual NFTs with the stats printed on the card, run seven drills and a daily contract, then bolt on your mods at the gunsmith. The build you set there is the build you carry into every cabinet: the range is the launch pad.</p>
+      </div>
+      <div class="row">
+        <span class="n">04</span>
         <h3>KJP Gear</h3>
         <p>One hundred pieces of field equipment — suppressors, kevlar, boots, night optics, a skeleton key — and every piece works in <em>both</em> cabinets: it rides the operative, not the gun, so it needs no slot. One million PLS each. Every mint splits itself in the mint transaction: 50% buys and burns KJP, 50% buys and burns WICK. There is no withdraw function in the contract.</p>
       </div>
       <div class="row">
-        <span class="n">04</span>
+        <span class="n">05</span>
         <h3>World leaderboard</h3>
         <p>Scores are signed by your wallet before they count, fenced per mode, and capped at what the mode can physically produce. Campaign, gauntlet, boss rush and the daily each keep their own lane.</p>
       </div>
       <div class="row">
-        <span class="n">05</span>
+        <span class="n">06</span>
         <h3>Daily contract</h3>
         <p>One seeded run a day, identical for everybody who plays it, with a ghost of the current leader racing beside you.</p>
       </div>
       <div class="row">
-        <span class="n">06</span>
+        <span class="n">07</span>
         <h3>On-chain art</h3>
         <p>No IPFS, no metadata server, no pinning service to outlive. The SVG renders from contract storage, so the art survives exactly as long as the chain does.</p>
       </div>
@@ -525,6 +567,7 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
   <div class="wordmark">ARCADE ALLEY</div>
   <div class="fbar">
     <a href="/play/">games.wick.pics/play</a>
+    <a href="/range/">games.wick.pics/range</a>
     <a href="https://mint.wick.pics">mint.wick.pics</a>
     <a href="https://wick.pics">wick.pics</a>
     <span class="lgl mono">Utility for $WICK · PulseChain 369</span>
@@ -535,7 +578,7 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
 /* ── ticker content, duplicated once so the -50% roll is seamless ── */
 (function(){
   const bits = ["101 NFT guns","Fully on-chain art","World leaderboard","Daily contract",
-                "Boss rush","Endless gauntlet","10 contracts","Get the dog back"];
+                "Boss rush","Endless gauntlet","10 contracts","Members-only range","The build travels","Get the dog back"];
   const half = bits.map(b => '<span>'+b+' <em>◆</em></span>').join('');
   document.getElementById('track').innerHTML = half + half;
 })();

@@ -140,6 +140,15 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outl
   white-space:nowrap;display:flex;align-items:center}
 .tabs button:hover{color:var(--ink);background:none}
 .tabs button.on{color:#fff;border-bottom-color:var(--blue);background:none}
+/* THE RANGE — external door in the tab bar (an <a>, so the button[data-tab] binding
+   never sees it). Brass, because it's the members-only floor. */
+.tabs a.range{padding:0 13px;color:#e8c576;font:700 13px/1 var(--sans);text-decoration:none;
+  white-space:nowrap;display:flex;align-items:center;border-bottom:2px solid transparent}
+.tabs a.range:hover{color:#fff;border-bottom-color:#e8c576}
+#playRow{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+#playRow a{text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block;font-weight:800}
+#playRow a.rangeCta{border:1px solid #8a6d2f;color:#e8c576;background:rgba(232,197,118,.08)}
+#playRow a.rangeCta:hover{background:rgba(232,197,118,.18)}
 .tab{display:none}
 .tab.on{display:block}
 h2{margin:0 0 4px;font:750 17px/1.2 var(--sans);letter-spacing:.01em}
@@ -282,6 +291,7 @@ tbody tr:hover{background:#111823}
     <button data-tab="tAds" id="tabAdsBtn" style="display:none">Advertise</button>
     <button data-tab="tMine">Arsenal</button>
     <button data-tab="tBoard">Leaderboard</button>
+    <a class="range" href="https://games.wick.pics/range/" title="ARSENAL RANGE — members-only 3D range. Live-fire your guns, bolt on mods, launch into any cabinet.">🎯 Range ↗</a>
   </nav>
 
   <!-- v1 OFFER ESCROW.
@@ -361,7 +371,14 @@ tbody tr:hover{background:#111823}
       <span id="mintNote"></span>
     </div>
     <div id="tierPanel"></div>
-    <div id="playWithGuns"></div>
+    <!-- Holder CTAs. #playWithGuns was a <div> that got .href assigned — a div can't
+         navigate, so the PLAY button read right and went nowhere. It's an <a> now,
+         and the RANGE door rides next to it: the members-only proving ground where
+         you live-fire these exact guns, bolt on mods, and launch into any cabinet. -->
+    <div id="playRow">
+      <a id="playWithGuns" class="primary" href="https://games.wick.pics/play/" style="display:none"></a>
+      <a id="rangeWithGuns" class="rangeCta" href="https://games.wick.pics/range/" style="display:none">🎯 TAKE THEM TO THE RANGE →</a>
+    </div>
    </div>
 
    <!-- CSFloat's signature: real items fanned in 3D behind crosshair guides. Populated
@@ -551,19 +568,31 @@ const MARKET_ABI = [
   "function getListing(uint256 id) view returns (address seller, uint256 price)",
   "function feeBps() view returns (uint96)",
   // offers pool — tokenId 0 = a standing offer on ANY gun in the collection.
-  // These fragments MUST match the DEPLOYED v1 contract: getOffer returns 4 words,
-  // makeOffer takes one argument. If the v2 market ever ships, change the address
-  // in config.js and these two fragments in the SAME commit.
-  "function makeOffer(uint256 tokenId) payable returns (uint256)",
+  // These fragments MUST match the market cfg.market points at. It points at v2,
+  // which takes a gunType on makeOffer and returns it from getOffer. v1 is still
+  // live and still holds escrow, so its two differing fragments live in
+  // MARKET_V1_ABI below — change the address and the fragments in the SAME commit.
+  "function makeOffer(uint256 tokenId, uint8 gunType) payable returns (uint256)",
   "function cancelOffer(uint256 id)",
   "function acceptOffer(uint256 id, uint256 tokenId)",
   "function offersCount() view returns (uint256)",
-  "function getOffer(uint256 id) view returns (address bidder, uint256 amount, uint256 tokenId, bool open)",
+  "function getOffer(uint256 id) view returns (address bidder, uint256 amount, uint256 tokenId, uint8 gunType, bool open)",
   "function burnPending() view returns (uint256)",
   "function burnPool(uint256 minOut)",
   "event Sold(uint256 indexed id, address indexed seller, address indexed buyer, uint256 price)",
   "event OfferAccepted(uint256 indexed offerId, uint256 indexed tokenId, address indexed seller, address bidder, uint256 amount)",
 ];
+
+/* The pre-1-Aug market is still deployed and still holds bidders"+String.fromCharCode(39)+" escrowed PLS,
+   so the reclaim banner has to speak its older dialect: makeOffer took one
+   argument and getOffer returned four words, with "open" where v2 now puts gunType.
+   Derived from MARKET_ABI so shared fragments can never drift apart. */
+const MARKET_V1_ABI = MARKET_ABI
+  .filter(f => f.indexOf("function makeOffer(") < 0 && f.indexOf("function getOffer(") < 0)
+  .concat([
+    "function makeOffer(uint256 tokenId) payable returns (uint256)",
+    "function getOffer(uint256 id) view returns (address bidder, uint256 amount, uint256 tokenId, bool open)",
+  ]);
 
 function toast(msg, ms=3600){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), ms); }
 const fmt = w => { try{ return Number(ethers.formatEther(w)).toLocaleString(undefined,{maximumFractionDigits:6}); }catch(e){ return "?"; } };
@@ -910,12 +939,13 @@ async function loadArsenal(){
   $("#sYours").textContent = ids.length.toString();
   // this must run BEFORE the zero-guns early return, or the CTA survives selling
   // your last gun and links into the game claiming guns that no longer exist
-  const play=$("#playWithGuns");
+  const play=$("#playWithGuns"), range=$("#rangeWithGuns");
   if(play){
-    play.style.display = ids.length ? "block" : "none";
+    play.style.display = ids.length ? "inline-block" : "none";
     if(ids.length){ play.href="https://games.wick.pics/play/?w="+account;
       play.textContent="🎮 PLAY WITH MY "+ids.length+" GUN"+(ids.length>1?"S":"")+" →"; }
   }
+  if(range) range.style.display = ids.length ? "inline-block" : "none";   // the range door only opens for holders
   if(ids.length===0){ box.innerHTML=""; empty.textContent="You don't own any WICK guns yet — the mint sold out, but there are live listings on the MARKETPLACE tab."; empty.style.display="block"; return; }
   empty.style.display="none";
 
@@ -1466,17 +1496,24 @@ function renderCatalog(){
 }
 
 /* ---- market compatibility ----------------------------------------------
-   The deployed market is v1: getOffer returns 4 words, makeOffer takes (tokenId).
+   cfg.market is v2: getOffer returns 5 words, makeOffer takes (tokenId, gunType).
+   cfg.marketOld is v1 and speaks the 4-word form; it gets MARKET_V1_ABI.
    The old "detect v1/v2 from decode failures" compat layer deadlocked — the flag
    was only ever set AFTER a successful getOffer, which the wrong ABI guaranteed
-   never happened. One contract, one ABI, one decode. */
+   never happened. Two contracts, two ABIs, no sniffing. */
+/* v2 returns FIVE words — gunType slotted in ahead of open. Reading open from
+   r[3] took it from gunType instead, which is 0 on every plain gun offer, so
+   every live offer decoded as closed and silently vanished from the list. */
 async function readOffer(ro,i){
   const r = await ro.getOffer(i);
-  return { id:i, bidder:r[0], amount:r[1], tokenId:Number(r[2]), gunType:0, open:r[3] };
+  return { id:i, bidder:r[0], amount:r[1], tokenId:Number(r[2]),
+           gunType:Number(r[3]||0), open:r[4] };
 }
 async function sendOffer(tokenId,gunType,value){
-  if(gunType) throw new Error("tier bids need the upgraded marketplace");
-  return sendBuffered(market,"makeOffer",[tokenId],{value});
+  // v2 takes the tier alongside the token. Sending the old one-argument form hit
+  // a selector the contract does not have, which comes back as a bare revert:
+  // "missing revert data".
+  return sendBuffered(market,"makeOffer",[tokenId, gunType||0],{value});
 }
 
 /* ---------------- BID ON RARES ----------------
@@ -1788,7 +1825,7 @@ async function reclaimV1(id){
       +"The PLS returns to your wallet in this same transaction. Your offer is withdrawn.")) return;
     if(!await marketPreflight()) return;
     toast("Confirm in your wallet…");
-    await (await new ethers.Contract(cfg.marketOld, MARKET_ABI, signer).cancelOffer(id)).wait();
+    await (await new ethers.Contract(cfg.marketOld, MARKET_V1_ABI, signer).cancelOffer(id)).wait();
     toast("Reclaimed "+fmt(o.amt)+" PLS.");
     await loadV1Escrow();
   }catch(e){ toast("Reclaim failed: "+(e.shortMessage||e.message||e)); }
@@ -1806,7 +1843,7 @@ const legacyConfigured=()=>cfg.marketOld&&!/^0x0{40}$/i.test(cfg.marketOld)&&cfg
 function legacyRead(){
   if(!legacyRO&&legacyConfigured()){
     const p=new ethers.JsonRpcProvider(cfg.rpcRead||cfg.chain.rpc, cfg.chain.id, {staticNetwork:true, batchMaxCount:20});
-    legacyRO=new ethers.Contract(cfg.marketOld, MARKET_ABI, p);
+    legacyRO=new ethers.Contract(cfg.marketOld, MARKET_V1_ABI, p);
   }
   return legacyRO;
 }
@@ -1865,7 +1902,7 @@ async function legacyBuy(id){
   if(!confirm("Buy gun #"+id+" from the OLD (v1) marketplace for "+fmt(row.price)+" PLS?\n\n"+
               "Same 15% royalty, burned as $WICK in the same transaction.")) return;
   try{
-    const c=new ethers.Contract(cfg.marketOld, MARKET_ABI, signer);
+    const c=new ethers.Contract(cfg.marketOld, MARKET_V1_ABI, signer);
     toast("Confirm in your wallet…");
     await (await sendBuffered(c,"buy",[id],{value:row.price})).wait();
     toast("Bought gun #"+id+" from the old market.");
@@ -1877,7 +1914,7 @@ async function legacyCancel(id){
   if(!confirm("Cancel your v1 listing for gun #"+id+"?\n\n"+
               "The gun never left your wallet. After this you can list it on the new marketplace.")) return;
   try{
-    const c=new ethers.Contract(cfg.marketOld, MARKET_ABI, signer);
+    const c=new ethers.Contract(cfg.marketOld, MARKET_V1_ABI, signer);
     toast("Confirm in your wallet…");
     await (await sendBuffered(c,"cancel",[id])).wait();
     toast("Cancelled. You can now list gun #"+id+" on the new market.");

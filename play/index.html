@@ -97,6 +97,19 @@
      the cascade), so hiding MUST also cancel the animation — otherwise the button keeps
      pulsing at full opacity over live gameplay even though clicks are already disabled. */
   #getguns.hide{display:none!important;animation:none!important;opacity:0;pointer-events:none}
+  /* ---- THE RANGE pill: the members-only proving ground + the arcade's gunsmith.
+       Same origin (/range/) so the build set there is read here natively. ---- */
+  #torange{
+    position:fixed; z-index:60;
+    top:calc(12px + env(safe-area-inset-top,0px)); right:calc(12px + env(safe-area-inset-right,0px));
+    transform:translateY(46px);
+    font-family:'Press Start 2P', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size:10px; letter-spacing:1px; color:#e8c576; text-decoration:none;
+    background:rgba(7,10,18,.86); border:2px solid rgba(232,197,118,.7); border-radius:9px; padding:8px 11px;
+    box-shadow:0 0 12px rgba(232,197,118,.25); transition:filter .15s ease;
+  }
+  #torange:hover{filter:brightness(1.35)}
+  #torange.hide{display:none!important}
 </style>
 <!-- The real NFT gun art — the same file mint.wick.pics ships, itself shared 1:1
      with the on-chain SVG. Only the gunsmith bench uses it, and it falls back to
@@ -110,6 +123,7 @@
      one here just meant two clicks to reach the same menu. -->
 <a id="arcadeBack" href="/">🕹 ARCADE</a>
 <a id="getguns" href="https://games.wick.pics/arsenal/"><img src="/tabula-rasa.png" alt="TABULA RASA — platinum holo 1/1"><span>🔫 GET GUNS</span><small>WICK ARSENAL · TABULA RASA 1/1</small></a>
+<a id="torange" href="https://games.wick.pics/range/" title="ARSENAL RANGE — members-only 3D range · gunsmith · launch pad">🎯 THE RANGE</a>
 <div id="rot"><div class="ic">📱</div><div id="rotTxt">Rotate to <b>landscape</b><br>to play <b>PEPE WICK</b></div>
   <button id="rotUnlock" type="button">🔫 UNLOCK MY GUNS</button>
   <div class="sm" id="rotSm">you can do this in portrait — rotate after</div></div>
@@ -148,7 +162,32 @@ function syncGunsBtn(){
   if(b)b.classList.toggle("hide",!want);
   const a=document.getElementById("arcadeBack");     // the way back to the hall rides along
   if(a)a.classList.toggle("hide",!want);
+  const r=document.getElementById("torange");        // and the door to the range
+  if(r)r.classList.toggle("hide",!want);
 }
+/* ---- WICK LOADOUT handoff: the ARSENAL RANGE is the arcade's gunsmith + launch pad.
+   Same-origin (/range/) it writes pw_loadout / pw_carry / pw_modcfg directly and this
+   file reads them as it always has. From ANY origin it can also hand the build over in
+   the URL as #wl=<base64url JSON {v:1,g:gunType,gid,m:[modTypes],c:[carry],cfg:{...}}>.
+   The fragment is a PREFERENCE, never a proof: the wallet scan below still decides
+   what you own, and carrySet()/modAlloc() drop anything you don't. ---- */
+(function(){
+  try{
+    const m=/(?:^|[#&])wl=([A-Za-z0-9_-]+)/.exec(location.hash||"");
+    if(!m)return;
+    let s=m[1].replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+="=";
+    const o=JSON.parse(decodeURIComponent(escape(atob(s))));
+    if(!o||o.v!==1)return;
+    if(typeof o.g==="number")localStorage.setItem("pw_loadout",String(o.g));
+    if(Array.isArray(o.c))localStorage.setItem("pw_carry",JSON.stringify(o.c.slice(0,2)));
+    if(o.cfg&&typeof o.cfg==="object"&&!Array.isArray(o.cfg))localStorage.setItem("pw_modcfg",JSON.stringify(o.cfg));
+    else if(typeof o.g==="number"&&Array.isArray(o.m)){ const c=JSON.parse(localStorage.getItem("pw_modcfg")||"{}"); c[o.g]=o.m.slice(0,3); localStorage.setItem("pw_modcfg",JSON.stringify(c)); }
+    // consume ONLY the wl= part — a reload must not re-apply a stale build, but a
+    // #w=0x… wallet riding in the same fragment must survive for URL_WALLET below
+    const rest=(location.hash||"").replace(/^#/,"").split("&").filter(p=>p&&!/^wl=/.test(p)).join("&");
+    history.replaceState(null,"",location.pathname+location.search+(rest?"#"+rest:""));
+  }catch(e){}
+})();
 /* ============================================================
    PEPE WICK — a 2D contract, Mario-school.
    The approved aesthetic: no line work, gradient moonlight,
