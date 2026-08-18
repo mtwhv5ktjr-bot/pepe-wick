@@ -684,8 +684,40 @@ function stepFx(dt) {
 }
 
 // ---------------------------------------------------------------- aiming
-let yaw = 0, pitch = 0;
+// Two-stage aim: raw input drives a TARGET (aimYaw/aimPitch); the camera's
+// yaw/pitch chase it with a frame-rate-independent exponential lerp. Raw
+// pointer-lock deltas are stepped and spiky (OS acceleration, event batching,
+// the occasional 1000px glitch on lock acquire) — the lerp turns that into a
+// continuous sweep without the mush of a moving-average filter.
+let yaw = 0, pitch = 0;          // what the camera shows
+let aimYaw = 0, aimPitch = 0;    // where the hand is
 const PITCH_LIM = 1.25;
+const BASE_SENS = 0.0021;        // rad / px at sensitivity 1.0
+const AIM = {
+  sens: (() => { const v = parseFloat(localStorage.getItem('ar_sens') || '1'); return isNaN(v) ? 1 : Math.max(0.3, Math.min(2.5, v)); })(),
+  smooth: (() => { const v = parseFloat(localStorage.getItem('ar_smooth') || '0.5'); return isNaN(v) ? 0.5 : Math.max(0, Math.min(1, v)); })(),
+};
+// smoothing 0 → snap; 0.5 → 32/s (τ≈31ms, 99% inside ~140ms); 1 → 12/s (τ≈83ms)
+function aimRate() { return AIM.smooth <= 0 ? Infinity : 52 - 40 * AIM.smooth; }
+function setAim(y, p) { // hard set BOTH stages — menus, resets, QA
+  aimYaw = yaw = y;
+  aimPitch = pitch = Math.max(-PITCH_LIM, Math.min(PITCH_LIM, p));
+}
+function nudgeAim(dx, dy, sens) {
+  aimYaw -= dx * sens;
+  aimPitch -= dy * sens;
+  aimPitch = Math.max(-PITCH_LIM, Math.min(PITCH_LIM, aimPitch));
+}
+function stepAim(dt) {
+  const k = aimRate();
+  if (!isFinite(k)) { yaw = aimYaw; pitch = aimPitch; return; }
+  const a = 1 - Math.exp(-k * dt);
+  yaw += (aimYaw - yaw) * a;
+  pitch += (aimPitch - pitch) * a;
+  // snap the last hair so a still hand is a still crosshair, not an asymptote
+  if (Math.abs(aimYaw - yaw) < 1e-5) yaw = aimYaw;
+  if (Math.abs(aimPitch - pitch) < 1e-5) pitch = aimPitch;
+}
 function applyAim() {
   camera.rotation.y = yaw;
   camera.rotation.x = pitch + recoilP;
@@ -694,9 +726,17 @@ function applyAim() {
 let lastPointerType = 'mouse';
 window.addEventListener('pointerdown', e => { if (e.pointerType) lastPointerType = e.pointerType; }, true);
 function tryPointerLock() {
+  // unadjustedMovement: raw HID deltas, no OS pointer acceleration — the single
+  // biggest "why does my aim feel uneven" fix. Falls back where unsupported.
   try {
-    const p = canvas.requestPointerLock && canvas.requestPointerLock();
-    if (p && p.catch) p.catch(() => {});
+    let p = null;
+    try { p = canvas.requestPointerLock({ unadjustedMovement: true }); } catch (e) { p = null; }
+    if (p && p.catch) {
+      p.catch(() => { try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch (e) {} });
+    } else if (!p && !document.pointerLockElement) {
+      const q = canvas.requestPointerLock && canvas.requestPointerLock();
+      if (q && q.catch) q.catch(() => {});
+    }
   } catch (e) {}
 }
 canvas.addEventListener('click', () => {
@@ -704,14 +744,17 @@ canvas.addEventListener('click', () => {
   if (mode === MODES.DRILL && !document.pointerLockElement && lastPointerType === 'mouse') tryPointerLock();
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+let inspectVel = 0;
 document.addEventListener('mousemove', e => {
   if (mode === MODES.DRILL && document.pointerLockElement === canvas) {
-    const sens = zooming ? 0.0012 : 0.0021;
-    yaw -= e.movementX * sens;
-    pitch -= e.movementY * sens;
-    pitch = Math.max(-PITCH_LIM, Math.min(PITCH_LIM, pitch));
+    const dx = e.movementX || 0, dy = e.movementY || 0;
+    if (Math.abs(dx) > 400 || Math.abs(dy) > 400) return; // lock-acquire glitch, not a hand
+    const sens = BASE_SENS * AIM.sens * (zooming ? 0.55 : 1);
+    nudgeAim(dx, dy, sens);
   } else if (mode === MODES.INSPECT && dragging) {
-    inspectYaw += e.movementX * 0.008;
+    const dx = e.movementX || 0;
+    inspectVel = dx * 0.008;       // fling — the turntable keeps the momentum
+    inspectYaw += inspectVel;
   }
 });
 let dragging = false, lastTouch = null;
@@ -746,11 +789,10 @@ canvas.addEventListener('touchmove', e => {
   for (const t of e.changedTouches) {
     if (t.identifier !== aimTouchId || !lastTouch) continue;
     if (mode === MODES.DRILL) {
-      yaw -= (t.clientX - lastTouch.x) * 0.004;
-      pitch -= (t.clientY - lastTouch.y) * 0.004;
-      pitch = Math.max(-PITCH_LIM, Math.min(PITCH_LIM, pitch));
+      nudgeAim(t.clientX - lastTouch.x, t.clientY - lastTouch.y, 0.004 * AIM.sens);
     } else if (mode === MODES.INSPECT) {
-      inspectYaw += (t.clientX - lastTouch.x) * 0.01;
+      inspectVel = (t.clientX - lastTouch.x) * 0.01;
+      inspectYaw += inspectVel;
     }
     lastTouch = { x: t.clientX, y: t.clientY };
   }
@@ -887,7 +929,7 @@ function startDrill(kind, opts) {
   drill = DR.create(kind, opts && opts.seed != null ? opts.seed : (Date.now() % 1000000) >>> 0, opts && opts.mods);
   clearTargetMeshes();
   ammo = equipped.stats.mag; reloading = 0; fireCd = 0; zooming = false;
-  yaw = 0; pitch = 0;
+  setAim(0, 0); recoilP = 0; recoilY = 0;
   $('menu').classList.add('hidden');
   $('end').classList.add('hidden');
   $('hud').classList.remove('hidden');
@@ -1196,8 +1238,16 @@ $('btn-locker').onclick = () => { AUD.unlock(); AUD.play('ui'); mode = MODES.LOC
 $('btn-locker-back').onclick = () => { AUD.play('ui'); mode = MODES.MENU; $('locker').classList.add('hidden'); $('menu').classList.remove('hidden'); };
 $('btn-inspect-back').onclick = () => { AUD.play('ui'); closeInspect(true); };
 $('btn-inspect-equip').onclick = () => { AUD.play('ui'); if (inspectGun) equipGun(inspectGun); closeInspect(true); renderLocker(); };
-$('btn-help').onclick = () => { AUD.unlock(); AUD.play('ui'); $('help').classList.remove('hidden'); };
+$('btn-help').onclick = () => { AUD.unlock(); AUD.play('ui'); syncAimCtl(); $('help').classList.remove('hidden'); };
 $('btn-help-back').onclick = () => { AUD.play('ui'); $('help').classList.add('hidden'); };
+// aim controls (RANGE RULES) — live + persisted
+function syncAimCtl() {
+  $('sens').value = AIM.sens; $('sensv').textContent = AIM.sens.toFixed(2) + '×';
+  $('smooth').value = AIM.smooth; $('smoothv').textContent = Math.round(AIM.smooth * 100) + '%';
+}
+$('sens').oninput = e => { AIM.sens = parseFloat(e.target.value); localStorage.setItem('ar_sens', String(AIM.sens)); syncAimCtl(); };
+$('smooth').oninput = e => { AIM.smooth = parseFloat(e.target.value); localStorage.setItem('ar_smooth', String(AIM.smooth)); syncAimCtl(); };
+syncAimCtl();
 $('btn-retry').onclick = () => { AUD.play('ui'); startDrill(drillKind, drillOpts); };
 $('btn-endmenu').onclick = () => { AUD.play('ui'); mode = MODES.MENU; $('end').classList.add('hidden'); $('menu').classList.remove('hidden'); clearTargetMeshes(); };
 $('btn-mute').onclick = () => { AUD.unlock(); const m = AUD.toggleMute(); $('btn-mute').textContent = m ? '♪ OFF' : '♪'; };
@@ -1265,9 +1315,13 @@ function tick(dtOverride) {
     camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 10);
     camera.updateProjectionMatrix();
   }
-  recoilP = Math.max(0, recoilP - dt * 1.6);
+  // recoil: exponential recovery (a linear ramp reads as a mechanical hinge),
+  // horizontal kick lands on the aim TARGET so the smoothing carries it, not fights it
+  recoilP *= Math.exp(-dt * 7);
+  if (recoilP < 1e-4) recoilP = 0;
   recoilY *= Math.max(0, 1 - dt * 8);
-  yaw += recoilY * dt * 8;
+  aimYaw += recoilY * dt * 8;
+  stepAim(dt);
   applyAim();
   if (viewmodel) {
     viewmodel.visible = (mode === MODES.DRILL || mode === MODES.COUNTDOWN);
@@ -1278,15 +1332,19 @@ function tick(dtOverride) {
     viewmodel.rotation.x = reloading > 0 ? 0.55 : recoilP * 2.2;
   }
   if (mode === MODES.GATE || mode === MODES.MENU || mode === MODES.LOCKER || mode === MODES.END) {
-    yaw = Math.sin(now / 11000) * 0.3;
-    pitch = -0.02 + Math.sin(now / 7000) * 0.015;
+    setAim(Math.sin(now / 11000) * 0.3, -0.02 + Math.sin(now / 7000) * 0.015);
     applyAim();
   }
   if (mode === MODES.INSPECT && inspectModel) {
-    if (!dragging) inspectYaw += dt * 0.5;
+    if (!dragging) {
+      // fling inertia bleeds off, then the slow showroom turn takes over
+      inspectVel *= Math.exp(-dt * 3.2);
+      if (Math.abs(inspectVel) < 0.0004) inspectVel = 0;
+      inspectYaw += inspectVel + dt * 0.5 * (1 - Math.min(1, Math.abs(inspectVel) / 0.02));
+    }
     inspectModel.rotation.y = inspectYaw;
     camera.position.set(0, 1.62, -3.4 + inspectDist);
-    yaw = 0; pitch = -0.04; applyAim();
+    setAim(0, -0.04); applyAim();
   } else {
     camera.position.set(0, 1.6, 0);
   }
@@ -1321,13 +1379,16 @@ window.qaShot = function (name) {
 };
 window.qaAim = function (x, y, z) {
   const dir = new THREE.Vector3(x - camera.position.x, y - camera.position.y, z - camera.position.z).normalize();
-  yaw = Math.atan2(-dir.x, -dir.z);
-  pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+  setAim(Math.atan2(-dir.x, -dir.z), Math.asin(Math.max(-1, Math.min(1, dir.y))));
   recoilP = 0; recoilY = 0;
   applyAim();
   camera.updateMatrixWorld();
   return { yaw, pitch };
 };
+// QA: feed raw pointer deltas through the REAL nudge path, read the smoothed result per frame
+window.qaMouse = function (dx, dy) { nudgeAim(dx, dy, BASE_SENS * AIM.sens * (zooming ? 0.55 : 1)); return { aimYaw, aimPitch, yaw, pitch }; };
+window.qaAimState = function () { return { aimYaw, aimPitch, yaw, pitch, recoilP, smooth: AIM.smooth, sens: AIM.sens, rate: aimRate() }; };
+window.qaSetAim = function (o) { if (o.smooth != null) AIM.smooth = o.smooth; if (o.sens != null) AIM.sens = o.sens; return window.qaAimState(); };
 window.qaFire = function () { fireCd = 0; reloading = 0; if (ammo <= 0 && equipped) ammo = equipped.stats.mag; fire(); return { ammo, score: drill ? drill.score : null }; };
 window.qaStartDrill = function (kind) { startDrill(kind); $('countdown').classList.add('hidden'); if (countIv) { clearInterval(countIv); countIv = null; } mode = MODES.DRILL; return true; };
 window.qaMem = function () { return { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }; };

@@ -156,6 +156,14 @@
   .cab .carries { font-size: 11px; margin-top: 10px; color: var(--cc); }
   .cab .go { position: absolute; right: 14px; top: 16px; font-size: 14px; color: var(--cc); }
 
+  /* ---------- aim controls in RANGE RULES ---------- */
+  .aimctl { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; background: #0a0d13; }
+  .aimrow { display: flex; align-items: center; gap: 14px; font-size: 11px; letter-spacing: 1px; color: var(--dim); margin: 6px 0; }
+  .aimrow span { width: 150px; }
+  .aimrow b { width: 52px; text-align: right; color: var(--gold); font-family: Consolas, monospace; }
+  .aimrow input[type=range] { flex: 1; accent-color: #e8c576; }
+  .aimnote { font-size: 10px; color: var(--dim); margin-top: 8px; line-height: 1.6; }
+
   #endstats { font-size: 15px; line-height: 2; margin: 8px 0; }
   #endscore { font-size: 74px; font-family: 'Black Ops One', Impact, sans-serif; color: #fff;
     text-shadow: 0 0 30px rgba(232,197,118,0.4); }
@@ -303,6 +311,11 @@
       · DAILY MARKSMAN: one seeded contract for every member, new terms at midnight UTC.<br>
       · OVERTIME: endless boards. Let three walk and the lights go out.<br>
       · The Table rewards the hand, not the wallet — every gun can gold every drill.
+    </div>
+    <div class="aimctl">
+      <div class="aimrow"><span>MOUSE SENSITIVITY</span><input type="range" id="sens" min="0.3" max="2.5" step="0.05"><b id="sensv">1.00×</b></div>
+      <div class="aimrow"><span>AIM SMOOTHING</span><input type="range" id="smooth" min="0" max="1" step="0.05"><b id="smoothv">50%</b></div>
+      <div class="aimnote">Smoothing turns stepped mouse deltas into one continuous sweep · 0% = raw · pointer lock uses unadjusted movement (no OS acceleration) where the browser allows it</div>
     </div>
     <div class="row"><button id="btn-help-back" class="primary">UNDERSTOOD</button></div>
   </div>
