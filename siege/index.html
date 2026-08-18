@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>CONTINENTAL SIEGE — hold every floor of the hotel</title>
+<meta name="description" content="Tower defense in the WICK universe. Pepe operatives of the Continental hold six floors against the High Table. Your WICK ARSENAL guns in their hands, KJP GEAR perks. Members of the wick.pics arcade.">
+<meta name="theme-color" content="#05070c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2305070c'/%3E%3Crect x='14' y='18' width='36' height='34' fill='%23151a24' stroke='%23e8c576' stroke-width='3'/%3E%3Crect x='20' y='24' width='7' height='9' fill='%23ffd9a0'/%3E%3Crect x='37' y='24' width='7' height='9' fill='%23ffd9a0'/%3E%3Crect x='28' y='38' width='8' height='14' fill='%233dffb0'/%3E%3Cpath d='M10 18h44' stroke='%233dffb0' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="canonical" href="https://games.wick.pics/siege/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Arcade Alley — wick.pics">
+<meta property="og:title" content="CONTINENTAL SIEGE — hold every floor of the hotel">
+<meta property="og:description" content="John Wick × Pepe tower defense. Nine operatives of the Continental staff, your on-chain WICK ARSENAL guns in their hands, six floors + THE PIT, KJP GEAR perks. Free to play on PulseChain.">
+<meta property="og:url" content="https://games.wick.pics/siege/">
+<meta property="og:image" content="https://games.wick.pics/siege/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CONTINENTAL SIEGE — hold every floor of the hotel">
+<meta name="twitter:description" content="John Wick × Pepe tower defense with your on-chain WICK ARSENAL guns. Six floors + THE PIT. Free to play.">
+<meta name="twitter:image" content="https://games.wick.pics/siege/og.jpg">
+<style>
+  @font-face { font-family: 'Black Ops One'; src: url('lib/black-ops-one.woff2') format('woff2'); font-display: swap; }
+  html, body { margin: 0; height: 100%; background: #05070c; overflow: hidden; }
+  #game { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas { image-rendering: auto; }
+  #links { position: fixed; top: 10px; left: 12px; z-index: 5; font: 10px Consolas, monospace; letter-spacing: 2px; }
+  #links a { color: #7c8798; text-decoration: none; margin-right: 14px; }
+  #links a:hover { color: #e8c576; }
+  /* preload the display face so Phaser text measures correctly */
+  #fontprime { position: fixed; left: -9999px; top: -9999px; font-family: 'Black Ops One'; }
+  /* phones held upright: the board is 1280×768 — ask for landscape instead of shipping a postage stamp */
+  #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #05070c; color: #e8c576; font: 14px Consolas, monospace; letter-spacing: 3px; text-align: center; place-items: center; }
+  #rotate b { display: block; font-size: 42px; margin-bottom: 14px; }
+  @media (orientation: portrait) and (max-width: 900px) { #rotate { display: grid; } }
+</style>
+</head>
+<body>
+<div id="fontprime">CONTINENTAL</div>
+<div id="rotate"><div><b>⟳</b>ROTATE TO LANDSCAPE<br><span style="color:#7c8798;font-size:11px">THE HOTEL IS WIDER THAN IT IS TALL</span></div></div>
+<div id="links"><a href="https://games.wick.pics/">◂ ARCADE ALLEY</a><a href="https://games.wick.pics/range/">🎯 THE RANGE</a><a href="https://mint.wick.pics">🔫 ARSENAL</a></div>
+<div id="game"></div>
+<script>
+  window.__consoleErrors = [];
+  (function () { const o = console.error; console.error = function () { window.__consoleErrors.push(Array.from(arguments).join(' ')); o.apply(console, arguments); };
+    window.addEventListener('error', e => window.__consoleErrors.push(e.message));
+    window.addEventListener('unhandledrejection', e => window.__consoleErrors.push('unhandledrejection: ' + ((e.reason && e.reason.message) || e.reason))); })();
+</script>
+<script src="lib/phaser.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/art/gunart.js"></script>
+<script src="js/art/pepe.js"></script>
+<script src="js/art/cast.js"></script>
+<script src="js/art/guns.js"></script>
+<script src="js/art/fx.js"></script>
+<script src="js/art/floors.js"></script>
+<script src="js/art/title.js"></script>
+<script src="js/nft.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/battle.js"></script>
+</body>
+</html>

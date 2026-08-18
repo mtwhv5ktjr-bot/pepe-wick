@@ -177,6 +177,7 @@ section{position:relative}
 .machine.horde{--mc:var(--hot)}
 .machine.kjp{--mc:#ffd27c}                 /* the counselor's cabinet burns gold */
 .machine.range{--mc:#e8c576}               /* the range is brass — the members-only door */
+.machine.siege{--mc:#7cf9a5}               /* the hotel marquee burns wick green */
 
 /* marquee — the backlit name board, tapered like the real thing */
 .marquee{position:relative;height:clamp(46px,5.8vw,58px);margin:0 10px;overflow:hidden;
@@ -348,10 +349,11 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
     <div class="brand">
       <b>WICK.PICS</b><span>/</span><em>ARCADE</em>
     </div>
-    <div class="status mono"><span class="dot"></span> FOUR CABINETS · THREE ONLINE</div>
+    <div class="status mono"><span class="dot"></span> FIVE CABINETS · FOUR ONLINE</div>
     <nav>
       <a href="/play/">Play</a>
       <a href="/range/">Range</a>
+      <a href="/siege/">Siege</a>
       <a href="https://mint.wick.pics">Arsenal</a>
       <a href="/arsenal/">Collection</a>
     </nav>
@@ -367,10 +369,11 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
     </div>
     <h1 class="display">A back-alley arcade where the guns are&nbsp;<span class="o">yours</span> and the leaderboard never forgets.</h1>
     <div class="heroFoot">
-      <p class="lede">Four cabinets: get the dog back, break into Langley for the file they wrote about you, or take your iron to the members-only range and build the loadout you carry into every machine. Fully on-chain art, NFT weapons you actually hold, gear that works in every cabinet, and a world leaderboard signed by your own wallet.</p>
+      <p class="lede">Five cabinets: get the dog back, break into Langley for the file they wrote about you, hold every floor of the Continental against the High Table, or take your iron to the members-only range and build the loadout you carry into every machine. Fully on-chain art, NFT weapons you actually hold, gear that works in every cabinet, and a world leaderboard signed by your own wallet.</p>
       <div class="cta">
         <a class="btn solid" href="/play/">Play Pepe Wick <span class="ar">↗</span></a>
         <a class="btn" href="/range/">Arsenal Range <span class="ar">↗</span></a>
+        <a class="btn" href="/siege/">Continental Siege <span class="ar">↗</span></a>
         <a class="btn" href="https://mint.wick.pics">Wick Arsenal <span class="ar">↗</span></a>
       </div>
     </div>
@@ -477,6 +480,37 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
             <div><dt>Door</dt><dd>One Arsenal gun gets you in</dd></div>
           </dl>
           <div class="status"><b>Enter the range</b><span class="ar">↗</span></div>
+        </a>
+
+        <a class="machine siege" href="/siege/">
+          <div class="spill" aria-hidden="true"></div>
+          <div class="marquee"><b>CONTINENTAL SIEGE</b></div>
+          <div class="hood" aria-hidden="true"></div>
+          <div class="bezel">
+            <div class="crt">
+              <img src="/siege/siege-cabinet.jpg" alt="CONTINENTAL SIEGE — hold every floor of the hotel" loading="lazy" decoding="async">
+              <div class="sweep" aria-hidden="true"></div>
+              <div class="press">PRESS START</div>
+            </div>
+          </div>
+          <div class="deck" aria-hidden="true">
+            <div class="stick"><i></i></div>
+            <div class="btns">
+              <b style="--b:#7cf9a5"></b><b style="--b:#e8c576"></b><b style="--b:#ff5c5c"></b>
+            </div>
+          </div>
+          <div class="coindoor">
+            <span class="slot" aria-hidden="true"></span>
+            <span class="cred">FREE PLAY · CREDITS <b>∞</b></span>
+          </div>
+          <div class="base" aria-hidden="true"></div>
+          <dl class="plate">
+            <div><dt>Mode</dt><dd>Tower defense · 6 floors + THE PIT · daily contract</dd></div>
+            <div><dt>Operatives</dt><dd>Nine Pepes of the Continental staff</dd></div>
+            <div><dt>Weapons</dt><dd>Your Arsenal guns in their hands (≤ +10% DPS)</dd></div>
+            <div><dt>Gear</dt><dd>KJP GEAR = markers + BABA YAGA</dd></div>
+          </dl>
+          <div class="status"><b>Hold the hotel</b><span class="ar">↗</span></div>
         </a>
 
         <a class="machine horde" href="/horde/">

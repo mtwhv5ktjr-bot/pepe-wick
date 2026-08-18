@@ -155,6 +155,7 @@
     { key: 'pepewick', name: 'PEPE WICK', tag: 'SIDE-SCROLLER · 10 CONTRACTS', url: 'https://games.wick.pics/play/', carries: 'guns + mods', color: '#7cf9a5', live: true },
     { key: 'kjp', name: 'KJP — THE BLACK FILE', tag: 'TOP-DOWN STEALTH · 6 OPS', url: 'https://kjp-game.wick.pics', carries: 'KJP GEAR', color: '#ffd27c', live: true },
     { key: 'shooter', name: 'WICK SHOOTER', tag: 'BELT-SCROLLER · 10 LEVELS', url: 'https://wick-shooter.vercel.app', carries: 'guns', color: '#ff4d00', live: true },
+    { key: 'siege', name: 'CONTINENTAL SIEGE', tag: 'TOWER DEFENSE · 6 FLOORS + THE PIT', url: 'https://games.wick.pics/siege/', carries: 'guns (≤ +10% DPS) + KJP GEAR', color: '#7cf9a5', live: true },
     { key: 'horde', name: 'PEPE WICK vs HORDE', tag: 'CROWD RUNNER', url: 'https://games.wick.pics/horde/', carries: '—', color: '#ff2a6d', live: false },
     { key: 'arsenal', name: 'WICK ARSENAL', tag: 'MINT · MARKET · MODS', url: 'https://mint.wick.pics', carries: 'buy / sell iron', color: '#e8c576', live: true },
   ];
