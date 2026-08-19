@@ -118,6 +118,7 @@
       const cg = this.add.graphics().setDepth(D.floor - 1); cg.fillGradientStyle(0x03040a, 0x03040a, 0x0b0e15, 0x0b0e15, 1, 1, 1, 1).fillRect(0, HUD_H, W, BY - HUD_H);
       this.hudBg = this.add.nineslice(W / 2, hy - 14, 'ui_panel', undefined, W + 28, HUD_H + 28, 14, 14, 14, 14).setDepth(D.hud); // the 14px nineslice padding hangs OFF the top edge, never over the cornice
       this.hudFloor = txt(this, 16, hy, c.floor.name + (this.opts.mode === 'daily' ? ' · DAILY' : this.opts.mode === 'endless' ? ' · ENDLESS' : '') + (c.doctrine.id !== 'none' ? ' · ' + c.doctrine.name : ''), 15, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      for (let fs = 15; fs > 9 && this.hudFloor.width > 200; fs--) this.hudFloor.setFontSize(fs); // the toggles start at x≈214
       this.hudWave = txt(this, W / 2 - 40, hy, '', 14, INK).setOrigin(0.5).setDepth(D.hud + 1);
       this.add.image(W - 392, hy, 'ui_coinIcon').setDepth(D.hud + 1).setScale(0.9);
       this.hudCoins = txt(this, W - 378, hy, '', 16, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
@@ -127,7 +128,11 @@
       this.auto = false; this.btnAuto = button(this, W - 156, hy, 60, 28, 'AUTO', () => this.toggleAuto(), { size: 11, depth: D.hud + 1 });
       this.btnSpeed = button(this, W / 2 + 130, hy, 56, 28, '×1', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.btnSpeed.t.setText('×' + this.speed); }, { size: 12, depth: D.hud + 1 });
       this.btnPause = button(this, W / 2 + 194, hy, 56, 28, '❚❚', () => this.togglePause(), { size: 12, depth: D.hud + 1 });
-      this.btnQuit = button(this, W / 2 - 230, hy, 84, 28, '◂ QUIT', () => this.scene.start('Floors'), { size: 11, depth: D.hud + 1 });
+      const back = () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title');
+      this.btnQuit = button(this, W / 2 - 228, hy, 84, 28, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
+      // sound + shake toggles live in the HUD too (they were only on the title)
+      this.btnSound = button(this, W / 2 - 318, hy, 68, 24, AUD.isMuted() ? '♪ OFF' : '♪ ON', () => { const m = AUD.toggleMute(); this.btnSound.t.setText(m ? '♪ OFF' : '♪ ON'); }, { size: 10, depth: D.hud + 1 });
+      this.btnShake = button(this, W / 2 - 392, hy, 68, 24, LS.get('cs_shake') === '0' ? 'SHAKE OFF' : 'SHAKE ON', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); this.btnShake.t.setText(off ? 'SHAKE OFF' : 'SHAKE ON'); if (!off) this.shake(160, 0.006); }, { size: 10, depth: D.hud + 1 });
       // ghost cursor + range ring
       this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
       this.ghostGun = this.add.image(0, 0, 'gun_1').setDepth(D.air).setVisible(false).setAlpha(0.7);
@@ -492,9 +497,9 @@
             this.tweens.add({ targets: core, scale: R / 40, alpha: 0, duration: 260, ease: 'Quad.easeOut', onComplete: () => core.destroy() });
             this.ringFx(x, y, 0xff9d3d, R / 20); this.sparks(x, y - 4, 0xffb347, 10); this.smoke(x, y - 8, 5);
             const scorch = this.add.image(x, y + 4, 'fx_bulletHole').setDepth(D.floorFx).setScale(R / 4, R / 6).setAlpha(0.42); this.tweens.add({ targets: scorch, alpha: 0, delay: 5000, duration: 3000, onComplete: () => scorch.destroy() });
-            this.cameras.main.shake(140, 0.005); AUD.play('splash'); break; }
-          case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.cameras.main.shake(300, 0.008); AUD.play('boss_die'); } else AUD.play('die'); break; }
-          case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.cameras.main.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
+            this.shake(140, 0.005); AUD.play('splash'); break; }
+          case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.shake(300, 0.008); AUD.play('boss_die'); } else AUD.play('die'); break; }
+          case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
           case 'wave_start': this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
           case 'wave_clear': { this.banner('FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
@@ -566,6 +571,7 @@
       const g0 = this.add.image(tv.body.x, tv.body.y - 34, 'fx_glow').setTint(0x9ff3ff).setBlendMode(Phaser.BlendModes.ADD).setScale(0.8).setAlpha(0.8).setDepth(D.air); this.fxLayer.add(g0); this.tweens.add({ targets: g0, alpha: 0, scale: 1.4, duration: 200, onComplete: () => g0.destroy() });
       AUD.play('tesla');
     }
+    shake(ms, amt) { if (LS.get('cs_shake') === '0') return; this.cameras.main.shake(ms, amt); }
     // nearest live enemy to a sim-space point (events carry positions, not victim ids)
     enemyNear(x, y, maxD) {
       const c = this.core; let best = null, bd = (maxD || 26) * (maxD || 26);
@@ -600,7 +606,7 @@
       const bx = W / 2;
       if (win && this.opts.mode === 'campaign' && c.floorId < 6) button(this, bx - 130, H / 2 + 150, 220, 40, 'NEXT FLOOR ▸', () => this.scene.start('Battle', Object.assign({}, this.opts, { floor: c.floorId + 1 })), { hot: true, depth: D.overlay + 2 });
       else button(this, bx - 130, H / 2 + 150, 220, 40, 'RUN IT BACK', () => this.scene.restart(this.opts), { hot: true, depth: D.overlay + 2 });
-      button(this, bx + 130, H / 2 + 150, 220, 40, 'THE ELEVATOR', () => this.scene.start('Floors'), { depth: D.overlay + 2 });
+      button(this, bx + 130, H / 2 + 150, 220, 40, this.opts.mode === 'campaign' ? 'THE ELEVATOR' : 'THE LOBBY', () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title'), { depth: D.overlay + 2 });
     }
   }
   window.__CS_SCENES.Battle = Battle;

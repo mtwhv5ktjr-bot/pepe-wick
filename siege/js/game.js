@@ -260,6 +260,8 @@
       acct.on('pointerdown', () => { AUD.unlock(); AUD.play('ui'); showAccounts(this); });
       const muteT = mono(this, 200, H - 16, AUD.isMuted() ? '♪ OFF' : '♪ ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       muteT.on('pointerdown', () => { AUD.unlock(); muteT.setText(AUD.toggleMute() ? '♪ OFF' : '♪ ON'); });
+      const shakeT = mono(this, 268, H - 16, LS.get('cs_shake') === '0' ? '⌁ SHAKE OFF' : '⌁ SHAKE ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
+      shakeT.on('pointerdown', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); shakeT.setText(off ? '⌁ SHAKE OFF' : '⌁ SHAKE ON'); AUD.play('ui'); });
       mono(this, W - 16, H - 16, 'A KJP GEAR OPERATION · YOUR WICK ARSENAL GUNS IN THEIR HANDS · FREE PLAY', 10, DIM).setOrigin(1, 1).setDepth(20);
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.92, 0.32); } catch (e) {}
       this.input.once('pointerdown', () => AUD.unlock());
