@@ -9,9 +9,19 @@
    ========================================================================= */
 (function () {
   'use strict';
-  const W = 1280, H = 768, CELL = 56;                // canvas; board = 20×12 cells at CELL 56 → 1120×672 (K = 1), offset (0,68); rail 160 right; 28px strip below
-  const HUD_H = 44;                                  // top strip; 24px cornice between it and the board so row-0 walkers keep heads + hp bars visible
-  const BX = 0, BY = 68, BW = CS.COLS * CELL, BH = CS.ROWS * CELL, RAIL_X = BX + BW; // HUD strip above, card rail right
+  const W = 1280, H = 768;
+  // The canvas is a fixed 1280×768 that FIT-scales into the viewport. On a phone in landscape that is
+  // ~0.5×, so desktop-sized UI lands at 4-6 physical px and buttons at 13px. MOBILE therefore gets its
+  // own layout: a two-row HUD, a smaller centred board, and a full-width card tray along the bottom.
+  const MOBILE = (() => { try { return matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 520; } catch (e) { return false; } })();
+  const US = MOBILE ? 1.7 : 1;                       // UI scale: fonts + panels (the BOARD scales via CELL)
+  const CELL = MOBILE ? 46 : 56;
+  const HUD_H = MOBILE ? 96 : 44;                    // mobile HUD is two rows of fat touch targets
+  const BW = CS.COLS * CELL, BH = CS.ROWS * CELL;
+  const BX = MOBILE ? Math.round((W - BW) / 2) : 0, BY = MOBILE ? HUD_H + 8 : 68;
+  const RAIL_X = MOBILE ? W : BX + BW;               // desktop: card rail to the right of the board
+  const TRAY = MOBILE ? { y: BY + BH + 6, h: H - (BY + BH + 6) } : null; // mobile: cards along the bottom
+  const inBoard = p => p.x >= BX && p.x < BX + BW && p.y >= BY && p.y < BY + BH;
   const K = CELL / CS.CELL;                          // sim px → screen px
   const SX = x => BX + (x - CS.BOARD_X) * K, SY = y => BY + (y - CS.BOARD_Y) * K, SR = r => r * K;
   const FONT = '"Black Ops One", Impact, sans-serif', MONO = 'Consolas, "Courier New", monospace';
@@ -67,12 +77,12 @@
 
   // ---------------- text helpers ----------------
   function txt(scene, x, y, s, size, color, extra) {
-    return scene.add.text(x, y, s, Object.assign({ fontFamily: FONT, fontSize: size + 'px', color: color || INK }, extra || {}));
+    return scene.add.text(x, y, s, Object.assign({ fontFamily: FONT, fontSize: Math.round(size * US) + 'px', color: color || INK }, extra || {}));
   }
   // Consolas has no ⛁ (U+26C1) — the coin glyph only exists in the display face — so mono text swaps it for ¤ (Latin-1, everywhere)
   const MONO_FIX = v => (typeof v === 'string' ? v.replace(/⛁/g, '¤') : v);
   function mono(scene, x, y, s, size, color, extra) {
-    const t = scene.add.text(x, y, MONO_FIX(s), Object.assign({ fontFamily: MONO, fontSize: size + 'px', color: color || INK }, extra || {}));
+    const t = scene.add.text(x, y, MONO_FIX(s), Object.assign({ fontFamily: MONO, fontSize: Math.round(size * US) + 'px', color: color || INK }, extra || {}));
     const orig = t.setText.bind(t); t.setText = v => orig(Array.isArray(v) ? v.map(MONO_FIX) : MONO_FIX(v)); return t;
   }
   function nine(scene, key, x, y, w, h, depth) {
@@ -83,7 +93,9 @@
   }
   function button(scene, x, y, w, h, label, cb, opts) {
     opts = opts || {};
+    if (MOBILE) { if (!opts.noScale) { w = Math.round(w * 1.15); h = Math.max(h, 46); } }   // explicit (noScale) sizes are laid out by hand; the rest get thumb-sized
     const bg = scene.add.nineslice(x, y, opts.hot ? 'ui_btnHot' : 'ui_btn', undefined, w, h, 14, 14, 14, 14).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(opts.depth || 20);
+    if (MOBILE && bg.input && bg.input.hitArea && bg.input.hitArea.setTo) { const pad = 16; bg.input.hitArea.setTo(-pad, -pad, w + pad * 2, h + pad * 2); } // fat fingers, unchanged visuals
     const t = txt(scene, x, y, label, opts.size || 15, opts.hot ? '#0b0e15' : (opts.color || GOLD)).setOrigin(0.5).setDepth((opts.depth || 20) + 1);
     if (opts.sub) mono(scene, x, y + h / 2 + 12, opts.sub, 10, DIM).setOrigin(0.5).setDepth((opts.depth || 20) + 1);
     bg.on('pointerover', () => { bg.setTexture('ui_btnHot'); t.setColor('#0b0e15'); });
@@ -277,14 +289,17 @@
   // ledger is read; `onDone(res)` lets the scene re-skin itself. Fails soft with the reason on the button.
   function walletButton(scene, x, y, w, h, onDone, opts) {
     opts = opts || {};
-    const label = () => ART.wallet ? '✓ GEAR ×' + ART.wallet.count + ' · GUNS ×' + ART.wallet.gunCount + (ART.wallet.gunTypes.length ? ' — IRON ON THE FLOOR' : '') : '🔗 CONNECT WALLET · USE YOUR ARSENAL GUNS';
+    // the long label does not fit a phone HUD slot — keep it short there
+    const label = () => ART.wallet
+      ? (MOBILE ? '✓ GEAR ×' + ART.wallet.count + ' · GUNS ×' + ART.wallet.gunCount : '✓ GEAR ×' + ART.wallet.count + ' · GUNS ×' + ART.wallet.gunCount + (ART.wallet.gunTypes.length ? ' — IRON ON THE FLOOR' : ''))
+      : (MOBILE ? '🔗 CONNECT WALLET' : '🔗 CONNECT WALLET · USE YOUR ARSENAL GUNS');
     const b = button(scene, x, y, w, h, label(), async () => {
       if (ART.wallet || b.busy) return; b.busy = true; b.t.setText('CHECKING THE LEDGER…');
       const r = await CS_NFT.connect(); if (r.ok) ART.wallet = r;
       b.busy = false;
       if (!scene.sys.isActive() || !b.t.active) return;
       if (r.ok) { b.t.setText(label()); if (onDone) onDone(r); }
-      else { b.t.setText(r.err === 'NO WALLET DETECTED' ? 'NO WALLET — OPEN THIS PAGE IN METAMASK / RABBY' : r.err); scene.time.delayedCall(3200, () => { if (b.t.active) b.t.setText(label()); }); }
+      else { b.t.setText(r.err === 'NO WALLET DETECTED' ? (MOBILE ? 'OPEN IN METAMASK APP' : 'NO WALLET — OPEN THIS PAGE IN METAMASK / RABBY') : r.err); scene.time.delayedCall(3200, () => { if (b.t.active) b.t.setText(label()); }); }
     }, { hot: !ART.wallet, size: opts.size || 12, depth: opts.depth || 20, color: ART.wallet ? GREEN : GOLD });
     return b;
   }
@@ -384,7 +399,8 @@
         // footer row: intro / lock line + waves
         const fy = y + CH / 2 - 16;
         const prev = CS.CAMPAIGN[CS.CAMPAIGN.indexOf(f.id) - 1];
-        mono(this, x - CW / 2 + 12, fy, locked ? 'LOCKED — CLEAR ' + (CS.floorById(prev) ? CS.floorById(prev).name : '') : f.intro.split('.')[0].toUpperCase(), 8, locked ? DIM : INK).setOrigin(0, 0.5);
+        const foot = locked ? (MOBILE ? '🔒 LOCKED' : 'LOCKED — CLEAR ' + (CS.floorById(prev) ? CS.floorById(prev).name : '')) : (MOBILE ? f.intro.split('.')[0].toUpperCase().slice(0, 22) : f.intro.split('.')[0].toUpperCase());
+        mono(this, x - CW / 2 + 12, fy, foot, 8, locked ? DIM : INK).setOrigin(0, 0.5);
         mono(this, x + CW / 2 - 12, fy, f.waves + ' WAVES', 9, locked ? DIM : GOLD).setOrigin(1, 0.5);
         if (locked) { this.add.image(x, ty - 10, 'ui_lockIcon').setScale(1.1).setAlpha(0.9); }
         else {
@@ -397,15 +413,17 @@
       // Defaults (OPERATIVE + HOUSE STANDARD) are the intended game: a new player can just pick a floor.
       const dy = 700;
       const DIFF_SUB = { operative: 'STANDARD · intended game', ghost: 'HARDER · +35% enemy hp', babayaga: 'BRUTAL · +80% enemy hp' };
+      const SHORT = { 'HOUSE STANDARD': 'STANDARD', 'IRON DISCIPLINE': 'IRON', 'THE LEDGER': 'LEDGER', 'CLOSED DOORS': 'DOORS', 'BABA YAGA': 'YAGA' };
+      const lbl = s => (MOBILE && SHORT[s]) ? SHORT[s] : s;
       const DOCT_SUB = { none: 'no trade-off · default', iron: '+8% dmg / −20⛁ bonus', ledger: '+10% bounty / −5% rof', doors: '+4 markers / −40⛁ start' };
-      mono(this, 120, dy - 30, 'DIFFICULTY  — how hard they come up the stairs', 10, DIM);
+      mono(this, 120, dy - 30, MOBILE ? 'DIFFICULTY' : 'DIFFICULTY  — how hard they come up the stairs', 10, DIM);
       let dx = 120;
-      for (const d in CS.DIFFS) { const on = d === this.diff; button(this, dx + 80, dy, 160, 36, CS.DIFFS[d].name, () => { this.diff = d; LS.set('cs_diff', d); this.scene.restart(); }, { hot: on, size: 13, sub: DIFF_SUB[d] }); dx += 172; }
-      mono(this, 700, dy - 30, 'PERK (optional)  — one trade-off for the whole floor, or leave HOUSE STANDARD', 10, DIM);
-      let ox = 700; for (const k in CS.DOCTRINES) { const on = k === this.doct; button(this, ox + 66, dy, 132, 36, CS.DOCTRINES[k].name, () => { this.doct = k; LS.set('cs_doct', k); this.scene.restart(); }, { hot: on, size: 11, sub: DOCT_SUB[k] }); ox += 140; }
+      for (const d in CS.DIFFS) { const on = d === this.diff; button(this, dx + 80, dy, MOBILE ? 150 : 160, 36, lbl(CS.DIFFS[d].name), () => { this.diff = d; LS.set('cs_diff', d); this.scene.restart(); }, { hot: on, size: 13, sub: MOBILE ? null : DIFF_SUB[d], noScale: MOBILE }); dx += 172; }
+      mono(this, 700, dy - 30, MOBILE ? 'PERK (optional)' : 'PERK (optional)  — one trade-off for the whole floor, or leave HOUSE STANDARD', 10, DIM);
+      let ox = 700; for (const k in CS.DOCTRINES) { const on = k === this.doct; button(this, ox + 66, dy, MOBILE ? 124 : 132, 36, lbl(CS.DOCTRINES[k].name), () => { this.doct = k; LS.set('cs_doct', k); this.scene.restart(); }, { hot: on, size: 11, sub: MOBILE ? null : DOCT_SUB[k], noScale: MOBILE }); ox += 140; }
       const chosen = (this.diff === 'operative' && this.doct === 'none') ? 'YOUR TERMS: OPERATIVE · HOUSE STANDARD — the intended experience. New here? Just pick a floor.' : 'YOUR TERMS: ' + CS.DIFFS[this.diff].name + ' · ' + CS.DOCTRINES[this.doct].name + ' — ' + CS.DOCTRINES[this.doct].desc.toLowerCase();
       mono(this, W / 2, dy + 42, chosen, 10, GOLD).setOrigin(0.5);
-      mono(this, W / 2, dy + 58, 'ON THE FLOOR: pick an operative (1-9), click a tile to post, SEND WAVE · click a posted unit for targeting orders · THE HOUSE spends a fat bank', 9, DIM).setOrigin(0.5);
+      mono(this, W / 2, dy + 58, MOBILE ? 'TAP A CARD, TAP A TILE, SEND WAVE · TAP A POSTED UNIT FOR ORDERS' : 'ON THE FLOOR: pick an operative (1-9), click a tile to post, SEND WAVE · click a posted unit for targeting orders · THE HOUSE spends a fat bank', 9, DIM).setOrigin(0.5);
       button(this, 84, 32, 132, 30, '◂ LOBBY', () => this.scene.start('Title'), { size: 11 });
       walletButton(this, W - 196, 46, 352, 32, () => this.scene.restart(), { size: 11 });
       AUD.setState({ scene: 'floors', intensity: 0, active: false, danger: false, boss: false });
@@ -414,5 +432,5 @@
   }
 
   window.__CS_SCENES = { Boot, Title, Floors };
-  window.__CS_SHARED = { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, nine, button, HOTKEYS, starsFor, setStars, starsAny, gunModsFor, walletLine, todayUTC };
+  window.__CS_SHARED = { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, MOBILE, US, TRAY, inBoard, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, nine, button, HOTKEYS, starsFor, setStars, starsAny, gunModsFor, walletLine, todayUTC };
 })();

@@ -6,6 +6,9 @@
 <title>CONTINENTAL SIEGE — hold every floor of the hotel</title>
 <meta name="description" content="Tower defense in the WICK universe. Pepe operatives of the Continental hold six floors against the High Table. Your WICK ARSENAL guns in their hands, KJP GEAR perks. Members of the wick.pics arcade.">
 <meta name="theme-color" content="#05070c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2305070c'/%3E%3Crect x='14' y='18' width='36' height='34' fill='%23151a24' stroke='%23e8c576' stroke-width='3'/%3E%3Crect x='20' y='24' width='7' height='9' fill='%23ffd9a0'/%3E%3Crect x='37' y='24' width='7' height='9' fill='%23ffd9a0'/%3E%3Crect x='28' y='38' width='8' height='14' fill='%233dffb0'/%3E%3Cpath d='M10 18h44' stroke='%233dffb0' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="canonical" href="https://games.wick.pics/siege/">
 <meta property="og:type" content="website">
@@ -34,6 +37,8 @@
   #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #05070c; color: #e8c576; font: 14px Consolas, monospace; letter-spacing: 3px; text-align: center; place-items: center; }
   #rotate b { display: block; font-size: 42px; margin-bottom: 14px; }
   @media (orientation: portrait) and (max-width: 900px) { #rotate { display: grid; } }
+  /* on a phone the in-canvas UI owns the corners — the HTML link strip would sit on top of it */
+  @media (pointer: coarse), (max-width: 900px) { #links { display: none; } }
 </style>
 </head>
 <body>
@@ -60,5 +65,18 @@
 <script src="js/audio.js"></script>
 <script src="js/game.js"></script>
 <script src="js/battle.js"></script>
+<script>
+  // phone: go fullscreen and lock landscape on the first touch (both are user-gesture only, both fail soft)
+  (function () {
+    if (!matchMedia('(pointer: coarse)').matches) return;
+    const once = () => {
+      document.removeEventListener('touchend', once);
+      const el = document.documentElement;
+      try { (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); } catch (e) {}
+      try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}
+    };
+    document.addEventListener('touchend', once, { passive: true });
+  })();
+</script>
 </body>
 </html>

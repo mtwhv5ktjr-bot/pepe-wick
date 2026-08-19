@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const S = window.__CS_SHARED;
-  const { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, button, HOTKEYS, starsFor, setStars, gunModsFor, walletLine } = S;
+  const { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, MOBILE, US, TRAY, inBoard, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, button, HOTKEYS, starsFor, setStars, gunModsFor, walletLine } = S;
   const AUD = window.CS_AUDIO;
   const D = { floor: 0, floorFx: 1, deco: 2, ground: 3, shadow: 4, world: 10, /* world objects sort within 10..2000 by y */ air: 2100, fxTop: 2200, hud: 3000, panel: 3100, banner: 3200, overlay: 4000 };
   const ANIM_MS = 1000 / 60;
@@ -44,9 +44,9 @@
       this.input.on('pointerdown', p => { if (p.rightButtonDown()) { if (this.selDef) this.selectDef(this.selDef); this.closeSel(); return; } this.onDown(p); });
       this.input.mouse && this.input.mouse.disableContextMenu();
       this.input.keyboard.on('keydown', e => this.onKey(e));
-      try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.96, 0.30); } catch (e) {}
+      if (!MOBILE) try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.96, 0.30); } catch (e) {}
       this.fxLayer = this.add.layer().setDepth(D.fxTop);
-      try { this.fxLayer.postFX.addBloom(0xffffff, 1, 1, 0.9, 1.15); } catch (e) {}
+      if (!MOBILE) try { this.fxLayer.postFX.addBloom(0xffffff, 1, 1, 0.9, 1.15); } catch (e) {}
       this.banner('FLOOR ' + CS.stageOf(f.id) + ' — ' + f.name, f.intro, 1700);
       AUD.setState({ scene: 'battle', floor: f.id, intensity: 0.08, active: false, boss: false, danger: false });
       this.input.once('pointerdown', () => AUD.unlock());
@@ -94,16 +94,16 @@
         this.ambientObjs.push(g);
       });
       if (amb.rain) {
-        const rain = this.add.particles(0, 0, 'fx_rain', { x: { min: -60, max: W }, y: -30, lifespan: 1300, speedY: { min: 560, max: 760 }, speedX: { min: 40, max: 90 }, quantity: 3, frequency: 14, alpha: { start: 0.45, end: 0.05 }, scale: { min: 0.6, max: 1 }, blendMode: 'ADD' }).setDepth(D.air);
+        const rain = this.add.particles(0, 0, 'fx_rain', { x: { min: -60, max: W }, y: -30, lifespan: 1300, speedY: { min: 560, max: 760 }, speedX: { min: 40, max: 90 }, quantity: MOBILE ? 1 : 3, frequency: MOBILE ? 34 : 14, alpha: { start: 0.45, end: 0.05 }, scale: { min: 0.6, max: 1 }, blendMode: 'ADD' }).setDepth(D.air);
         this.ambientObjs.push(rain);
         this.lightning = 0;
       }
-      (amb.sparks || []).forEach(s => { const e = this.add.particles(BX + s.x, BY + s.y, 'fx_spark', { lifespan: { min: 300, max: 700 }, speed: { min: 20, max: 90 }, angle: { min: 200, max: 340 }, gravityY: 240, quantity: 1, frequency: 260, scale: { start: 0.5, end: 0 }, alpha: { start: 1, end: 0 }, tint: 0xffd27f, blendMode: 'ADD' }).setDepth(D.air); this.ambientObjs.push(e); });
+      (amb.sparks || []).slice(0, MOBILE ? 1 : 99).forEach(s => { const e = this.add.particles(BX + s.x, BY + s.y, 'fx_spark', { lifespan: { min: 300, max: 700 }, speed: { min: 20, max: 90 }, angle: { min: 200, max: 340 }, gravityY: 240, quantity: 1, frequency: MOBILE ? 700 : 260, scale: { start: 0.5, end: 0 }, alpha: { start: 1, end: 0 }, tint: 0xffd27f, blendMode: 'ADD' }).setDepth(D.air); this.ambientObjs.push(e); });
       // dust motes everywhere (cheap ambience)
-      const motes = this.add.particles(0, 0, 'fx_dot', { x: { min: 0, max: W }, y: { min: 60, max: H }, lifespan: 6000, speedY: { min: -6, max: -14 }, speedX: { min: -6, max: 6 }, quantity: 1, frequency: 220, alpha: { start: 0, end: 0.35, ease: 'Sine.easeInOut' }, scale: { min: 0.3, max: 0.7 }, blendMode: 'ADD' }).setDepth(D.air);
+      const motes = this.add.particles(0, 0, 'fx_dot', { x: { min: 0, max: W }, y: { min: 60, max: H }, lifespan: 6000, speedY: { min: -6, max: -14 }, speedX: { min: -6, max: 6 }, quantity: 1, frequency: MOBILE ? 600 : 220, alpha: { start: 0, end: 0.35, ease: 'Sine.easeInOut' }, scale: { min: 0.3, max: 0.7 }, blendMode: 'ADD' }).setDepth(D.air);
       this.ambientObjs.push(motes);
       // film grain
-      if (!this.grain) { this.grain = this.add.tileSprite(0, 0, W, H, 'fx_noise').setOrigin(0).setAlpha(0.06).setBlendMode(Phaser.BlendModes.OVERLAY).setDepth(D.overlay - 1); }
+      if (!this.grain && !MOBILE) { this.grain = this.add.tileSprite(0, 0, W, H, 'fx_noise').setOrigin(0).setAlpha(0.06).setBlendMode(Phaser.BlendModes.OVERLAY).setDepth(D.overlay - 1); }
     }
     drawFallbackFloor(f) {
       const g = this.add.graphics().setDepth(D.floor); this.fallbackG = g;
@@ -114,6 +114,7 @@
 
     // ---------------------------------------------------------------- HUD
     buildHud() {
+      if (MOBILE) return this.buildHudMobile();
       const c = this.core;
       const hy = HUD_H / 2;
       // cornice: the dark band between the HUD and the top of the wall — row-0 walkers' heads + hp bars live here
@@ -150,7 +151,68 @@
       this.legend = mono(this, BX + 12, ly, "PLACE  1-9 pick · click a tile to post · keep clicking to post more · right-click holsters\nORDERS  click a posted unit → pick who it shoots, or flip to ALL to command every unit of that type   ·   SPACE send · A auto · N max all", 9, DIM).setOrigin(0, 0.5).setLineSpacing(2).setDepth(D.hud + 1);
       this.toastT = mono(this, BX + BW / 2, HUD_H + 12, '', 11, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
+    // PHONE HUD — row 1 reads the run, row 2 is all thumb targets. Everything is sized for a 0.5x canvas.
+    buildHudMobile() {
+      const c = this.core, r1 = 26, r2 = 72;
+      this.hudBg = this.add.nineslice(W / 2, HUD_H / 2 - 14, 'ui_panel', undefined, W + 28, HUD_H + 28, 14, 14, 14, 14).setDepth(D.hud);
+      this.hudFloor = txt(this, 14, r1, c.floor.name, 13, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      for (let fs = 13; fs > 8 && this.hudFloor.width > 300; fs--) this.hudFloor.setFontSize(Math.round(fs * US));
+      this.hudWave = txt(this, W / 2 + 90, r1, '', 13, INK).setOrigin(0.5).setDepth(D.hud + 1);
+      this.hudRule = mono(this, W / 2 + 90, r1 + 24, '', 8, RED).setOrigin(0.5).setDepth(D.hud + 1);
+      this.add.image(W - 300, r1, 'ui_coinIcon').setDepth(D.hud + 1).setScale(1.3);
+      this.hudCoins = txt(this, W - 280, r1, '', 15, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.add.image(W - 150, r1, 'ui_markerIcon').setDepth(D.hud + 1).setScale(1.3);
+      this.hudMarkers = txt(this, W - 130, r1, '', 15, GREEN).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      const B = (cx, w, h, label, cb, o) => button(this, cx, r2, w, h, label, cb, Object.assign({ size: 11, depth: D.hud + 1, noScale: true }, o || {}));
+      this.btnCog = B(58, 76, 54, '⚙', () => this.toggleSettings(), { size: 15 });          //  20..96
+      this.btnHouse = B(190, 168, 54, 'THE HOUSE', () => this.toggleHouse());                // 106..274
+      const back = () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title');
+      this.btnQuit = B(350, 132, 54, '◂ QUIT', back);                                        // 284..416
+      this.btnMaxAll = B(512, 172, 54, 'MAX ALL ⬆', () => this.maxAll());                    // 426..598
+      this.btnPause = B(752, 92, 54, '❚❚', () => this.togglePause());                        // 706..798
+      this.btnSpeed = B(854, 92, 54, '×1', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.btnSpeed.t.setText('×' + this.speed); });
+      this.btnAuto = B(966, 112, 54, 'AUTO', () => this.toggleAuto());                       // 910..1022
+      this.btnWave = B(1150, 236, 54, 'SEND WAVE', () => this.sendWave(), { hot: true, size: 12 }); // 1032..1268
+      // shared bits the desktop HUD also builds
+      this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
+      this.ghostGun = this.add.image(0, 0, 'gun_1').setDepth(D.air).setVisible(false).setAlpha(0.7);
+      this.ring = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 1).setVisible(false).setAlpha(0.8);
+      this.cellOverlay = this.add.image(0, 0, 'fx_placeOk').setDepth(D.floorFx + 1).setVisible(false);
+      this.selRing = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 1).setVisible(false).setTint(0xe8c576);
+      this.deadRing = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 2).setVisible(false).setTint(0xff5c5c).setAlpha(0.75);
+      this.dmgTexts = [];
+      this.legend = mono(this, BX + 4, HUD_H + BH + 8, '', 8, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1).setVisible(false);
+      this.walletBtn = walletButton(this, 436, r1 - 6, 196, 38, r => this.applyWallet(r), { size: 9, depth: D.hud + 1, noScale: true });
+      this.toastT = mono(this, BX + BW / 2, HUD_H + 22, '', 11, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
+    }
+    // PHONE TRAY — nine cards across the bottom, portrait + price, tap to arm, hold for the tip
+    buildTrayMobile() {
+      const defs = HOTKEYS.map(id => CS.TURRETS[id]);
+      const gap = 6, cardW = Math.floor((W - gap * (defs.length + 1)) / defs.length), cardH = Math.min(TRAY.h - 10, 108);
+      const cy = TRAY.y + TRAY.h / 2 - 2;
+      this.add.rectangle(W / 2, cy, W, TRAY.h + 8, 0x05070c, 1).setDepth(D.hud - 1);
+      this.cards = {};
+      defs.forEach((def, i) => {
+        const x = gap + cardW / 2 + i * (cardW + gap);
+        const sp = CS_CAST.OPERATIVES[def.id];
+        const bg = this.add.nineslice(x, cy, 'ui_card', undefined, cardW, cardH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.hud).setInteractive({ useHandCursor: true });
+        const art = this.add.image(x, cy - 20, 'portrait_' + def.id).setDepth(D.hud + 1).setScale(0.62);
+        const gunT = this.gunTypeFor(def.id);
+        const gun = gunT ? this.add.image(x + 4, cy - 38, 'gun_' + gunT).setDepth(D.hud + 1).setScale(0.66).setAngle(-12) : null;
+        const name = txt(this, x, cy + 16, sp.title.replace('THE ', '').slice(0, 9), 10, INK).setOrigin(0.5).setDepth(D.hud + 1);
+        for (let fs = 10; fs > 6 && name.width > cardW - 8; fs--) name.setFontSize(Math.round(fs * US));
+        const cost = txt(this, x, cy + 38, '', 11, GOLD).setOrigin(0.5).setDepth(D.hud + 1);
+        const cd = { def, bg, art, gun, name, cost, key: null, x, y: cy, w: cardW, h: cardH };
+        // tap = arm · hold = the tip (there is no hover on a phone)
+        bg.on('pointerdown', () => { this.holdT = this.time.delayedCall(320, () => this.showCardTip(cd)); });
+        bg.on('pointerup', () => { if (this.holdT) { const fired = this.holdT.hasDispatched; this.holdT.remove(); this.holdT = null; if (!fired) { this.hideCardTip(); this.selectDef(def.id); } } });
+        bg.on('pointerout', () => { if (this.holdT) { this.holdT.remove(); this.holdT = null; } });
+        this.cards[def.id] = cd;
+      });
+      this.tipPanel = null; this.selPanel = null;
+    }
     buildTray() {
+      if (MOBILE) return this.buildTrayMobile();
       const defs = HOTKEYS.map(id => CS.TURRETS[id]);
       const railW = W - RAIL_X, railCX = RAIL_X + railW / 2;
       const cardW = railW - 22, cardH = 72, gap = 4; const x0 = railCX, y0 = HUD_H + 8 + cardH / 2;
@@ -198,6 +260,13 @@
       if (m) lines.push('YOUR ' + m.gunName + ' · ×' + m.dmgMult + ' dmg · ×' + m.rofMult + ' rof' + (m.rangeMult !== 1 ? ' · ×' + m.rangeMult + ' range' : ''));
       if (this.groupPri[def.id]) lines.push('STANDING ORDER — TARGET ' + PRI_NAME[this.groupPri[def.id]]);
       if (def.holderOnly) lines.push(this.core.holder ? 'KJP GEAR ON FILE — cleared' : 'HOLDERS ONLY — KJP GEAR');
+      if (MOBILE) { // centred over the board, tap anywhere to dismiss
+        const t = mono(this, W / 2, BY + BH / 2, lines.join('\n'), 10, INK, { align: 'center', wordWrap: { width: 700 } }).setOrigin(0.5).setDepth(D.panel + 1);
+        const p = this.add.nineslice(W / 2, BY + BH / 2, 'ui_panel', undefined, Math.max(420, t.width + 60), t.height + 50, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
+        this.tipPanel = [p, t];
+        this.time.delayedCall(2600, () => this.hideCardTip());
+        return;
+      }
       const ty = Math.min(H - 20, c.y + 60);
       const t = mono(this, RAIL_X - 28, ty, lines.join('\n'), 11, INK, { align: 'right', wordWrap: { width: 320 } }).setOrigin(1, 1).setDepth(D.panel + 1);
       const p = this.add.nineslice(RAIL_X - 14, ty + 12, 'ui_panel', undefined, Math.max(240, t.width + 30), t.height + 24, 14, 14, 14, 14).setOrigin(1, 1).setDepth(D.panel);
@@ -234,6 +303,7 @@
 
     // ---------------------------------------------------------------- input
     cellFromPointer(p) { const c = Math.floor((p.x - BX) / CELL), r = Math.floor((p.y - BY) / CELL); if (c < 0 || r < 0 || c >= CS.COLS || r >= CS.ROWS) return null; return { c, r }; }
+    // on a phone the board is centred with a tray under it — everything else is UI
     hideGhost() { this.ghost.setVisible(false); this.ghostGun.setVisible(false); this.ring.setVisible(false); this.cellOverlay.setVisible(false); if (this.deadRing && this.selTid == null) this.deadRing.setVisible(false); }
     onMove(p) {
       if (this.finished) return;
@@ -245,7 +315,7 @@
     refreshGhost() {
       const p = this.hoverP; if (!p) return;
       const cell = this.cellFromPointer(p); this.hoverCell = cell;
-      if (!cell || !this.selDef || this.paused || p.x >= RAIL_X || p.y < BY || this.overUI(p)) { this.hideGhost(); return; } // off the board: never leave a ghost hanging over the HUD/rail
+      if (!cell || !this.selDef || this.paused || !inBoard(p) || this.overUI(p)) { this.hideGhost(); return; } // off the board: never leave a ghost hanging over the HUD/rail
       const cx = BX + cell.c * CELL + CELL / 2, cy = BY + cell.r * CELL + CELL / 2;
       const cp = CS.canPlace(this.core, this.selDef, cell.c, cell.r), afford = this.core.coins >= CS.TURRETS[this.selDef].cost, footing = cp.ok || /COIN/i.test(cp.err || ''), ok = cp.ok && afford;
       this.ghost.setPosition(cx, cy + 22).setVisible(true).setAlpha(ok ? 0.75 : 0.5);
@@ -261,7 +331,7 @@
       const cd = this.cards[this.selDef]; if (cd) cd.cost.setColor(afford ? GOLD : RED);
     }
     onDown(p) {
-      if (this.finished || p.x >= RAIL_X || p.y < BY || this.overUI(p)) return; // results panel up / rail / hud / selection panel
+      if (this.finished || !inBoard(p) || this.overUI(p)) return; // results panel up / off-board / selection panel
       if (this.paused) { this.toast('PAUSED — NO ACTIONS', 800); AUD.play('deny'); return; }
       const cell = this.cellFromPointer(p); if (!cell) return;
       const here = CS.turretAt(this.core, cell.c, cell.r);
@@ -298,7 +368,7 @@
     // ⚙ popover: music, gunfire and screen shake are three independent switches (all persisted)
     toggleSettings() {
       if (this.setPanel) { this.setPanel.forEach(o => o.destroy()); this.setPanel = null; this.selRect = null; return; }
-      const x = W / 2 - 300, y = HUD_H + 88, wdt = 260, hgt = 148;
+      const x = MOBILE ? W / 2 : W / 2 - 300, y = MOBILE ? BY + BH / 2 : HUD_H + 88, wdt = Math.round(260 * US), hgt = Math.round(148 * US);
       const panel = this.add.nineslice(x, y, 'ui_panel', undefined, wdt, hgt, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
       const title = txt(this, x, y - 52, 'HOUSE SETTINGS', 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
       const mk2 = (yy, label, isOff, onClick) => {
@@ -316,19 +386,21 @@
     toggleHouse() {
       if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.selRect = null; return; }
       this.closeSel();
-      const c = this.core, PW = 470, PH = 400, x = W / 2 - 40, y = BY + PH / 2 + 18;
+      const c = this.core, PW = MOBILE ? 1080 : 470, PH = MOBILE ? 620 : 400, x = MOBILE ? W / 2 : W / 2 - 40, y = MOBILE ? BY + BH / 2 : BY + PH / 2 + 18;
       const O = [];
       O.push(this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel));
       O.push(txt(this, x, y - 176, 'THE HOUSE', 20, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
       const bank = mono(this, x, y - 154, 'ON THE BOOK: ' + c.coins + '⛁   ·   spend it or the High Table will', 10, GREEN).setOrigin(0.5).setDepth(D.panel + 1);
       O.push(bank);
       // one row = title+cost button, a plain-English line, and a live level read-out
-      const row = (yy, label, cost, sub, level, enabled, onBuy) => {
+      const RW = MOBILE ? 700 : 300, RX = MOBILE ? x - 120 : x - 66, RS = MOBILE ? 1.55 : 1;
+      const row = (yy0, label, cost, sub, level, enabled, onBuy) => {
+        const yy = MOBILE ? y - 250 + (yy0 - (y - 116)) * RS : yy0;
         const afford = c.coins >= cost && enabled;
-        const bb = button(this, x - 66, yy, 300, 30, label + '  —  ' + cost + '⛁', () => { if (!enabled) { AUD.play('deny'); this.toast('BETWEEN WAVES ONLY', 1100); return; } onBuy(); }, { size: 11, depth: D.panel + 1, hot: afford, color: afford ? GOLD : DIM });
+        const bb = button(this, RX, yy, RW, 30, label + '  —  ' + cost + '⛁', () => { if (!enabled) { AUD.play('deny'); this.toast('BETWEEN WAVES ONLY', 1100); return; } onBuy(); }, { size: 11, depth: D.panel + 1, hot: afford, color: afford ? GOLD : DIM });
         O.push(bb.bg, bb.t);
-        O.push(mono(this, x - 216, yy + 20, sub, 9, DIM).setOrigin(0, 0.5).setDepth(D.panel + 1));
-        O.push(mono(this, x + 156, yy, level, 10, level && level !== '—' ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
+        O.push(mono(this, RX - RW / 2, yy + (MOBILE ? 34 : 20), sub, 9, DIM).setOrigin(0, 0.5).setDepth(D.panel + 1));
+        O.push(mono(this, RX + RW / 2 + (MOBILE ? 130 : 90), yy, level, 10, level && level !== '—' ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
       };
       const buy = (kind) => { const r = CS.buyHouse(c, kind); if (r.ok) { AUD.play('coin'); if (kind === 'sanction') { this.shake(0, 0.01); this.toast('SANCTION SERVED — ' + r.hit + ' HIT ACROSS THE FLOOR', 1800); } else this.toast(CS.HOUSE[kind].name + ' ×' + r.level + ' (−' + r.cost + '⛁)', 1600); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err, 1200); } };
       const H = c.house || {};
@@ -370,8 +442,9 @@
       const t = this.core.turrets.find(x => x.tid === tid); if (!t) return;
       const def = CS.TURRETS[t.def], sp = CS_CAST.OPERATIVES[t.def], st = CS.turretStats(this.core, t);
       const px = SX(t.x), py = SY(t.y);
-      const PW = 288, PH = 268;
-      const x = px + 160 > RAIL_X - 20 ? px - 160 : px + 160, y = Math.max(BY + PH / 2 + 6, Math.min(H - PH / 2 - 6, py));
+      const PW = Math.round(288 * US), PH = Math.round(268 * US);
+      const x = MOBILE ? W / 2 : (px + 160 > RAIL_X - 20 ? px - 160 : px + 160);
+      const y = MOBILE ? BY + BH / 2 : Math.max(BY + PH / 2 + 6, Math.min(H - PH / 2 - 6, py));
       const rr = SR(st.range); this.selRing.setPosition(px, py).setScale(rr * 2 / 128).setVisible(rr > 0);
       const dz = def.minRange ? SR(def.minRange) : 0; this.deadRing.setPosition(px, py).setScale(dz * 2 / 128).setVisible(dz > 0);
       const pnl = this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
@@ -653,7 +726,7 @@
       if (v) v.hitT = 2;
       this.sparks(tx, ty, ev.crit ? 0xffd23f : acc, ev.crit ? 8 : def.id === 'shotgun' ? 6 : 3);
       const now = this.time.now; tv.lastNum = tv.lastNum || 0;
-      if (ev.crit || now - tv.lastNum > (def.id === 'smg' || def.id === 'gatling' ? 260 : 90)) { tv.lastNum = now; this.dmgText(tx + (Math.random() * 16 - 8), ty - 12, (ev.crit ? '✦' : '') + shown, ev.crit ? GOLD : '#e6ecf5'); }
+      if (ev.crit || now - tv.lastNum > (MOBILE ? 420 : (def.id === 'smg' || def.id === 'gatling' ? 260 : 90))) { tv.lastNum = now; this.dmgText(tx + (Math.random() * 16 - 8), ty - 12, (ev.crit ? '✦' : '') + shown, ev.crit ? GOLD : '#e6ecf5'); }
       if (ev.crit) { const cr = this.add.image(tx, ty, 'fx_crit').setBlendMode(Phaser.BlendModes.ADD).setDepth(D.air); this.fxLayer.add(cr); this.tweens.add({ targets: cr, scale: 1.8, alpha: 0, duration: 260, onComplete: () => cr.destroy() }); }
       // shotgun burst: pellet sparks fan across neighbours of the target
       if (def.kind === 'burst') { for (const ee of c.enemies) { if (e && ee.eid === e.eid) continue; const pp = CS.posAlong(c.parsed, ee.d); if (Math.hypot(pp.x - ev.tx, pp.y - ev.ty) <= (def.burstRadius || def.splash || 40)) { this.sparks(SX(pp.x), SY(pp.y) - 16, acc, 2); const vv = this.enemyViews.get(ee.eid); if (vv) vv.hitT = 2; } } }
@@ -700,6 +773,7 @@
       return best;
     }
     sparks(x, y, tint, n) {
+      n = MOBILE ? Math.max(1, Math.round((n || 4) * 0.5)) : n;
       for (let i = 0; i < (n || 4); i++) { const s = this.add.image(x, y, 'fx_spark').setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(D.air).setScale(0.6 + Math.random() * 0.6); this.fxLayer.add(s); const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 22; this.tweens.add({ targets: s, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d + 8, alpha: 0, scale: 0.1, duration: 220 + Math.random() * 200, onComplete: () => s.destroy() }); }
     }
     ringFx(x, y, tint, scale) { const r = this.add.image(x, y, 'fx_ring').setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(D.floorFx + 2).setScale(0.3).setAlpha(0.9); this.fxLayer.add(r); this.tweens.add({ targets: r, scale: scale || 1.6, alpha: 0, duration: 380, onComplete: () => r.destroy() }); }
