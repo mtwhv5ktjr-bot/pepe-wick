@@ -255,9 +255,32 @@
       cost: 400, range: 172, rof: 8.0, dmg: 8, kind: 'hitscan', hotkey: '9', holderOnly: true,
     },
   };
-  const TIERS = 3;
-  function tierCost(def, tier) { // cost to go INTO tier (2 or 3)
-    return Math.round(def.cost * (tier === 2 ? 0.8 : 1.3));
+  const TIERS = 4; // T4 = THE HIGH TABLE: expensive, repeatable across every operative — the main coin sink
+  function tierCost(def, tier) { // cost to go INTO tier (2, 3 or 4)
+    return Math.round(def.cost * (tier === 2 ? 0.8 : tier === 3 ? 1.3 : 3.6));
+  }
+  // a marker (life) bought back from the house — 500⛁, +80% each time this floor
+  function markerCost(st) { return Math.round((500 + 120 * (st.floorId - 1)) * Math.pow(1.8, st.markersBought || 0)); }
+  function buyMarker(st) {
+    if (st.over) return { ok: false, err: 'FLOOR CLOSED' };
+    const cost = markerCost(st);
+    if (st.coins < cost) return { ok: false, err: 'INSUFFICIENT COIN' };
+    st.coins -= cost; st.stats.spent += cost; st.markers++; st.markersBought = (st.markersBought || 0) + 1;
+    emit(st, { t: 'marker_bought', cost, markers: st.markers });
+    return { ok: true, cost, markers: st.markers };
+  }
+  // DOUBLE OR NOTHING: pay to make the NEXT wave harder — more of them, tougher, but they pay double.
+  // This is what turns a fat bank back into difficulty (and score) instead of a boring victory lap.
+  // priced above a fresh bank on every floor (start coin = diff + 40/floor) so it is a LATE-game choice
+  function wagerCost(st) { return Math.round(520 + 240 * st.wave + 140 * (st.floorId - 1)); }
+  function wagerWave(st) {
+    if (st.over || st.waveActive) return { ok: false, err: 'MID-WAVE' };
+    if (st.wager) return { ok: false, err: 'ALREADY SIGNED' };
+    const cost = wagerCost(st);
+    if (st.coins < cost) return { ok: false, err: 'INSUFFICIENT COIN' };
+    st.coins -= cost; st.stats.spent += cost; st.wager = true;
+    emit(st, { t: 'wager', cost, wave: st.wave + 1 });
+    return { ok: true, cost };
   }
   function tierMult(tier) {
     return { dmg: Math.pow(1.6, tier - 1), rof: Math.pow(1.15, tier - 1), range: Math.pow(1.12, tier - 1), income: Math.pow(1.7, tier - 1) };
@@ -369,7 +392,8 @@
     };
     if (st.gearCount > 0) st.markers += Math.min(10, st.gearCount); // +1 marker per gear piece, cap +10
     st.markers += doctrine.markers || 0;
-    st.startMarkers = st.markers; // score/stars are LEAK-relative so extra markers never buy score
+    st.startMarkers = st.markers;
+    st.markersBought = 0; st.wager = false; st.waveWager = false; // score/stars are LEAK-relative so extra markers never buy score
     return st;
   }
 
@@ -481,6 +505,7 @@
   function startWave(st) {
     if (st.over || st.waveActive) return { ok: false };
     st.wave++;
+    st.waveWager = !!st.wager; st.wager = false; // the signed contract applies to THIS wave only
     st.waveActive = true;
     st.stats.startTime = st.time;
     for (const t of st.turrets) { t.incomeClock = 0; t.incomeTicks = 0; } // mint cap resets per wave
@@ -488,14 +513,15 @@
     const interest = Math.min(50, Math.floor(st.coins * 0.05));
     if (interest > 0) { st.coins += interest; st.stats.earned += interest; emit(st, { t: 'interest', amount: interest }); }
     const comp = waveComp(st.floorId, st.wave, st.rng);
-    const lvl = hpLevel(st, st.wave);
+    const lvl = hpLevel(st, st.wave) + (st.waveWager ? 3 : 0); // a signed contract comes up the stairs angrier
     for (const grp of comp) {
-      for (let i = 0; i < grp.n; i++) {
-        st.spawnQueue.push({ at: st.time + grp.delay + i * grp.gap, type: grp.type, lvl });
+      const count = st.waveWager ? Math.max(grp.n, Math.round(grp.n * 1.45)) : grp.n;
+      for (let i = 0; i < count; i++) {
+        st.spawnQueue.push({ at: st.time + grp.delay + i * grp.gap * (st.waveWager ? 0.8 : 1), type: grp.type, lvl });
       }
     }
     st.spawnQueue.sort((a, b) => a.at - b.at);
-    emit(st, { t: 'wave_start', wave: st.wave, count: st.spawnQueue.length });
+    emit(st, { t: 'wave_start', wave: st.wave, count: st.spawnQueue.length, wager: !!st.waveWager });
     return { ok: true, wave: st.wave };
   }
 
@@ -512,7 +538,7 @@
     const e = {
       eid: st.nextEid++, type, name: base.name,
       hp, maxHp: hp, spd: base.spd * spdScale, baseSpd: base.spd * spdScale,
-      armor: base.armor, bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1)),
+      armor: base.armor, bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1)),
       r: base.r, d: -st.rng() * 8, // slight stagger back from spawn
       slowT: 0, slowF: 1, cloaked: false, cloakT: base.cloak ? base.cloak.vis * (0.5 + st.rng() * 0.5) : 0,
       healRate: base.healRate || 0, healRadius: base.healRadius || 0,
@@ -735,10 +761,11 @@
     // wave clear
     if (st.waveActive && st.spawnQueue.length === 0 && st.enemies.length === 0) {
       st.waveActive = false;
-      const bonus = Math.max(20, 60 + 10 * st.wave + (st.doctrine.waveBonus || 0));
+      const bonus = Math.round(Math.max(20, 60 + 10 * st.wave + (st.doctrine.waveBonus || 0)) * (st.waveWager ? 2.5 : 1));
       st.coins += bonus; st.stats.earned += bonus;
       st.stats.waveTimes.push(st.time - st.stats.startTime);
-      emit(st, { t: 'wave_clear', wave: st.wave, bonus });
+      emit(st, { t: 'wave_clear', wave: st.wave, bonus, wager: !!st.waveWager });
+      if (st.waveWager) { st.stats.wagersHeld = (st.stats.wagersHeld || 0) + 1; st.waveWager = false; }
       if (!st.floor.endless && st.wave >= st.floor.waves) {
         st.over = true; st.victory = true;
         emit(st, { t: 'win', floor: st.floorId, stars: stars(st) });
@@ -750,15 +777,16 @@
   function stars(st) {
     if (!st.victory) return 0;
     if (st.stats.leaks === 0) return 3;
-    if (st.markers >= st.startMarkers - 6) return 2; // relative: gear/DOORS markers don't widen the band
+    if (st.markers - (st.markersBought || 0) >= st.startMarkers - 6) return 2; // relative: gear/DOORS/bought markers never widen the band
     return 1;
   }
 
   function score(st) {
     // markers term is leak-relative (20 minus damage taken, floored at 0) so
     // holders/doctrines score identically on identical play — envelope holds
-    const markerTerm = Math.max(0, 20 - (st.startMarkers - st.markers)) * 150;
-    return st.stats.kills * 25 + markerTerm + st.wave * 200 + (st.victory ? 1000 * st.floorId : 0);
+    const markerTerm = Math.max(0, 20 - (st.startMarkers - (st.markers - (st.markersBought || 0)))) * 150; // bought markers are NOT score
+    const wagerTerm = (st.stats.wagersHeld || 0) * 500; // signed contracts held pay in score
+    return st.stats.kills * 25 + markerTerm + wagerTerm + st.wave * 200 + (st.victory ? 1000 * st.floorId : 0);
   }
 
   // ---------- DAILY CONTRACT ----------
@@ -855,6 +883,7 @@
     FLOORS, TURRETS, ENEMIES, DIFFS, DOCTRINES, TIERS, BOSS_NAMES,
     mulberry32, parseMap, posAlong, waveComp,
     createGame, step, drainEvents, place, canPlace, upgrade, sell, cyclePriority, damage,
+    buyMarker, markerCost, wagerWave, wagerCost,
     startWave, turretStats, tierCost, tierMult, turretAt, cellAt,
     stars, score, dailyContract, botPlay, coverageScore, floorById,
   };

@@ -11,6 +11,8 @@
   const ANIM_MS = 1000 / 60;
   const ENEMY_SCALE = { goon: 0.62, runner: 0.58, heavy: 0.7, shield: 0.66, hound: 1.0, medic: 0.6, ghost: 0.62, boss: 0.74 };
   const SHOT_SFX = { pistol: 'shot_pistol', smg: 'shot_smg', shotgun: 'shot_shotgun', sniper: 'shot_sniper', gatling: 'shot_gatling', tesla: 'tesla', keg: 'lob' };
+  const PRI_NAME = { first: 'LEAD', strong: 'STRONGEST', last: 'REARGUARD' };
+  const PRI_HELP = { first: 'the one closest to the stairwell — stops leaks', strong: 'the toughest on screen — good vs heavies & bosses', last: 'the one furthest back — thins the tail' };
   const ACCENT = { pistol: 0xffd27f, smg: 0x7cf9a5, shotgun: 0xff9d3d, sniper: 0x7fd0ff, gatling: 0xffd23f, tesla: 0x9ff3ff, keg: 0xff7a2f };
 
   class Battle extends Phaser.Scene {
@@ -18,7 +20,7 @@
     init(opts) {
       this.opts = opts || { floor: 1, difficulty: 'operative', mode: 'campaign' };
       // Phaser reuses this scene instance across start/restart — every per-run flag must be reset here, not assumed fresh
-      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null; this.setPanel = null; this.trauma = 0;
+      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null; this.setPanel = null; this.trauma = 0; this.groupPri = {}; this.groupMode = {}; this.housePanel = null;
       this.propSprites = []; this.ambientObjs = []; this.bannerObjs = null; this.selPanel = null; this.tipPanel = null; this.dmgTexts = [];
     }
     async create() {
@@ -131,7 +133,9 @@
       const back = () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title');
       this.btnQuit = button(this, W / 2 - 232, hy, 74, 26, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
       // sound + shake toggles live in the HUD too (they were only on the title)
-      this.btnCog = button(this, W / 2 - 306, hy, 44, 26, '⚙', () => this.toggleSettings(), { size: 14, depth: D.hud + 1 });
+      this.btnCog = button(this, W / 2 - 396, hy, 40, 26, '⚙', () => this.toggleSettings(), { size: 14, depth: D.hud + 1 });
+      // THE HOUSE — where a fat bank goes: T4 iron, bought markers, and signed contracts
+      this.btnHouse = button(this, W / 2 - 312, hy, 122, 26, 'THE HOUSE', () => this.toggleHouse(), { size: 10, depth: D.hud + 1 });
       // ghost cursor + range ring
       this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
       this.ghostGun = this.add.image(0, 0, 'gun_1').setDepth(D.air).setVisible(false).setAlpha(0.7);
@@ -141,7 +145,7 @@
       this.dmgTexts = [];
       const ly = BY + BH + (H - BY - BH) / 2;
       this.add.rectangle(BX + BW / 2, ly, BW, H - BY - BH, 0x05070c, 1).setDepth(D.hud);
-      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK TILE TO POST · KEEP CLICKING TO PEPPER · ESC/RIGHT-CLICK HOLSTERS · SPACE SENDS · A AUTO · U UP · M MAX · N MAX ALL · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.legend = mono(this, BX + 12, ly, "PLACE  1-9 pick · click a tile to post · keep clicking to post more · right-click holsters\nORDERS  click a posted unit → pick who it shoots, or flip to ALL to command every unit of that type   ·   SPACE send · A auto · N max all", 9, DIM).setOrigin(0, 0.5).setLineSpacing(2).setDepth(D.hud + 1);
       this.toastT = mono(this, BX + BW / 2, BY + 30, '', 12, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
     buildTray() {
@@ -190,6 +194,7 @@
       const lines = [sp.title + ' — ' + def.name, sp.line, def.desc, ''];
       lines.push('DMG ' + def.dmg + ' · ROF ' + def.rof + '/s · RANGE ' + Math.round(def.range * K / CELL * 10) / 10 + ' cells' + (def.kind !== 'hitscan' ? ' · ' + def.kind.toUpperCase() : ''));
       if (m) lines.push('YOUR ' + m.gunName + ' · ×' + m.dmgMult + ' dmg · ×' + m.rofMult + ' rof' + (m.rangeMult !== 1 ? ' · ×' + m.rangeMult + ' range' : ''));
+      if (this.groupPri[def.id]) lines.push('STANDING ORDER — TARGET ' + PRI_NAME[this.groupPri[def.id]]);
       if (def.holderOnly) lines.push(this.core.holder ? 'KJP GEAR ON FILE — cleared' : 'HOLDERS ONLY — KJP GEAR');
       const ty = Math.min(H - 20, c.y + 60);
       const t = mono(this, RAIL_X - 28, ty, lines.join('\n'), 11, INK, { align: 'right', wordWrap: { width: 320 } }).setOrigin(1, 1).setDepth(D.panel + 1);
@@ -260,6 +265,8 @@
         const r = CS.place(this.core, this.selDef, cell.c, cell.r);
         if (!r.ok) { this.toast(r.err || 'CAN’T PLACE THERE', 1200); AUD.play('deny'); return; }
         AUD.play('place');
+        // new posts follow the standing order for their type
+        if (this.groupPri[this.selDef] && r.turret) this.setPriority(r.turret.tid, this.groupPri[this.selDef]);
         // the card STAYS armed — pick THE BELLHOP once and pepper him around the floor; holster with ESC, right-click, or by tapping the card again.
         // Auto-holster when you can no longer afford the next one (and say so).
         if (this.core.coins < CS.TURRETS[this.selDef].cost) { this.toast('OUT OF COIN FOR ANOTHER ' + CS_CAST.OPERATIVES[this.selDef].title.replace('THE ', '') + ' — HOLSTERED', 1300); this.selectDef(this.selDef); }
@@ -299,6 +306,45 @@
       this.setPanel = [panel, title, bSound.bg, bSound.t, b3.bg, b3.t];
       this.selRect = { x0: x - wdt / 2, y0: y - hgt / 2, x1: x + wdt / 2, y1: y + hgt / 2 }; // board clicks must not pass under it
     }
+    // THE HOUSE: the late-game coin sink. Everything here is priced out of reach early and escalates,
+    // so a rich bank turns into difficulty + score instead of a victory lap.
+    toggleHouse() {
+      if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.selRect = null; return; }
+      this.closeSel();
+      const c = this.core, PW = 360, PH = 268, x = W / 2, y = BY + PH / 2 + 40;
+      const objs = [];
+      objs.push(this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel));
+      objs.push(txt(this, x, y - 112, 'THE HOUSE', 18, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
+      objs.push(mono(this, x, y - 90, 'services for members with money to burn', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      // 1) marker buy-back
+      const mCost = CS.markerCost(c), canM = c.coins >= mCost;
+      const b1 = button(this, x, y - 56, 320, 30, 'SIGN A MARKER — ' + mCost + '⛁', () => {
+        const r = CS.buyMarker(c);
+        if (r.ok) { AUD.play('coin'); this.toast('MARKER SIGNED · ' + r.markers + ' ON THE BOOK  (−' + r.cost + '⛁)', 1600); this.syncHud(); this.rebuildHouse(); }
+        else { AUD.play('deny'); this.toast(r.err, 1200); }
+      }, { size: 11, depth: D.panel + 1, hot: canM, color: canM ? GOLD : DIM });
+      objs.push(b1.bg, b1.t);
+      objs.push(mono(this, x, y - 34, 'buy a life back · price +80% each time · never buys score or stars', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      // 2) double or nothing
+      const wCost = CS.wagerCost(c), signed = !!c.wager, canW = c.coins >= wCost && !c.waveActive && !signed;
+      const b2 = button(this, x, y + 4, 320, 30, signed ? '◉ CONTRACT SIGNED — NEXT WAVE' : 'DOUBLE OR NOTHING — ' + wCost + '⛁', () => {
+        const r = CS.wagerWave(c);
+        if (r.ok) { AUD.play('wave'); this.shake(0, 0.004); this.toast('CONTRACT SIGNED — THEY COME HARDER, THEY PAY DOUBLE', 2000); this.syncHud(); this.rebuildHouse(); }
+        else { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'SIGN IT BETWEEN WAVES' : r.err, 1300); }
+      }, { size: 11, depth: D.panel + 1, hot: canW, color: signed ? GREEN : canW ? GOLD : DIM });
+      objs.push(b2.bg, b2.t);
+      objs.push(mono(this, x, y + 26, '+45% bodies · tougher · but DOUBLE bounties, 2.5× wave bonus, +500 score', 9, signed ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      // 3) T4 (informational — bought from a unit's own panel)
+      const t4 = c.turrets.filter(t => t.tier >= CS.TIERS).length, upg = c.turrets.filter(t => t.tier < CS.TIERS).length;
+      objs.push(mono(this, x, y + 58, 'THE HIGH TABLE — TIER 4 IRON', 10, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
+      objs.push(mono(this, x, y + 76, 'click any operative → UP to tier 4 (3.6× its price)', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      objs.push(mono(this, x, y + 92, t4 + ' at the high table · ' + upg + ' still upgradable', 9, t4 ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      const b3 = button(this, x, y + 118, 150, 26, 'CLOSE', () => this.toggleHouse(), { size: 10, depth: D.panel + 1 });
+      objs.push(b3.bg, b3.t);
+      this.housePanel = objs;
+      this.selRect = { x0: x - PW / 2, y0: y - PH / 2, x1: x + PW / 2, y1: y + PH / 2 };
+    }
+    rebuildHouse() { if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.toggleHouse(); } }
     togglePause() {
       if (!this.paused && this.core.waveActive) { this.toast('NO PAUSING MID-WAVE — HOLD THE FLOOR', 1200); AUD.play('deny'); return; }
       this.paused = !this.paused; this.btnPause.t.setText(this.paused ? '▶' : '❚❚');
@@ -323,23 +369,58 @@
       const t = this.core.turrets.find(x => x.tid === tid); if (!t) return;
       const def = CS.TURRETS[t.def], sp = CS_CAST.OPERATIVES[t.def], st = CS.turretStats(this.core, t);
       const px = SX(t.x), py = SY(t.y);
-      const x = px + 150 > RAIL_X - 20 ? px - 150 : px + 150, y = Math.max(BY + 110, Math.min(H - 110, py));
+      const PW = 288, PH = 268;
+      const x = px + 160 > RAIL_X - 20 ? px - 160 : px + 160, y = Math.max(BY + PH / 2 + 6, Math.min(H - PH / 2 - 6, py));
       const rr = SR(st.range); this.selRing.setPosition(px, py).setScale(rr * 2 / 128).setVisible(rr > 0);
-      const panel = this.add.nineslice(x, y, 'ui_panel', undefined, 260, 200, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
-      this.selRect = { x0: x - 130, y0: y - 100, x1: x + 130, y1: y + 100 }; // scene pointer handlers must not fall through the panel onto the board
-      const title = txt(this, x, y - 82, sp.title + ' · T' + t.tier, 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
+      const pnl = this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
+      this.selRect = { x0: x - PW / 2, y0: y - PH / 2, x1: x + PW / 2, y1: y + PH / 2 }; // scene pointer handlers must not fall through onto the board
+      const nm = sp.title.replace('THE ', ''), kin = this.core.turrets.filter(o => o.def === t.def);
+      const objs = [pnl];
+      objs.push(txt(this, x, y - 116, sp.title + ' · T' + t.tier, 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
       const m = this.gunMods[t.def];
-      const info = mono(this, x, y - 40, ['DMG ' + st.dmg.toFixed(1) + ' · ROF ' + st.rof.toFixed(2) + '/s', 'RANGE ' + (st.range * K / CELL).toFixed(1) + ' cells' + (t.gilded ? ' · GILDED +10%' : ''), 'KILLS ' + (t.kills || 0) + ' · DEALT ' + Math.round(t.dealt || 0), m ? 'IRON: ' + m.gunName : (t.auraDmg ? 'RALLIED' : '')].join('\n'), 11, INK, { align: 'center' }).setOrigin(0.5).setDepth(D.panel + 1);
+      objs.push(mono(this, x, y - 80, ['DMG ' + st.dmg.toFixed(1) + ' · ROF ' + st.rof.toFixed(2) + '/s · RANGE ' + (st.range * K / CELL).toFixed(1) + ' cells', 'KILLS ' + (t.kills || 0) + ' · DEALT ' + Math.round(t.dealt || 0) + (t.gilded ? ' · GILDED' : '') + (t.auraDmg ? ' · RALLIED' : ''), m ? 'YOUR IRON: ' + m.gunName : ''].filter(Boolean).join('\n'), 10, INK, { align: 'center' }).setOrigin(0.5).setDepth(D.panel + 1));
+      // ---- money row
       const up = t.tier < CS.TIERS ? CS.tierCost(def, t.tier + 1) : null;
-      const b1 = button(this, x - 74, y + 42, 100, 32, up ? 'UP ' + up + '⛁' : 'MAX TIER', () => this.doUpgrade(), { hot: !!up && this.core.coins >= up, size: 11, depth: D.panel + 1 });
-      const bMax = button(this, x + 8, y + 42, 54, 32, 'MAX', () => this.maxUpgrade(), { size: 10, depth: D.panel + 1, color: up ? GOLD : DIM });
+      const b1 = button(this, x - 88, y - 32, 100, 30, up ? 'UP ' + up + '⛁' : 'MAX TIER', () => this.doUpgrade(), { hot: !!up && this.core.coins >= up, size: 11, depth: D.panel + 1 });
+      const bMax = button(this, x - 6, y - 32, 54, 30, 'MAX', () => this.maxUpgrade(), { size: 10, depth: D.panel + 1, color: up ? GOLD : DIM });
       const refund = Math.round(def.cost * 0.7 + (t.tier > 1 ? CS.tierCost(def, 2) * 0.7 : 0) + (t.tier > 2 ? CS.tierCost(def, 3) * 0.7 : 0));
-      const b2 = button(this, x + 82, y + 42, 84, 32, 'SELL ' + refund + '⛁', () => this.doSell(), { size: 10, depth: D.panel + 1 });
-      const b3 = button(this, x, y + 80, 240, 28, 'PRIORITY: ' + (t.priority || 'first').toUpperCase(), () => { CS.cyclePriority(this.core, tid); this.openSel(tid); }, { size: 10, depth: D.panel + 1 });
-      this.selPanel = [panel, title, info, b1, bMax, b2, b3];
+      const b2 = button(this, x + 70, y - 32, 84, 30, 'SELL ' + refund + '⛁', () => this.doSell(), { size: 10, depth: D.panel + 1 });
+      objs.push(b1.bg, b1.t, bMax.bg, bMax.t, b2.bg, b2.t);
+      // ---- targeting: plain question, three explicit choices, and one switch that says who the order is for
+      objs.push(mono(this, x, y + 2, 'WHO DO THEY SHOOT FIRST?', 10, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
+      const cur = t.priority || 'first', groupOn = !!this.groupMode[t.def];
+      const opts = [['first', 'LEAD'], ['strong', 'STRONGEST'], ['last', 'REARGUARD']];
+      opts.forEach(([key, label], i) => {
+        const bx = x - 92 + i * 92, on = cur === key;
+        const bb = button(this, bx, y + 26, 88, 30, label, () => {
+          if (this.groupMode[t.def]) this.applyGroup(t.def, key); else { this.setPriority(tid, key); this.openSel(tid); }
+        }, { hot: on, size: 10, depth: D.panel + 1 });
+        objs.push(bb.bg, bb.t);
+      });
+      objs.push(mono(this, x, y + 50, PRI_HELP[cur], 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      // the switch: THIS ONE vs EVERY <TYPE> — flipping it applies the current choice to the whole group
+      const sw = button(this, x, y + 78, 250, 30, groupOn ? '◉ ORDER FOR ALL ' + kin.length + ' ' + nm + 'S' : '○ ORDER FOR THIS ONE ONLY', () => {
+        const now = !this.groupMode[t.def]; this.groupMode[t.def] = now;
+        if (now) this.applyGroup(t.def, t.priority || 'first'); else { delete this.groupPri[t.def]; this.toast('ORDERS FOR ' + nm + 'S ARE INDIVIDUAL AGAIN', 1300); AUD.play('ui'); this.openSel(tid); }
+      }, { size: 10, depth: D.panel + 1, color: groupOn ? GREEN : GOLD });
+      objs.push(sw.bg, sw.t);
+      objs.push(mono(this, x, y + 102, groupOn ? 'new ' + nm + 's you post follow this order too' : 'tap to command every ' + nm + ' at once', 9, groupOn ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      this.selPanel = objs;
     }
-    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
+    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel && !this.housePanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
     overUI(p) { const r = this.selRect; return !!(r && p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1); }
+    // core only exposes cyclePriority(), so walk the cycle (first → strong → last) until it matches
+    setPriority(tid, want) { const t = this.core.turrets.find(x => x.tid === tid); if (!t) return; for (let i = 0; i < 3 && (t.priority || 'first') !== want; i++) CS.cyclePriority(this.core, tid); }
+    applyGroup(defId, want) {
+      this.groupPri[defId] = want;
+      const kin = this.core.turrets.filter(t => t.def === defId);
+      for (const t of kin) this.setPriority(t.tid, want);
+      const nm = CS_CAST.OPERATIVES[defId].title.replace('THE ', '');
+      this.groupMode[defId] = true;
+      this.toast('ALL ' + kin.length + ' ' + nm + 'S NOW SHOOT THE ' + PRI_NAME[want], 1800); AUD.play('ui');
+      for (const t of kin) { const v = this.turretViews.get(t.tid); if (v) this.puff(v.body.x, v.body.y - 24, 0x7cf9a5); }
+      if (this.selTid != null) this.openSel(this.selTid);
+    }
     doUpgrade() { const r = CS.upgrade(this.core, this.selTid); if (r.ok) { AUD.play('upgrade'); const t = this.core.turrets.find(x => x.tid === this.selTid); if (t) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); this.openSel(this.selTid); } else { AUD.play('deny'); this.toast(r.err || 'NOT ENOUGH COIN', 1000); } }
     doSell() { const r = CS.sell(this.core, this.selTid); if (r.ok) { AUD.play('sell'); this.closeSel(); } }
 
@@ -516,8 +597,10 @@
             this.shake(140, 0.005); AUD.play('splash'); break; }
           case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.shake(300, 0.008); AUD.play('boss_die'); } else { AUD.play('die'); if (ev.type === 'heavy' || ev.type === 'shield') this.shake(0, 0.0022); } break; }
           case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
-          case 'wave_start': this.shake(0, 0.0035); this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
-          case 'wave_clear': { this.banner('FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
+          case 'wager': this.banner('CONTRACT SIGNED', 'THE NEXT WAVE COMES HARDER — AND PAYS DOUBLE', 1800); break;
+          case 'marker_bought': break;
+          case 'wave_start': this.shake(0, ev.wager ? 0.008 : 0.0035); if (ev.wager) this.banner('DOUBLE OR NOTHING', ev.count + ' COMING UP THE STAIRS · DOUBLE BOUNTIES', 1900); else this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
+          case 'wave_clear': { this.banner(ev.wager ? 'CONTRACT HELD' : 'FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.wager ? ' · DOUBLE OR NOTHING PAID' : '') + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
           case 'mint': { const t = c.turrets.find(x => x.tid === ev.tid); if (t) { this.coinPop(SX(t.x), SY(t.y) - 30, ev.amount); AUD.play('mint'); } break; }
           case 'place': break;
