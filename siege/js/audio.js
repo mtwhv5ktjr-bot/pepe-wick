@@ -21,7 +21,9 @@
 (function (global) {
   'use strict';
   let ctx = null, master = null, comp = null, musicBus = null, sfxBus = null, revBus = null, revSend = null, dlySend = null;
-  let muted = false;
+  // three independent switches: muted = everything (legacy), musicOff = the score only, sfxOff = the guns only
+  let muted = false, musicOff = false, sfxOff = false;
+  const MUSIC_LVL = 0.42, SFX_LVL = 0.9;
   const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 
   // ------------------------------------------------------------------ graph
@@ -47,7 +49,8 @@
       const dOut = ctx.createGain(); dOut.gain.value = 0.5;
       if (pl) { dl.connect(pl); pl.connect(dOut); dr.connect(pr); pr.connect(dOut); } else { dl.connect(dOut); dr.connect(dOut); }
       dOut.connect(master);
-      muted = LS.get('cs_mute') === '1'; master.gain.value = muted ? 0 : 0.55;
+      muted = LS.get('cs_mute') === '1'; musicOff = LS.get('cs_music') === '0'; sfxOff = LS.get('cs_sfx') === '0';
+      master.gain.value = muted ? 0 : 0.55; musicBus.gain.value = musicOff ? 0 : MUSIC_LVL; sfxBus.gain.value = sfxOff ? 0 : SFX_LVL;
       startScheduler();
       return true;
     } catch (e) { return false; }
@@ -169,7 +172,7 @@
     if (!ctx || ctx.state !== 'running') return;
     const pal = S.pal, spb = 60 / pal.bpm, s16 = spb / 4;
     while (S.next < ctx.currentTime + 0.14) {
-      try { scheduleStep(S.next, S.step, pal, spb, s16); } catch (e) { if (!S.warned) { S.warned = true; console.warn('music step', e); } }
+      if (!musicOff && !muted) { try { scheduleStep(S.next, S.step, pal, spb, s16); } catch (e) { if (!S.warned) { S.warned = true; console.warn('music step', e); } } }
       const swing = (S.step % 2 === 1) ? (pal.swing - 0.5) * 2 * s16 : 0; // delay off-16ths for swing
       S.next += s16 + (S.step % 2 === 0 ? swing : -swing);
       S.step = (S.step + 1) % 16; if (S.step === 0) S.bar++;
@@ -238,7 +241,7 @@
     if (S.scene !== 'battle') { S.palKey = 'lounge'; S.pal = PAL.lounge; }
     if (o.intensity != null) S.intensity = Math.max(0, Math.min(1, o.intensity)); if (o.danger != null) S.danger = !!o.danger; if (o.boss != null) { if (o.boss && !S.boss) cadence('boss'); S.boss = !!o.boss; } if (o.active != null) S.active = !!o.active;
     if (S.rain && ctx) S.rain.gain.setTargetAtTime(S.scene === 'title' ? 0.028 : (S.scene === 'battle' && S.floor === 6 ? 0.03 : 0.008), ctx.currentTime, 0.8);
-    if (musicBus && ctx) musicBus.gain.setTargetAtTime(S.scene === 'results' ? 0.22 : 0.42, ctx.currentTime, 0.6);
+    if (musicBus && ctx) musicBus.gain.setTargetAtTime(musicOff ? 0 : (S.scene === 'results' ? 0.22 : MUSIC_LVL), ctx.currentTime, 0.6);
   }
 
   // ------------------------------------------------------------------ SFX (layered: crack + body + tail into the room)
@@ -286,10 +289,14 @@
 
   const AUDIO = {
     unlock,
-    play(name) { if (!ctx || muted) return; const f = SFX[name]; if (f) try { f(); } catch (e) {} },
-    cue(kind) { if (!ctx || muted) return; try { cadence(kind); } catch (e) {} },
+    play(name) { if (!ctx || muted || sfxOff) return; const f = SFX[name]; if (f) try { f(); } catch (e) {} },
+    cue(kind) { if (!ctx || muted || musicOff) return; try { cadence(kind); } catch (e) {} },
     setState(o) { try { setState(o); } catch (e) {} },
     toggleMute() { muted = !muted; LS.set('cs_mute', muted ? '1' : '0'); if (master) master.gain.value = muted ? 0 : 0.55; return muted; },
+    toggleMusic() { musicOff = !musicOff; LS.set('cs_music', musicOff ? '0' : '1'); if (musicBus && ctx) musicBus.gain.setTargetAtTime(musicOff ? 0 : MUSIC_LVL, ctx.currentTime, 0.08); return musicOff; },
+    toggleSfx() { sfxOff = !sfxOff; LS.set('cs_sfx', sfxOff ? '0' : '1'); if (sfxBus && ctx) sfxBus.gain.setTargetAtTime(sfxOff ? 0 : SFX_LVL, ctx.currentTime, 0.05); return sfxOff; },
+    isMusicOff() { return musicOff || LS.get('cs_music') === '0'; },
+    isSfxOff() { return sfxOff || LS.get('cs_sfx') === '0'; },
     isMuted() { return muted || LS.get('cs_mute') === '1'; },
     _state: S,
   };

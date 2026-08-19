@@ -258,9 +258,11 @@
       const unlockedLines = ACCOUNTS.reduce((n, fl, i) => n + Math.min(3, starsAny(i + 1)), 0);
       const acct = mono(this, 16, H - 16, '⬦ HOUSE ACCOUNTS ' + unlockedLines + '/18', 12, GOLD).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       acct.on('pointerdown', () => { AUD.unlock(); AUD.play('ui'); showAccounts(this); });
-      const muteT = mono(this, 200, H - 16, AUD.isMuted() ? '♪ OFF' : '♪ ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
-      muteT.on('pointerdown', () => { AUD.unlock(); muteT.setText(AUD.toggleMute() ? '♪ OFF' : '♪ ON'); });
-      const shakeT = mono(this, 268, H - 16, LS.get('cs_shake') === '0' ? '⌁ SHAKE OFF' : '⌁ SHAKE ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
+      const musicT = mono(this, 200, H - 16, AUD.isMusicOff() ? '♪ MUSIC OFF' : '♪ MUSIC ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
+      musicT.on('pointerdown', () => { AUD.unlock(); musicT.setText(AUD.toggleMusic() ? '♪ MUSIC OFF' : '♪ MUSIC ON'); });
+      const sfxT = mono(this, 318, H - 16, AUD.isSfxOff() ? '✷ SFX OFF' : '✷ SFX ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
+      sfxT.on('pointerdown', () => { AUD.unlock(); const off = AUD.toggleSfx(); sfxT.setText(off ? '✷ SFX OFF' : '✷ SFX ON'); if (!off) AUD.play('ui'); });
+      const shakeT = mono(this, 412, H - 16, LS.get('cs_shake') === '0' ? '⌁ SHAKE OFF' : '⌁ SHAKE ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       shakeT.on('pointerdown', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); shakeT.setText(off ? '⌁ SHAKE OFF' : '⌁ SHAKE ON'); AUD.play('ui'); });
       mono(this, W - 16, H - 16, 'A KJP GEAR OPERATION · YOUR WICK ARSENAL GUNS IN THEIR HANDS · FREE PLAY', 10, DIM).setOrigin(1, 1).setDepth(20);
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.92, 0.32); } catch (e) {}

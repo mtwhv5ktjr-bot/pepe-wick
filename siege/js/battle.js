@@ -18,7 +18,7 @@
     init(opts) {
       this.opts = opts || { floor: 1, difficulty: 'operative', mode: 'campaign' };
       // Phaser reuses this scene instance across start/restart — every per-run flag must be reset here, not assumed fresh
-      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null;
+      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null; this.setPanel = null; this.trauma = 0;
       this.propSprites = []; this.ambientObjs = []; this.bannerObjs = null; this.selPanel = null; this.tipPanel = null; this.dmgTexts = [];
     }
     async create() {
@@ -129,10 +129,9 @@
       this.btnSpeed = button(this, W / 2 + 130, hy, 56, 28, '×1', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.btnSpeed.t.setText('×' + this.speed); }, { size: 12, depth: D.hud + 1 });
       this.btnPause = button(this, W / 2 + 194, hy, 56, 28, '❚❚', () => this.togglePause(), { size: 12, depth: D.hud + 1 });
       const back = () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title');
-      this.btnQuit = button(this, W / 2 - 228, hy, 84, 28, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
+      this.btnQuit = button(this, W / 2 - 232, hy, 74, 26, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
       // sound + shake toggles live in the HUD too (they were only on the title)
-      this.btnSound = button(this, W / 2 - 318, hy, 68, 24, AUD.isMuted() ? '♪ OFF' : '♪ ON', () => { const m = AUD.toggleMute(); this.btnSound.t.setText(m ? '♪ OFF' : '♪ ON'); }, { size: 10, depth: D.hud + 1 });
-      this.btnShake = button(this, W / 2 - 392, hy, 68, 24, LS.get('cs_shake') === '0' ? 'SHAKE OFF' : 'SHAKE ON', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); this.btnShake.t.setText(off ? 'SHAKE OFF' : 'SHAKE ON'); if (!off) this.shake(160, 0.006); }, { size: 10, depth: D.hud + 1 });
+      this.btnCog = button(this, W / 2 - 306, hy, 44, 26, '⚙', () => this.toggleSettings(), { size: 14, depth: D.hud + 1 });
       // ghost cursor + range ring
       this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
       this.ghostGun = this.add.image(0, 0, 'gun_1').setDepth(D.air).setVisible(false).setAlpha(0.7);
@@ -284,6 +283,22 @@
     }
     sendWave() { if (this.paused) { this.toast('PAUSED — UNPAUSE FIRST', 900); AUD.play('deny'); return { ok: false }; } const r = CS.startWave(this.core); if (r.ok) { AUD.play('wave'); this.hideCardTip(); } return r; }
     // House rule: no pausing mid-wave (only between waves), and a paused floor takes NO actions — pause is a break, not a planning exploit
+    // ⚙ popover: music, gunfire and screen shake are three independent switches (all persisted)
+    toggleSettings() {
+      if (this.setPanel) { this.setPanel.forEach(o => o.destroy()); this.setPanel = null; this.selRect = null; return; }
+      const x = W / 2 - 300, y = HUD_H + 96, wdt = 250, hgt = 170;
+      const panel = this.add.nineslice(x, y, 'ui_panel', undefined, wdt, hgt, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
+      const title = txt(this, x, y - 62, 'HOUSE SETTINGS', 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
+      const mk2 = (yy, label, isOff, onClick) => {
+        const b = button(this, x, yy, 210, 30, label + (isOff() ? ' — OFF' : ' — ON'), () => { onClick(); b.t.setText(label + (isOff() ? ' — OFF' : ' — ON')); b.t.setColor(isOff() ? DIM : GOLD); }, { size: 11, depth: D.panel + 1, color: isOff() ? DIM : GOLD });
+        return b;
+      };
+      const b1 = mk2(y - 26, '♪ MUSIC', () => AUD.isMusicOff(), () => AUD.toggleMusic());
+      const b2 = mk2(y + 10, '✷ GUNFIRE', () => AUD.isSfxOff(), () => { const off = AUD.toggleSfx(); if (!off) AUD.play('ui'); });
+      const b3 = mk2(y + 46, '⌁ SCREEN SHAKE', () => LS.get('cs_shake') === '0', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); if (!off) this.shake(0, 0.006); });
+      this.setPanel = [panel, title, b1.bg, b1.t, b2.bg, b2.t, b3.bg, b3.t];
+      this.selRect = { x0: x - wdt / 2, y0: y - hgt / 2, x1: x + wdt / 2, y1: y + hgt / 2 }; // board clicks must not pass under it
+    }
     togglePause() {
       if (!this.paused && this.core.waveActive) { this.toast('NO PAUSING MID-WAVE — HOLD THE FLOOR', 1200); AUD.play('deny'); return; }
       this.paused = !this.paused; this.btnPause.t.setText(this.paused ? '▶' : '❚❚');
@@ -323,7 +338,7 @@
       const b3 = button(this, x, y + 80, 240, 28, 'PRIORITY: ' + (t.priority || 'first').toUpperCase(), () => { CS.cyclePriority(this.core, tid); this.openSel(tid); }, { size: 10, depth: D.panel + 1 });
       this.selPanel = [panel, title, info, b1, bMax, b2, b3];
     }
-    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
+    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
     overUI(p) { const r = this.selRect; return !!(r && p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1); }
     doUpgrade() { const r = CS.upgrade(this.core, this.selTid); if (r.ok) { AUD.play('upgrade'); const t = this.core.turrets.find(x => x.tid === this.selTid); if (t) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); this.openSel(this.selTid); } else { AUD.play('deny'); this.toast(r.err || 'NOT ENOUGH COIN', 1000); } }
     doSell() { const r = CS.sell(this.core, this.selTid); if (r.ok) { AUD.play('sell'); this.closeSel(); } }
@@ -340,6 +355,7 @@
         if (this.acc > 0.5) this.acc = 0.5;
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
+      this.updateShake(time, Math.min(0.1, dtMs / 1000));
       if (this.selDef && this.hoverP && !this.finished) this.refreshGhost();
       // adaptive score: intensity from the floor state, throttled to 4 Hz
       if ((this.musicT = (this.musicT || 0) + dtMs) > 250) { this.musicT = 0; const boss = c.enemies.some(e => e.boss); const I = c.waveActive ? Math.min(1, 0.3 + 0.45 * Math.min(1, c.enemies.length / 14) + 0.25 * (c.floor.endless ? Math.min(1, c.wave / 12) : c.wave / c.floor.waves)) : 0.08; AUD.setState({ scene: 'battle', floor: c.floorId, intensity: I, active: !!c.waveActive, boss, danger: c.markers > 0 && c.markers <= 5 }); }
@@ -351,7 +367,7 @@
     syncHud() {
       const c = this.core;
       const wmax = c.floor.endless ? '∞' : c.floor.waves;
-      this.hudWave.setText('WAVE ' + c.wave + ' / ' + wmax + (c.waveActive ? '  ·  ' + c.enemies.length + ' ON THE FLOOR' : c.wave < (c.floor.endless ? 999 : c.floor.waves) ? '  ·  SEND WHEN READY' : ''));
+      this.hudWave.setText('WAVE ' + c.wave + '/' + wmax + (c.waveActive ? '  ·  ' + c.enemies.length + ' ON FLOOR' : c.wave < (c.floor.endless ? 999 : c.floor.waves) ? '  ·  READY' : ''));
       this.hudCoins.setText(c.coins + '');
       this.hudMarkers.setText(c.markers + '');
       this.hudMarkers.setColor(c.markers <= 5 ? RED : GREEN);
@@ -498,9 +514,9 @@
             this.ringFx(x, y, 0xff9d3d, R / 20); this.sparks(x, y - 4, 0xffb347, 10); this.smoke(x, y - 8, 5);
             const scorch = this.add.image(x, y + 4, 'fx_bulletHole').setDepth(D.floorFx).setScale(R / 4, R / 6).setAlpha(0.42); this.tweens.add({ targets: scorch, alpha: 0, delay: 5000, duration: 3000, onComplete: () => scorch.destroy() });
             this.shake(140, 0.005); AUD.play('splash'); break; }
-          case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.shake(300, 0.008); AUD.play('boss_die'); } else AUD.play('die'); break; }
+          case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.shake(300, 0.008); AUD.play('boss_die'); } else { AUD.play('die'); if (ev.type === 'heavy' || ev.type === 'shield') this.shake(0, 0.0022); } break; }
           case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
-          case 'wave_start': this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
+          case 'wave_start': this.shake(0, 0.0035); this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
           case 'wave_clear': { this.banner('FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
           case 'mint': { const t = c.turrets.find(x => x.tid === ev.tid); if (t) { this.coinPop(SX(t.x), SY(t.y) - 30, ev.amount); AUD.play('mint'); } break; }
@@ -571,7 +587,23 @@
       const g0 = this.add.image(tv.body.x, tv.body.y - 34, 'fx_glow').setTint(0x9ff3ff).setBlendMode(Phaser.BlendModes.ADD).setScale(0.8).setAlpha(0.8).setDepth(D.air); this.fxLayer.add(g0); this.tweens.add({ targets: g0, alpha: 0, scale: 1.4, duration: 200, onComplete: () => g0.destroy() });
       AUD.play('tesla');
     }
-    shake(ms, amt) { if (LS.get('cs_shake') === '0') return; this.cameras.main.shake(ms, amt); }
+    shake(ms, amt) { // amt keeps the old Phaser-intensity scale (0.004-0.01) so call sites read the same
+      if (LS.get('cs_shake') === '0' || this.paused) return;
+      this.trauma = Math.min(0.78, (this.trauma || 0) + (amt || 0.005) * 62); // cap the pile-up so a busy wave rumbles without nausea
+    }
+    // trauma → screen offset, applied to camera scroll each frame and decayed; quadratic so small hits are
+    // subtle and a boss/leak really kicks. Never dropped, never overlaps badly, always returns to exactly 0.
+    updateShake(time, dt) {
+      const cam = this.cameras.main;
+      if (!(this.trauma > 0)) { if (cam.scrollX || cam.scrollY) cam.setScroll(0, 0); return; }
+      // decay is time-based but capped per frame, so a hit survives ~5 frames even on a 15 fps machine
+      // (a pure dt decay made every shake vanish inside one long frame — the "it stopped shaking" report)
+      this.trauma = Math.max(0, this.trauma - Math.min(dt, 0.033) * 2.1);
+      const mag = 20 * this.trauma, t = time * 0.06; // 20px at full trauma; one keg splash ≈ 6px, matching the old feel
+      const ox = (Math.sin(t * 1.7) * 0.6 + Math.sin(t * 3.1) * 0.4 + (Math.random() - 0.5) * 0.6) * mag;
+      const oy = (Math.cos(t * 2.3) * 0.6 + Math.sin(t * 4.7) * 0.3 + (Math.random() - 0.5) * 0.6) * mag * 0.8;
+      cam.setScroll(this.trauma > 0.002 ? ox : 0, this.trauma > 0.002 ? oy : 0);
+    }
     // nearest live enemy to a sim-space point (events carry positions, not victim ids)
     enemyNear(x, y, maxD) {
       const c = this.core; let best = null, bd = (maxD || 26) * (maxD || 26);
