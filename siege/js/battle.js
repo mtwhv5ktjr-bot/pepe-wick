@@ -18,7 +18,7 @@
     init(opts) {
       this.opts = opts || { floor: 1, difficulty: 'operative', mode: 'campaign' };
       // Phaser reuses this scene instance across start/restart — every per-run flag must be reset here, not assumed fresh
-      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false;
+      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null;
       this.propSprites = []; this.ambientObjs = []; this.bannerObjs = null; this.selPanel = null; this.tipPanel = null; this.dmgTexts = [];
     }
     async create() {
@@ -226,19 +226,26 @@
     hideGhost() { this.ghost.setVisible(false); this.ghostGun.setVisible(false); this.ring.setVisible(false); this.cellOverlay.setVisible(false); }
     onMove(p) {
       if (this.finished) return;
+      this.hoverP = { x: p.x, y: p.y };
+      this.refreshGhost();
+    }
+    // Placement preview. Re-run every frame while a card is armed (not just on pointer move) so the ghost
+    // flips red → ready AT THE SPOT the moment coin comes in — the player shouldn't have to wiggle the mouse.
+    refreshGhost() {
+      const p = this.hoverP; if (!p) return;
       const cell = this.cellFromPointer(p); this.hoverCell = cell;
       if (!cell || !this.selDef || this.paused || p.x >= RAIL_X || p.y < BY || this.overUI(p)) { this.hideGhost(); return; } // off the board: never leave a ghost hanging over the HUD/rail
-      if (this.selDef && cell) {
-        const cx = BX + cell.c * CELL + CELL / 2, cy = BY + cell.r * CELL + CELL / 2;
-        const ok = CS.canPlace(this.core, this.selDef, cell.c, cell.r).ok && this.core.coins >= CS.TURRETS[this.selDef].cost;
-        this.ghost.setPosition(cx, cy + 22).setVisible(p.x < RAIL_X && p.y > BY);
-        const ch = ART.chars['op_' + this.selDef];
-        if (this.ghostGun.visible !== undefined && this.ghostGun.texture.key !== '__MISSING') { const a = ch.fist2 || ch.fist; const sc = 0.62; this.ghostGun.setPosition(cx + (a.x - 48) * sc, cy + 22 - (112 * 0.94 - a.y) * sc).setScale(sc).setVisible(this.ghost.visible); }
-        const st = CS.turretStats(this.core, { def: this.selDef, tier: 1 });
-        const rr = SR(CS.TURRETS[this.selDef].range * (this.gunMods[this.selDef] ? this.gunMods[this.selDef].rangeMult : 1));
-        this.ring.setPosition(cx, cy).setScale(rr * 2 / 128).setVisible(this.ghost.visible && rr > 0).setTint(ok ? 0xffffff : 0xff5c5c);
-        this.cellOverlay.setTexture(ok ? 'fx_placeOk' : 'fx_placeBad').setPosition(cx, cy).setVisible(this.ghost.visible);
-      }
+      const cx = BX + cell.c * CELL + CELL / 2, cy = BY + cell.r * CELL + CELL / 2;
+      const cp = CS.canPlace(this.core, this.selDef, cell.c, cell.r), afford = this.core.coins >= CS.TURRETS[this.selDef].cost, footing = cp.ok || /COIN/i.test(cp.err || ''), ok = cp.ok && afford;
+      this.ghost.setPosition(cx, cy + 22).setVisible(true).setAlpha(ok ? 0.75 : 0.5);
+      if (ok) this.ghost.clearTint(); else this.ghost.setTint(footing ? 0xff9a9a : 0x9a9a9a); // red = can't afford yet, grey = no footing
+      const ch = ART.chars['op_' + this.selDef];
+      if (this.ghostGun.texture.key !== '__MISSING') { const a = ch.fist2 || ch.fist; const sc = 0.62; this.ghostGun.setPosition(cx + (a.x - 48) * sc, cy + 22 - (112 * 0.94 - a.y) * sc).setScale(sc).setVisible(true).setAlpha(ok ? 0.8 : 0.45); }
+      const rr = SR(CS.TURRETS[this.selDef].range * (this.gunMods[this.selDef] ? this.gunMods[this.selDef].rangeMult : 1));
+      this.ring.setPosition(cx, cy).setScale(rr * 2 / 128).setVisible(rr > 0).setTint(ok ? 0xffffff : 0xff5c5c);
+      this.cellOverlay.setTexture(ok ? 'fx_placeOk' : 'fx_placeBad').setPosition(cx, cy).setVisible(true);
+      // the armed card's cost mirrors the same state
+      const cd = this.cards[this.selDef]; if (cd) cd.cost.setColor(afford ? GOLD : RED);
     }
     onDown(p) {
       if (this.finished || p.x >= RAIL_X || p.y < BY || this.overUI(p)) return; // results panel up / rail / hud / selection panel
@@ -328,6 +335,7 @@
         if (this.acc > 0.5) this.acc = 0.5;
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
+      if (this.selDef && this.hoverP && !this.finished) this.refreshGhost();
       // adaptive score: intensity from the floor state, throttled to 4 Hz
       if ((this.musicT = (this.musicT || 0) + dtMs) > 250) { this.musicT = 0; const boss = c.enemies.some(e => e.boss); const I = c.waveActive ? Math.min(1, 0.3 + 0.45 * Math.min(1, c.enemies.length / 14) + 0.25 * (c.floor.endless ? Math.min(1, c.wave / 12) : c.wave / c.floor.waves)) : 0.08; AUD.setState({ scene: 'battle', floor: c.floorId, intensity: I, active: !!c.waveActive, boss, danger: c.markers > 0 && c.markers <= 5 }); }
       if (this.lightning != null) { if (Math.random() < 0.0015) { this.cameras.main.flash(180, 220, 230, 255, false); } }
