@@ -39,7 +39,8 @@
       this.buildHud();
       this.buildTray();
       this.input.on('pointermove', p => this.onMove(p));
-      this.input.on('pointerdown', p => this.onDown(p));
+      this.input.on('pointerdown', p => { if (p.rightButtonDown()) { if (this.selDef) this.selectDef(this.selDef); this.closeSel(); return; } this.onDown(p); });
+      this.input.mouse && this.input.mouse.disableContextMenu();
       this.input.keyboard.on('keydown', e => this.onKey(e));
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.96, 0.30); } catch (e) {}
       this.fxLayer = this.add.layer().setDepth(D.fxTop);
@@ -136,7 +137,7 @@
       this.dmgTexts = [];
       const ly = BY + BH + (H - BY - BH) / 2;
       this.add.rectangle(BX + BW / 2, ly, BW, H - BY - BH, 0x05070c, 1).setDepth(D.hud);
-      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK TILE TO POST · SHIFT KEEPS PLACING · SPACE SENDS · A AUTO · U UP · M MAX · N MAX ALL · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK TILE TO POST · KEEP CLICKING TO PEPPER · ESC/RIGHT-CLICK HOLSTERS · SPACE SENDS · A AUTO · U UP · M MAX · N MAX ALL · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.toastT = mono(this, BX + BW / 2, BY + 30, '', 12, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
     buildTray() {
@@ -248,7 +249,9 @@
         const r = CS.place(this.core, this.selDef, cell.c, cell.r);
         if (!r.ok) { this.toast(r.err || 'CAN’T PLACE THERE', 1200); AUD.play('deny'); return; }
         AUD.play('place');
-        if (!p.event.shiftKey) this.selectDef(this.selDef); // deselect unless shift held
+        // the card STAYS armed — pick THE BELLHOP once and pepper him around the floor; holster with ESC, right-click, or by tapping the card again.
+        // Auto-holster when you can no longer afford the next one (and say so).
+        if (this.core.coins < CS.TURRETS[this.selDef].cost) { this.toast('OUT OF COIN FOR ANOTHER ' + CS_CAST.OPERATIVES[this.selDef].title.replace('THE ', '') + ' — HOLSTERED', 1300); this.selectDef(this.selDef); }
         return;
       }
       if (here) { if (this.selDef) this.selectDef(this.selDef); this.openSel(here.tid); } else this.closeSel();
