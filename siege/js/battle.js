@@ -136,7 +136,7 @@
       this.dmgTexts = [];
       const ly = BY + BH + (H - BY - BH) / 2;
       this.add.rectangle(BX + BW / 2, ly, BW, H - BY - BH, 0x05070c, 1).setDepth(D.hud);
-      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK A TILE TO POST · SHIFT-CLICK KEEPS PLACING · SPACE SENDS · A AUTO-SEND · U UPGRADE · M MAX · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK TILE TO POST · SHIFT KEEPS PLACING · SPACE SENDS · A AUTO · U UP · M MAX · N MAX ALL · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.toastT = mono(this, BX + BW / 2, BY + 30, '', 12, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
     buildTray() {
@@ -148,6 +148,7 @@
       // wallet: bottom-right of the legend strip; connecting mid-floor re-skins the staff live
       const ly = BY + BH + (H - BY - BH) / 2;
       this.walletBtn = walletButton(this, RAIL_X - 150, ly, 280, 22, r => this.applyWallet(r), { size: 10, depth: D.hud + 2 });
+      this.btnMaxAll = button(this, RAIL_X - 352, ly, 104, 22, 'MAX ALL ⬆', () => this.maxAll(), { size: 10, depth: D.hud + 2 });
       this.cards = {};
       defs.forEach((def, i) => {
         const x = x0, y = y0 + i * (cardH + gap);
@@ -260,6 +261,7 @@
       if (k === ' ') { this.sendWave(); }
       if (k === 'a' || k === 'A') this.toggleAuto();
       if (k === 'm' || k === 'M') { if (this.selTid != null) this.maxUpgrade(); }
+      if (k === 'n' || k === 'N') this.maxAll();
       if (k === 'p' || k === 'P') { this.togglePause(); return; }
       if (this.paused) { if (k !== 'Escape') { this.toast('PAUSED — NO ACTIONS', 800); } return; }
       if (k === 'u' || k === 'U') { if (this.selTid != null) this.doUpgrade(); }
@@ -275,6 +277,14 @@
     }
     // AUTO: the next wave is called ~1.6 s after the floor is held (power-user request) — off by default, hotkey A
     toggleAuto() { this.auto = !this.auto; this.btnAuto.bg.setTexture(this.auto ? 'ui_btnHot' : 'ui_btn'); this.btnAuto.t.setColor(this.auto ? '#0b0e15' : GOLD); this.btnAuto.t.setText(this.auto ? 'AUTO ✓' : 'AUTO'); this.toast(this.auto ? 'AUTO-SEND ON — waves roll as soon as the floor is held' : 'AUTO-SEND OFF', 1400); AUD.play('ui'); if (this.auto && !this.core.waveActive && !this.core.over) this.sendWave(); }
+    // MAX ALL (button / N): round-robin upgrades across every operative, lowest tier first, until coins run out or all are T3
+    maxAll() {
+      if (this.paused) { this.toast('PAUSED — NO ACTIONS', 800); AUD.play('deny'); return; }
+      const c = this.core; let n = 0, spent = 0, progress = true;
+      while (progress) { progress = false; for (const t of c.turrets.slice().sort((a, b) => a.tier - b.tier)) { const before = c.coins; const r = CS.upgrade(c, t.tid); if (r.ok) { n++; spent += before - c.coins; progress = true; } } }
+      if (n) { AUD.play('upgrade'); for (const t of c.turrets) if (t.tier > 1) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); if (this.selTid != null) this.openSel(this.selTid); this.toast('MAX ALL — ' + n + ' UPGRADE' + (n > 1 ? 'S' : '') + ' · ' + spent + '⛁', 1600); }
+      else { AUD.play('deny'); this.toast(c.turrets.length && c.turrets.every(t => t.tier >= CS.TIERS) ? 'EVERYONE IS ALREADY MAX TIER' : 'NOT ENOUGH COIN FOR ANOTHER TIER', 1200); }
+    }
     maxUpgrade() { const c = this.core; let n = 0; while (this.selTid != null) { const r = CS.upgrade(c, this.selTid); if (!r.ok) break; n++; } if (n) { AUD.play('upgrade'); const t = c.turrets.find(x => x.tid === this.selTid); if (t) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); this.openSel(this.selTid); } else { AUD.play('deny'); this.toast(c.turrets.find(x => x.tid === this.selTid) && c.turrets.find(x => x.tid === this.selTid).tier >= CS.TIERS ? 'ALREADY MAX TIER' : 'NOT ENOUGH COIN', 1000); } }
 
     // ---------------------------------------------------------------- selection panel
