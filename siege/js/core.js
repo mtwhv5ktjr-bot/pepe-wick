@@ -148,6 +148,60 @@
         '.................E..',
       ],
     },
+    {
+      id: 8, key: 'kitchens', name: 'THE KITCHENS', waves: 11, palette: 'emerald',
+      intro: 'Service corridors — five of them, and they run every one.',
+      map: [
+        '....................',
+        'S###################',
+        '..G...XX......G....#',
+        '####################',
+        '#.....G....XX.....G.',
+        '####################',
+        '...G....XX.....G...#',
+        '####################',
+        '#....XX.....G......G',
+        '###################E',
+        '....XX.......XX.....',
+        '....................',
+      ],
+    },
+    {
+      id: 9, key: 'ballroom', name: 'THE BALLROOM', waves: 11, palette: 'wine',
+      intro: 'They dance the whole room before they reach you. Hold the middle.',
+      map: [
+        '....................',
+        'S##################.',
+        '..XX...........G..#.',
+        '..G...............#.',
+        '.###############..#.',
+        '.#..G.......XX.#..#.',
+        '.#....XX..G....#..#.',
+        '.#..E###########..#.',
+        '.#...G......XX....#.',
+        '.#...XX.......G...#.',
+        '.##################.',
+        '....................',
+      ],
+    },
+    {
+      id: 10, key: 'penthouse', name: 'THE PENTHOUSE', waves: 12, palette: 'gold',
+      intro: 'The Director keeps the good scotch up here. They walk the whole suite to reach it.',
+      map: [
+        '....................',
+        'S###################',
+        '..G...XX......G....#',
+        '####################',
+        '#.....G...XX......G.',
+        '####################',
+        '..G....XX......G...#',
+        'E###################',
+        '..G...XX....G....G..',
+        '....G......XX.......',
+        '..G......G......G...',
+        '....XX........G.....',
+      ],
+    },
   ];
 
   // Fix pit map: E must connect. Validate in parse; see tests.
@@ -231,8 +285,8 @@
       cost: 230, range: 112, rof: 0.9, dmg: 9, kind: 'burst', burstRadius: 64, burstMax: 5, hotkey: '3',
     },
     sniper: {
-      id: 'sniper', name: 'PENTHOUSE RIFLE', desc: 'Ignores armor. Sees the whole floor. Takes its time.',
-      cost: 320, range: 400, rof: 0.45, dmg: 72, kind: 'hitscan', pierceArmor: true, critChance: 0.15, critMult: 2, hotkey: '4',
+      id: 'sniper', name: 'PENTHOUSE RIFLE', desc: 'Ignores armor, crits, and outranges everything. Slow. Pick its window.',
+      cost: 320, range: 252, rof: 0.45, dmg: 80, kind: 'hitscan', pierceArmor: true, critChance: 0.15, critMult: 2, hotkey: '4',
     },
     keg: {
       id: 'keg', name: 'KEG MORTAR', desc: 'Lobbed powder keg. Splash hits cloaked marks. Blind up close.',
@@ -260,7 +314,7 @@
     return Math.round(def.cost * (tier === 2 ? 0.8 : tier === 3 ? 1.3 : 3.6));
   }
   // a marker (life) bought back from the house — 500⛁, +80% each time this floor
-  function markerCost(st) { return Math.round((500 + 120 * (st.floorId - 1)) * Math.pow(1.8, st.markersBought || 0)); }
+  function markerCost(st) { return Math.round((500 + 120 * ((st.stage || 1) - 1)) * Math.pow(1.8, st.markersBought || 0)); }
   function buyMarker(st) {
     if (st.over) return { ok: false, err: 'FLOOR CLOSED' };
     const cost = markerCost(st);
@@ -272,7 +326,32 @@
   // DOUBLE OR NOTHING: pay to make the NEXT wave harder — more of them, tougher, but they pay double.
   // This is what turns a fat bank back into difficulty (and score) instead of a boring victory lap.
   // priced above a fresh bank on every floor (start coin = diff + 40/floor) so it is a LATE-game choice
-  function wagerCost(st) { return Math.round(520 + 240 * st.wave + 140 * (st.floorId - 1)); }
+  function wagerCost(st) { return Math.round(520 + 240 * st.wave + 140 * ((st.stage || 1) - 1)); }
+  // standing house upgrades — buy as many as the bank allows, price doubles-ish each time
+  const HOUSE = {
+    shipment: { base: 1200, mult: 1.9, name: 'IRON SHIPMENT',    desc: '+8% damage to every operative' },
+    ammo:     { base: 1400, mult: 1.9, name: 'BLACK MARKET AMMO', desc: '+8% fire rate to every operative' },
+    payroll:  { base: 1600, mult: 2.0, name: 'THE PAYROLL',       desc: '+2 coin per kill, forever' },
+    sanction: { base: 900,  mult: 1.7, name: 'SANCTION',          desc: 'instant: 35% max hp off everything on the floor' },
+  };
+  function houseCost(st, kind) { const h = HOUSE[kind]; if (!h) return Infinity; return Math.round(h.base * Math.pow(h.mult, (st.house && st.house[kind]) || 0)); }
+  function buyHouse(st, kind) {
+    const h = HOUSE[kind];
+    if (!h) return { ok: false, err: 'NO SUCH SERVICE' };
+    if (st.over) return { ok: false, err: 'FLOOR CLOSED' };
+    const cost = houseCost(st, kind);
+    if (st.coins < cost) return { ok: false, err: 'INSUFFICIENT COIN' };
+    st.coins -= cost; st.stats.spent += cost; st.house[kind] = (st.house[kind] || 0) + 1;
+    let hit = 0;
+    if (kind === 'shipment') st.house.dmg = +(st.house.dmg + 0.08).toFixed(4);
+    else if (kind === 'ammo') st.house.rof = +(st.house.rof + 0.08).toFixed(4);
+    else if (kind === 'payroll') st.house.coinKill = (st.house.coinKill || 0) + 2;
+    else if (kind === 'sanction') { // a one-shot strike; routed through damage() so bounty/kill accounting stays honest
+      for (const e of st.enemies.slice()) { if (e.hp > 0) { hit++; damage(st, e, e.maxHp * 0.35, { pierceArmor: true }); } }
+    }
+    emit(st, { t: 'house', kind, cost, level: st.house[kind], hit });
+    return { ok: true, cost, level: st.house[kind], hit };
+  }
   function wagerWave(st) {
     if (st.over || st.waveActive) return { ok: false, err: 'MID-WAVE' };
     if (st.wager) return { ok: false, err: 'ALREADY SIGNED' };
@@ -297,7 +376,18 @@
     ghost:  { id: 'ghost',  name: 'GHOST',     hp: 62,  spd: 72,  bounty: 22, armor: 0, r: 15, cloak: { vis: 1.6, hid: 1.4 } },
     boss:   { id: 'boss',   name: 'BOSS',      hp: 900, spd: 30,  bounty: 150, armor: 5, r: 26, leak: 5, boss: true },
   };
-  const BOSS_NAMES = ['MS. PERKINS', 'CASSIAN', 'ARES', 'ZERO', 'KILLA', 'THE DIRECTOR'];
+  // THE PIT rotates a house rule every 4 waves — the endless run stops being one long ramp
+  const PIT_RULES = [
+    { id: 'clean',   name: 'CLEAN HOUSE',   desc: 'no rule — just them and you' },
+    { id: 'fog',     name: 'SMOKE',         desc: 'sightlines cut: −25% turret range', range: 0.75 },
+    { id: 'rush',    name: 'THE RUSH',      desc: 'they sprint: +22% speed, +30% bounty', spd: 1.22, bounty: 1.3 },
+    { id: 'armor',   name: 'PLATE CARRIERS', desc: 'every body armoured: +3 armor', armor: 3 },
+    { id: 'horde',   name: 'THE HORDE',     desc: 'twice the bodies, two-thirds the health', count: 2, hp: 0.66 },
+    { id: 'iron',    name: 'IRON NIGHT',    desc: 'tougher crews: +35% health, +25% bounty', hp: 1.35, bounty: 1.25 },
+  ];
+  function pitRule(wave) { return PIT_RULES[Math.floor((Math.max(1, wave) - 1) / 4) % PIT_RULES.length]; }
+  function activeRule(st) { return st.floor.endless ? pitRule(st.wave) : null; }
+  const BOSS_NAMES = ['MS. PERKINS', 'CASSIAN', 'ARES', 'ZERO', 'KILLA', 'THE DIRECTOR', 'THE SOUS-CHEF', 'THE MARQUIS', 'THE ELDER'];
 
   const DIFFS = {
     operative: { id: 'operative', name: 'OPERATIVE', hp: 1.0,  spd: 1.0,  coins: 320, bounty: 1.0 },
@@ -316,10 +406,10 @@
   // ---------- WAVE COMPOSITION ----------
   // Every floor restarts the player economy, so every floor restarts gentle
   // and ramps steeper the higher you climb. I = intensity, drives counts.
-  function waveIntensity(floorId, wave) { return wave * (1 + 0.22 * (floorId - 1)); }
+  function waveIntensity(floorId, wave) { const stage = stageOf(floorId); const ramp = stage <= 6 ? 0.22 * (stage - 1) : 1.10 + 0.13 * (stage - 6); return wave * (1 + ramp); }
   // hpLevel drives enemy hp/speed scaling — separate curve from counts.
   function hpLevel(st, wave) {
-    return st.floor.endless ? wave * 1.35 : wave + 2.2 * (st.floorId - 1);
+    return st.floor.endless ? wave * 1.35 : wave + (st.stage <= 6 ? 2.2 * (st.stage - 1) : 11 + 1.5 * (st.stage - 6));
   }
   // Returns array of groups {type, n, gap, delay}
   function waveComp(floorId, wave, rng) {
@@ -360,6 +450,10 @@
     return groups;
   }
   function floorById(id) { return FLOORS.find(f => f.id === id); }
+  const CAMPAIGN = FLOORS.filter(f => !f.endless).map(f => f.id);           // [1,2,3,4,5,6,8,9,10]
+  FLOORS.forEach(f => { f.stage = f.endless ? 0 : CAMPAIGN.indexOf(f.id) + 1; });
+  function stageOf(id) { const f = floorById(id); return f ? (f.stage || 1) : 1; }
+  function nextFloor(id) { const i = CAMPAIGN.indexOf(id); return i >= 0 && i < CAMPAIGN.length - 1 ? CAMPAIGN[i + 1] : null; }
 
   // ---------- GAME STATE ----------
   function createGame(opts) {
@@ -380,7 +474,7 @@
       mutators: opts.mutators || {},
       rng: mulberry32(seed), seed,
       time: 0, wave: 0, waveActive: false,
-      coins: diff.coins + 40 * (floorId - 1) + (doctrine.coins || 0) + (opts.bonusCoins || 0), // requisition budget grows per floor
+      coins: diff.coins + 40 * (stageOf(floorId) - 1) + (doctrine.coins || 0) + (opts.bonusCoins || 0), // requisition budget grows per stage
 
       markers: 20 + (opts.bonusMarkers || 0),
       turrets: [], enemies: [], lobs: [],
@@ -393,7 +487,9 @@
     if (st.gearCount > 0) st.markers += Math.min(10, st.gearCount); // +1 marker per gear piece, cap +10
     st.markers += doctrine.markers || 0;
     st.startMarkers = st.markers;
-    st.markersBought = 0; st.wager = false; st.waveWager = false; // score/stars are LEAK-relative so extra markers never buy score
+    st.stage = stageOf(floorId);
+    st.markersBought = 0; st.wager = false; st.waveWager = false;
+    st.house = { dmg: 0, rof: 0, coinKill: 0, shipment: 0, ammo: 0, payroll: 0, sanction: 0 }; // score/stars are LEAK-relative so extra markers never buy score
     return st;
   }
 
@@ -493,10 +589,10 @@
     const doc = st.doctrine || DOCTRINES.none;
     return {
       dmg: def.dmg * m.dmg * (1 + (t.auraDmg || 0)) * (t.gilded ? 1.1 : 1)
-        * (mod ? mod.dmgMult : 1) * (doc.dmg || 1),
+        * (mod ? mod.dmgMult : 1) * (doc.dmg || 1) * (1 + ((st.house && st.house.dmg) || 0)),
       rof: def.rof * m.rof * (1 + (t.auraRate || 0))
-        * (mod ? mod.rofMult : 1) * (doc.rof || 1),
-      range: def.range * m.range * (mod ? mod.rangeMult : 1),
+        * (mod ? mod.rofMult : 1) * (doc.rof || 1) * (1 + ((st.house && st.house.rof) || 0)),
+      range: def.range * m.range * (mod ? mod.rangeMult : 1) * (st.ruleNow && st.ruleNow.range ? st.ruleNow.range : 1),
       income: (def.income || 0) * m.income,
     };
   }
@@ -506,6 +602,7 @@
     if (st.over || st.waveActive) return { ok: false };
     st.wave++;
     st.waveWager = !!st.wager; st.wager = false; // the signed contract applies to THIS wave only
+    st.ruleNow = activeRule(st);                    // THE PIT: which house rule is running this wave
     st.waveActive = true;
     st.stats.startTime = st.time;
     for (const t of st.turrets) { t.incomeClock = 0; t.incomeTicks = 0; } // mint cap resets per wave
@@ -515,30 +612,33 @@
     const comp = waveComp(st.floorId, st.wave, st.rng);
     const lvl = hpLevel(st, st.wave) + (st.waveWager ? 3 : 0); // a signed contract comes up the stairs angrier
     for (const grp of comp) {
-      const count = st.waveWager ? Math.max(grp.n, Math.round(grp.n * 1.45)) : grp.n;
+      const ruleCount = st.ruleNow && st.ruleNow.count ? st.ruleNow.count : 1;
+      const count = Math.round((st.waveWager ? Math.max(grp.n, grp.n * 1.45) : grp.n) * ruleCount);
       for (let i = 0; i < count; i++) {
         st.spawnQueue.push({ at: st.time + grp.delay + i * grp.gap * (st.waveWager ? 0.8 : 1), type: grp.type, lvl });
       }
     }
     st.spawnQueue.sort((a, b) => a.at - b.at);
-    emit(st, { t: 'wave_start', wave: st.wave, count: st.spawnQueue.length, wager: !!st.waveWager });
+    emit(st, { t: 'wave_start', wave: st.wave, count: st.spawnQueue.length, wager: !!st.waveWager, rule: st.ruleNow ? { id: st.ruleNow.id, name: st.ruleNow.name, desc: st.ruleNow.desc } : null });
     return { ok: true, wave: st.wave };
   }
 
   function spawnEnemy(st, type, lvl) {
     const base = ENEMIES[type];
-    const hpScale = (1 + 0.11 * (lvl - 1)) * st.diff.hp * (st.mutators.enemyHp || 1);
-    const spdScale = Math.min(1.3, 1 + 0.005 * (lvl - 1)) * st.diff.spd * (st.mutators.enemySpeed || 1);
+    const rule = st.ruleNow || null; // THE PIT house rule for this wave
+    const hpScale = (1 + 0.11 * (lvl - 1)) * st.diff.hp * (st.mutators.enemyHp || 1) * (rule && rule.hp ? rule.hp : 1);
+    const spdScale = Math.min(1.35, 1 + 0.005 * (lvl - 1)) * st.diff.spd * (st.mutators.enemySpeed || 1) * (rule && rule.spd ? rule.spd : 1);
     let hp = base.hp * hpScale;
     if (base.boss) {
       hp = st.floor.endless
         ? base.hp * (0.5 + 0.1 * lvl) * st.diff.hp   // endless bosses scale with depth
-        : base.hp * (1 + 0.65 * (st.floorId - 1)) * st.diff.hp; // campaign bosses scale per floor
+        : base.hp * (1 + 0.65 * (st.stage - 1)) * st.diff.hp; // campaign bosses scale per stage
     }
     const e = {
       eid: st.nextEid++, type, name: base.name,
       hp, maxHp: hp, spd: base.spd * spdScale, baseSpd: base.spd * spdScale,
-      armor: base.armor, bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1)),
+      armor: base.armor + (rule && rule.armor ? rule.armor : 0),
+      bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1) * (rule && rule.bounty ? rule.bounty : 1)),
       r: base.r, d: -st.rng() * 8, // slight stagger back from spawn
       slowT: 0, slowF: 1, cloaked: false, cloakT: base.cloak ? base.cloak.vis * (0.5 + st.rng() * 0.5) : 0,
       healRate: base.healRate || 0, healRadius: base.healRadius || 0,
@@ -586,7 +686,7 @@
       e.hp = 0;
       st.stats.kills++;
       if (opts.srcT) opts.srcT.kills++;
-      let bounty = e.bounty + (mod && mod.coinKill ? mod.coinKill : 0); // GILDED: minted brass
+      let bounty = e.bounty + (mod && mod.coinKill ? mod.coinKill : 0) + ((st.house && st.house.coinKill) || 0); // GILDED: minted brass · THE PAYROLL: house standing order
       st.coins += bounty;
       st.stats.earned += bounty;
       const p = posAlong(st.parsed, e.d);
@@ -883,7 +983,8 @@
     FLOORS, TURRETS, ENEMIES, DIFFS, DOCTRINES, TIERS, BOSS_NAMES,
     mulberry32, parseMap, posAlong, waveComp,
     createGame, step, drainEvents, place, canPlace, upgrade, sell, cyclePriority, damage,
-    buyMarker, markerCost, wagerWave, wagerCost,
+    buyMarker, markerCost, wagerWave, wagerCost, buyHouse, houseCost, HOUSE,
+    CAMPAIGN, nextFloor, stageOf, PIT_RULES, pitRule,
     startWave, turretStats, tierCost, tierMult, turretAt, cellAt,
     stars, score, dailyContract, botPlay, coverageScore, floorById,
   };

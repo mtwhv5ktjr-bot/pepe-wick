@@ -47,7 +47,7 @@
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.96, 0.30); } catch (e) {}
       this.fxLayer = this.add.layer().setDepth(D.fxTop);
       try { this.fxLayer.postFX.addBloom(0xffffff, 1, 1, 0.9, 1.15); } catch (e) {}
-      this.banner('FLOOR ' + f.id + ' — ' + f.name, f.intro, 2600);
+      this.banner('FLOOR ' + CS.stageOf(f.id) + ' — ' + f.name, f.intro, 1700);
       AUD.setState({ scene: 'battle', floor: f.id, intensity: 0.08, active: false, boss: false, danger: false });
       this.input.once('pointerdown', () => AUD.unlock());
       // the HTML arcade links share the top-left with the floor name — hide them while the floor is live
@@ -120,8 +120,9 @@
       const cg = this.add.graphics().setDepth(D.floor - 1); cg.fillGradientStyle(0x03040a, 0x03040a, 0x0b0e15, 0x0b0e15, 1, 1, 1, 1).fillRect(0, HUD_H, W, BY - HUD_H);
       this.hudBg = this.add.nineslice(W / 2, hy - 14, 'ui_panel', undefined, W + 28, HUD_H + 28, 14, 14, 14, 14).setDepth(D.hud); // the 14px nineslice padding hangs OFF the top edge, never over the cornice
       this.hudFloor = txt(this, 16, hy, c.floor.name + (this.opts.mode === 'daily' ? ' · DAILY' : this.opts.mode === 'endless' ? ' · ENDLESS' : '') + (c.doctrine.id !== 'none' ? ' · ' + c.doctrine.name : ''), 15, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
-      for (let fs = 15; fs > 9 && this.hudFloor.width > 200; fs--) this.hudFloor.setFontSize(fs); // the toggles start at x≈214
+      for (let fs = 15; fs > 8 && this.hudFloor.width > 186; fs--) this.hudFloor.setFontSize(fs); // ⚙ starts at x=216
       this.hudWave = txt(this, W / 2 - 40, hy, '', 14, INK).setOrigin(0.5).setDepth(D.hud + 1);
+      this.hudRule = mono(this, W / 2 - 40, hy + 15, '', 9, RED).setOrigin(0.5).setDepth(D.hud + 1);
       this.add.image(W - 392, hy, 'ui_coinIcon').setDepth(D.hud + 1).setScale(0.9);
       this.hudCoins = txt(this, W - 378, hy, '', 16, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.add.image(W - 268, hy, 'ui_markerIcon').setDepth(D.hud + 1).setScale(0.9);
@@ -131,22 +132,23 @@
       this.btnSpeed = button(this, W / 2 + 130, hy, 56, 28, '×1', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.btnSpeed.t.setText('×' + this.speed); }, { size: 12, depth: D.hud + 1 });
       this.btnPause = button(this, W / 2 + 194, hy, 56, 28, '❚❚', () => this.togglePause(), { size: 12, depth: D.hud + 1 });
       const back = () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title');
-      this.btnQuit = button(this, W / 2 - 232, hy, 74, 26, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
+      this.btnQuit = button(this, 420, hy, 74, 26, '◂ QUIT', back, { size: 11, depth: D.hud + 1 });
       // sound + shake toggles live in the HUD too (they were only on the title)
-      this.btnCog = button(this, W / 2 - 396, hy, 40, 26, '⚙', () => this.toggleSettings(), { size: 14, depth: D.hud + 1 });
+      this.btnCog = button(this, 232, hy, 38, 26, '⚙', () => this.toggleSettings(), { size: 14, depth: D.hud + 1 });
       // THE HOUSE — where a fat bank goes: T4 iron, bought markers, and signed contracts
-      this.btnHouse = button(this, W / 2 - 312, hy, 122, 26, 'THE HOUSE', () => this.toggleHouse(), { size: 10, depth: D.hud + 1 });
+      this.btnHouse = button(this, 324, hy, 116, 26, 'THE HOUSE', () => this.toggleHouse(), { size: 10, depth: D.hud + 1 });
       // ghost cursor + range ring
       this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
       this.ghostGun = this.add.image(0, 0, 'gun_1').setDepth(D.air).setVisible(false).setAlpha(0.7);
       this.ring = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 1).setVisible(false).setAlpha(0.8);
       this.cellOverlay = this.add.image(0, 0, 'fx_placeOk').setDepth(D.floorFx + 1).setVisible(false);
       this.selRing = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 1).setVisible(false).setTint(0xe8c576);
+      this.deadRing = this.add.image(0, 0, 'fx_rangeRing').setDepth(D.floorFx + 2).setVisible(false).setTint(0xff5c5c).setAlpha(0.75); // keg blind spot
       this.dmgTexts = [];
       const ly = BY + BH + (H - BY - BH) / 2;
       this.add.rectangle(BX + BW / 2, ly, BW, H - BY - BH, 0x05070c, 1).setDepth(D.hud);
       this.legend = mono(this, BX + 12, ly, "PLACE  1-9 pick · click a tile to post · keep clicking to post more · right-click holsters\nORDERS  click a posted unit → pick who it shoots, or flip to ALL to command every unit of that type   ·   SPACE send · A auto · N max all", 9, DIM).setOrigin(0, 0.5).setLineSpacing(2).setDepth(D.hud + 1);
-      this.toastT = mono(this, BX + BW / 2, BY + 30, '', 12, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
+      this.toastT = mono(this, BX + BW / 2, HUD_H + 12, '', 11, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
     buildTray() {
       const defs = HOTKEYS.map(id => CS.TURRETS[id]);
@@ -220,19 +222,19 @@
     banner(big, small, ms) {
       // one banner at a time — a new one retires the old (intro banner vs WAVE 1 used to overprint)
       if (this.bannerObjs) { const old = this.bannerObjs; this.bannerObjs = null; this.tweens.killTweensOf(old); this.tweens.add({ targets: old, alpha: 0, y: '-=14', duration: 160, onComplete: () => old.forEach(o => o.destroy()) }); }
-      const y = 190;
-      const slab = this.add.image(W / 2, y, 'ui_waveBanner').setDepth(D.banner).setAlpha(0).setScale(1.06, 1);
+      const y = 150;
+      const slab = this.add.image(W / 2, y, 'ui_waveBanner').setDepth(D.banner).setAlpha(0).setScale(1.06, 0.86);
       const t1 = txt(this, W / 2, y - 12, big, 34, GOLD).setOrigin(0.5).setDepth(D.banner + 1).setAlpha(0);
       const t2 = mono(this, W / 2, y + 26, small || '', 12, INK).setOrigin(0.5).setDepth(D.banner + 1).setAlpha(0);
       const objs = this.bannerObjs = [slab, t1, t2];
-      this.tweens.add({ targets: objs, alpha: 1, duration: 220 });
+      this.tweens.add({ targets: objs, alpha: 0.9, duration: 200 });
       this.tweens.add({ targets: slab, scaleX: 1, duration: 260, ease: 'Back.easeOut' });
       this.tweens.add({ targets: objs, alpha: 0, delay: ms || 2000, duration: 400, onComplete: () => { if (this.bannerObjs === objs) this.bannerObjs = null; objs.forEach(o => o.destroy()); } });
     }
 
     // ---------------------------------------------------------------- input
     cellFromPointer(p) { const c = Math.floor((p.x - BX) / CELL), r = Math.floor((p.y - BY) / CELL); if (c < 0 || r < 0 || c >= CS.COLS || r >= CS.ROWS) return null; return { c, r }; }
-    hideGhost() { this.ghost.setVisible(false); this.ghostGun.setVisible(false); this.ring.setVisible(false); this.cellOverlay.setVisible(false); }
+    hideGhost() { this.ghost.setVisible(false); this.ghostGun.setVisible(false); this.ring.setVisible(false); this.cellOverlay.setVisible(false); if (this.deadRing && this.selTid == null) this.deadRing.setVisible(false); }
     onMove(p) {
       if (this.finished) return;
       this.hoverP = { x: p.x, y: p.y };
@@ -252,6 +254,8 @@
       if (this.ghostGun.texture.key !== '__MISSING') { const a = ch.fist2 || ch.fist; const sc = 0.62; this.ghostGun.setPosition(cx + (a.x - 48) * sc, cy + 22 - (112 * 0.94 - a.y) * sc).setScale(sc).setVisible(true).setAlpha(ok ? 0.8 : 0.45); }
       const rr = SR(CS.TURRETS[this.selDef].range * (this.gunMods[this.selDef] ? this.gunMods[this.selDef].rangeMult : 1));
       this.ring.setPosition(cx, cy).setScale(rr * 2 / 128).setVisible(rr > 0).setTint(ok ? 0xffffff : 0xff5c5c);
+      const mz = CS.TURRETS[this.selDef].minRange ? SR(CS.TURRETS[this.selDef].minRange) : 0;
+      if (this.deadRing) this.deadRing.setPosition(cx, cy).setScale(mz * 2 / 128).setVisible(mz > 0);
       this.cellOverlay.setTexture(ok ? 'fx_placeOk' : 'fx_placeBad').setPosition(cx, cy).setVisible(true);
       // the armed card's cost mirrors the same state
       const cd = this.cards[this.selDef]; if (cd) cd.cost.setColor(afford ? GOLD : RED);
@@ -283,6 +287,7 @@
       if (k === 'a' || k === 'A') this.toggleAuto();
       if (k === 'm' || k === 'M') { if (this.selTid != null) this.maxUpgrade(); }
       if (k === 'n' || k === 'N') this.maxAll();
+      if (k === 'h' || k === 'H') this.toggleHouse();
       if (k === 'p' || k === 'P') { this.togglePause(); return; }
       if (this.paused) { if (k !== 'Escape') { this.toast('PAUSED — NO ACTIONS', 800); } return; }
       if (k === 'u' || k === 'U') { if (this.selTid != null) this.doUpgrade(); }
@@ -311,37 +316,33 @@
     toggleHouse() {
       if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.selRect = null; return; }
       this.closeSel();
-      const c = this.core, PW = 360, PH = 268, x = W / 2, y = BY + PH / 2 + 40;
-      const objs = [];
-      objs.push(this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel));
-      objs.push(txt(this, x, y - 112, 'THE HOUSE', 18, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
-      objs.push(mono(this, x, y - 90, 'services for members with money to burn', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
-      // 1) marker buy-back
-      const mCost = CS.markerCost(c), canM = c.coins >= mCost;
-      const b1 = button(this, x, y - 56, 320, 30, 'SIGN A MARKER — ' + mCost + '⛁', () => {
-        const r = CS.buyMarker(c);
-        if (r.ok) { AUD.play('coin'); this.toast('MARKER SIGNED · ' + r.markers + ' ON THE BOOK  (−' + r.cost + '⛁)', 1600); this.syncHud(); this.rebuildHouse(); }
-        else { AUD.play('deny'); this.toast(r.err, 1200); }
-      }, { size: 11, depth: D.panel + 1, hot: canM, color: canM ? GOLD : DIM });
-      objs.push(b1.bg, b1.t);
-      objs.push(mono(this, x, y - 34, 'buy a life back · price +80% each time · never buys score or stars', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
-      // 2) double or nothing
-      const wCost = CS.wagerCost(c), signed = !!c.wager, canW = c.coins >= wCost && !c.waveActive && !signed;
-      const b2 = button(this, x, y + 4, 320, 30, signed ? '◉ CONTRACT SIGNED — NEXT WAVE' : 'DOUBLE OR NOTHING — ' + wCost + '⛁', () => {
-        const r = CS.wagerWave(c);
-        if (r.ok) { AUD.play('wave'); this.shake(0, 0.004); this.toast('CONTRACT SIGNED — THEY COME HARDER, THEY PAY DOUBLE', 2000); this.syncHud(); this.rebuildHouse(); }
-        else { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'SIGN IT BETWEEN WAVES' : r.err, 1300); }
-      }, { size: 11, depth: D.panel + 1, hot: canW, color: signed ? GREEN : canW ? GOLD : DIM });
-      objs.push(b2.bg, b2.t);
-      objs.push(mono(this, x, y + 26, '+45% bodies · tougher · but DOUBLE bounties, 2.5× wave bonus, +500 score', 9, signed ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
-      // 3) T4 (informational — bought from a unit's own panel)
-      const t4 = c.turrets.filter(t => t.tier >= CS.TIERS).length, upg = c.turrets.filter(t => t.tier < CS.TIERS).length;
-      objs.push(mono(this, x, y + 58, 'THE HIGH TABLE — TIER 4 IRON', 10, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
-      objs.push(mono(this, x, y + 76, 'click any operative → UP to tier 4 (3.6× its price)', 9, DIM).setOrigin(0.5).setDepth(D.panel + 1));
-      objs.push(mono(this, x, y + 92, t4 + ' at the high table · ' + upg + ' still upgradable', 9, t4 ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
-      const b3 = button(this, x, y + 118, 150, 26, 'CLOSE', () => this.toggleHouse(), { size: 10, depth: D.panel + 1 });
-      objs.push(b3.bg, b3.t);
-      this.housePanel = objs;
+      const c = this.core, PW = 470, PH = 400, x = W / 2 - 40, y = BY + PH / 2 + 18;
+      const O = [];
+      O.push(this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel));
+      O.push(txt(this, x, y - 176, 'THE HOUSE', 20, GOLD).setOrigin(0.5).setDepth(D.panel + 1));
+      const bank = mono(this, x, y - 154, 'ON THE BOOK: ' + c.coins + '⛁   ·   spend it or the High Table will', 10, GREEN).setOrigin(0.5).setDepth(D.panel + 1);
+      O.push(bank);
+      // one row = title+cost button, a plain-English line, and a live level read-out
+      const row = (yy, label, cost, sub, level, enabled, onBuy) => {
+        const afford = c.coins >= cost && enabled;
+        const bb = button(this, x - 66, yy, 300, 30, label + '  —  ' + cost + '⛁', () => { if (!enabled) { AUD.play('deny'); this.toast('BETWEEN WAVES ONLY', 1100); return; } onBuy(); }, { size: 11, depth: D.panel + 1, hot: afford, color: afford ? GOLD : DIM });
+        O.push(bb.bg, bb.t);
+        O.push(mono(this, x - 216, yy + 20, sub, 9, DIM).setOrigin(0, 0.5).setDepth(D.panel + 1));
+        O.push(mono(this, x + 156, yy, level, 10, level && level !== '—' ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
+      };
+      const buy = (kind) => { const r = CS.buyHouse(c, kind); if (r.ok) { AUD.play('coin'); if (kind === 'sanction') { this.shake(0, 0.01); this.toast('SANCTION SERVED — ' + r.hit + ' HIT ACROSS THE FLOOR', 1800); } else this.toast(CS.HOUSE[kind].name + ' ×' + r.level + ' (−' + r.cost + '⛁)', 1600); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err, 1200); } };
+      const H = c.house || {};
+      row(y - 116, 'IRON SHIPMENT', CS.houseCost(c, 'shipment'), '+8% damage to EVERY operative, forever', H.shipment ? '×' + H.shipment + '  +' + Math.round((H.dmg || 0) * 100) + '%' : '—', true, () => buy('shipment'));
+      row(y - 62, 'BLACK MARKET AMMO', CS.houseCost(c, 'ammo'), '+8% fire rate to EVERY operative, forever', H.ammo ? '×' + H.ammo + '  +' + Math.round((H.rof || 0) * 100) + '%' : '—', true, () => buy('ammo'));
+      row(y - 8, 'THE PAYROLL', CS.houseCost(c, 'payroll'), '+2 coin on every kill, forever', H.payroll ? '×' + H.payroll + '  +' + (H.coinKill || 0) + '⛁' : '—', true, () => buy('payroll'));
+      row(y + 46, 'SANCTION', CS.houseCost(c, 'sanction'), 'instant: 35% max hp off everything on the floor', H.sanction ? '×' + H.sanction : '—', true, () => buy('sanction'));
+      row(y + 100, 'SIGN A MARKER', CS.markerCost(c), 'buy a life back · never buys score or stars', c.markersBought ? '×' + c.markersBought : '—', true, () => { const r = CS.buyMarker(c); if (r.ok) { AUD.play('coin'); this.toast('MARKER SIGNED · ' + r.markers + ' ON THE BOOK', 1600); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err, 1200); } });
+      const signed = !!c.wager;
+      row(y + 154, signed ? '◉ CONTRACT SIGNED' : 'DOUBLE OR NOTHING', CS.wagerCost(c), '+45% bodies, tougher — pays DOUBLE bounty & 2.5× bonus', signed ? 'NEXT WAVE' : '—', !c.waveActive && !signed, () => { const r = CS.wagerWave(c); if (r.ok) { AUD.play('wave'); this.shake(0, 0.004); this.toast('CONTRACT SIGNED — THEY COME HARDER, THEY PAY DOUBLE', 2000); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'SIGN IT BETWEEN WAVES' : r.err, 1300); } });
+      O.push(mono(this, x - 216, y + 186, 'TIER 4 — THE HIGH TABLE: click any operative → UP (3.6× its price)', 9, GOLD).setOrigin(0, 0.5).setDepth(D.panel + 1));
+      const bc = button(this, x + 172, y + 186, 90, 24, 'CLOSE', () => this.toggleHouse(), { size: 10, depth: D.panel + 1 });
+      O.push(bc.bg, bc.t);
+      this.housePanel = O;
       this.selRect = { x0: x - PW / 2, y0: y - PH / 2, x1: x + PW / 2, y1: y + PH / 2 };
     }
     rebuildHouse() { if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.toggleHouse(); } }
@@ -372,6 +373,7 @@
       const PW = 288, PH = 268;
       const x = px + 160 > RAIL_X - 20 ? px - 160 : px + 160, y = Math.max(BY + PH / 2 + 6, Math.min(H - PH / 2 - 6, py));
       const rr = SR(st.range); this.selRing.setPosition(px, py).setScale(rr * 2 / 128).setVisible(rr > 0);
+      const dz = def.minRange ? SR(def.minRange) : 0; this.deadRing.setPosition(px, py).setScale(dz * 2 / 128).setVisible(dz > 0);
       const pnl = this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
       this.selRect = { x0: x - PW / 2, y0: y - PH / 2, x1: x + PW / 2, y1: y + PH / 2 }; // scene pointer handlers must not fall through onto the board
       const nm = sp.title.replace('THE ', ''), kin = this.core.turrets.filter(o => o.def === t.def);
@@ -407,7 +409,7 @@
       objs.push(mono(this, x, y + 102, groupOn ? 'new ' + nm + 's you post follow this order too' : 'tap to command every ' + nm + ' at once', 9, groupOn ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
       this.selPanel = objs;
     }
-    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel && !this.housePanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
+    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel && !this.housePanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); if (this.deadRing) this.deadRing.setVisible(false); }
     overUI(p) { const r = this.selRect; return !!(r && p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1); }
     // core only exposes cyclePriority(), so walk the cycle (first → strong → last) until it matches
     setPriority(tid, want) { const t = this.core.turrets.find(x => x.tid === tid); if (!t) return; for (let i = 0; i < 3 && (t.priority || 'first') !== want; i++) CS.cyclePriority(this.core, tid); }
@@ -437,6 +439,8 @@
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
       this.updateShake(time, Math.min(0.1, dtMs / 1000));
+      // THE HOUSE lights up the moment the bank can actually buy something (players were missing it entirely)
+      if (this.btnHouse && !this.finished) { const rich = c.coins >= Math.min(CS.houseCost(c, 'sanction'), CS.markerCost(c)); if (rich !== this.houseHot) { this.houseHot = rich; this.btnHouse.bg.setTexture(rich ? 'ui_btnHot' : 'ui_btn'); this.btnHouse.t.setColor(rich ? '#0b0e15' : GOLD).setText(rich ? 'THE HOUSE ⛁' : 'THE HOUSE'); } }
       if (this.selDef && this.hoverP && !this.finished) this.refreshGhost();
       // adaptive score: intensity from the floor state, throttled to 4 Hz
       if ((this.musicT = (this.musicT || 0) + dtMs) > 250) { this.musicT = 0; const boss = c.enemies.some(e => e.boss); const I = c.waveActive ? Math.min(1, 0.3 + 0.45 * Math.min(1, c.enemies.length / 14) + 0.25 * (c.floor.endless ? Math.min(1, c.wave / 12) : c.wave / c.floor.waves)) : 0.08; AUD.setState({ scene: 'battle', floor: c.floorId, intensity: I, active: !!c.waveActive, boss, danger: c.markers > 0 && c.markers <= 5 }); }
@@ -448,6 +452,7 @@
     syncHud() {
       const c = this.core;
       const wmax = c.floor.endless ? '∞' : c.floor.waves;
+      if (this.hudRule) this.hudRule.setText(c.ruleNow && c.ruleNow.id !== 'clean' ? '⚑ ' + c.ruleNow.name : '');
       this.hudWave.setText('WAVE ' + c.wave + '/' + wmax + (c.waveActive ? '  ·  ' + c.enemies.length + ' ON FLOOR' : c.wave < (c.floor.endless ? 999 : c.floor.waves) ? '  ·  READY' : ''));
       this.hudCoins.setText(c.coins + '');
       this.hudMarkers.setText(c.markers + '');
@@ -491,7 +496,7 @@
       const type = e.type;
       let key, ch, scale;
       if (type === 'hound') { key = 'en_hound'; ch = ART.chars.en_hound; scale = 1; }
-      else if (type === 'boss') { const bi = this.core.floor.endless ? (this.core.wave % 6) : (this.core.floorId - 1) % 6; key = 'en_boss' + bi; ch = ART.chars[key]; scale = ENEMY_SCALE.boss; }
+      else if (type === 'boss') { const bi = this.core.floor.endless ? (this.core.wave % 6) : (CS.stageOf(this.core.floorId) - 1) % 6; key = 'en_boss' + bi; ch = ART.chars[key]; scale = ENEMY_SCALE.boss; }
       else { const vnum = e.eid % 3; key = 'en_' + type + vnum; ch = ART.chars[key]; scale = ENEMY_SCALE[type] || 0.62; }
       const body = this.add.sprite(x, y, key + '_run').setOrigin(0.5, ch.baseY / ch.frameH).setScale(scale).setDepth(D.world + y);
       body.play(key + '_run');
@@ -503,7 +508,7 @@
       const slow = this.add.image(x, y, 'fx_slowRing').setDepth(D.floorFx + 2).setAlpha(0.8).setBlendMode(Phaser.BlendModes.ADD).setVisible(false).setScale(scale + 0.2);
       let gun = null;
       if (ch.gun && ART.guns[ch.gun]) { const g = ART.guns[ch.gun]; gun = this.add.image(x, y, 'gun_' + ch.gun).setOrigin(g.grip.x / g.w, g.grip.y / g.h).setScale(scale * 1.15).setDepth(D.world + y + 1); }
-      const name = txt(this, x, y - h - 20, e.boss ? (this.core.floor.endless ? 'THE COLLECTOR' : CS.BOSS_NAMES[(this.core.floorId - 1) % 6]) : '', 12, RED).setOrigin(0.5).setDepth(D.air + 2).setVisible(!!e.boss);
+      const name = txt(this, x, y - h - 20, e.boss ? (this.core.floor.endless ? 'THE COLLECTOR' : CS.BOSS_NAMES[(CS.stageOf(this.core.floorId) - 1) % CS.BOSS_NAMES.length]) : '', 12, RED).setOrigin(0.5).setDepth(D.air + 2).setVisible(!!e.boss);
       const v = { body, shadow, hpBg, hp, shimmer, slow, gun, name, ch, h, hitT: 0, lastX: null, type };
       this.enemyViews.set(e.eid, v);
       if (e.boss) { this.banner(name.text, 'BOSS ON THE FLOOR', 1800); AUD.play('boss'); }
@@ -599,7 +604,8 @@
           case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
           case 'wager': this.banner('CONTRACT SIGNED', 'THE NEXT WAVE COMES HARDER — AND PAYS DOUBLE', 1800); break;
           case 'marker_bought': break;
-          case 'wave_start': this.shake(0, ev.wager ? 0.008 : 0.0035); if (ev.wager) this.banner('DOUBLE OR NOTHING', ev.count + ' COMING UP THE STAIRS · DOUBLE BOUNTIES', 1900); else this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
+          case 'wave_start': this.shake(0, ev.wager ? 0.008 : 0.0035);
+            if (ev.rule && ev.rule.id !== this.lastRule) { this.lastRule = ev.rule.id; if (ev.rule.id !== 'clean') this.banner('HOUSE RULE — ' + ev.rule.name, ev.rule.desc.toUpperCase(), 2200); } if (ev.wager) this.banner('DOUBLE OR NOTHING', ev.count + ' COMING UP THE STAIRS · DOUBLE BOUNTIES', 1900); else this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
           case 'wave_clear': { this.banner(ev.wager ? 'CONTRACT HELD' : 'FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.wager ? ' · DOUBLE OR NOTHING PAID' : '') + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
           case 'mint': { const t = c.turrets.find(x => x.tid === ev.tid); if (t) { this.coinPop(SX(t.x), SY(t.y) - 30, ev.amount); AUD.play('mint'); } break; }
@@ -719,7 +725,8 @@
       const lines = ['SCORE ' + sc, 'MARKERS KEPT  ' + c.markers + ' / ' + c.startMarkers, 'KILLS ' + c.stats.kills + ' · LEAKS ' + c.stats.leaks, 'EARNED ' + c.stats.earned + '⛁ · SPENT ' + c.stats.spent + '⛁', c.floor.endless ? 'WAVES SURVIVED ' + c.wave : ''];
       mono(this, W / 2, H / 2 + 6, lines.filter(Boolean).join('\n'), 13, INK, { align: 'center', lineSpacing: 6 }).setOrigin(0.5).setDepth(D.overlay + 2);
       const bx = W / 2;
-      if (win && this.opts.mode === 'campaign' && c.floorId < 6) button(this, bx - 130, H / 2 + 150, 220, 40, 'NEXT FLOOR ▸', () => this.scene.start('Battle', Object.assign({}, this.opts, { floor: c.floorId + 1 })), { hot: true, depth: D.overlay + 2 });
+      const nxt = win && this.opts.mode === 'campaign' ? CS.nextFloor(c.floorId) : null;
+      if (nxt) button(this, bx - 130, H / 2 + 150, 220, 40, 'NEXT FLOOR ▸', () => this.scene.start('Battle', Object.assign({}, this.opts, { floor: nxt })), { hot: true, depth: D.overlay + 2 });
       else button(this, bx - 130, H / 2 + 150, 220, 40, 'RUN IT BACK', () => this.scene.restart(this.opts), { hot: true, depth: D.overlay + 2 });
       button(this, bx + 130, H / 2 + 150, 220, 40, this.opts.mode === 'campaign' ? 'THE ELEVATOR' : 'THE LOBBY', () => this.scene.start(this.opts.mode === 'campaign' ? 'Floors' : 'Title'), { depth: D.overlay + 2 });
     }

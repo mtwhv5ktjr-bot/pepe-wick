@@ -29,7 +29,9 @@
   function starsFor(floor, diff) { const p = loadProg(); return (p.stars && p.stars['f' + floor + '_' + diff]) || 0; }
   function setStars(floor, diff, n) { const p = loadProg(); p.stars = p.stars || {}; const k = 'f' + floor + '_' + diff; p.stars[k] = Math.max(p.stars[k] || 0, n); saveProg(p); }
   function starsAny(floor) { let b = 0; for (const d in CS.DIFFS) b = Math.max(b, starsFor(floor, d)); return b; }
-  function unlockedFloor() { let u = 1; for (let f = 1; f <= 5; f++) if (starsAny(f) > 0) u = f + 1; return u; }
+  // campaign is 9 floors now (THE PIT keeps id 7 and is not part of the chain)
+  function unlockedFloor() { let u = CS.CAMPAIGN[0]; for (const id of CS.CAMPAIGN) { if (starsAny(id) > 0) { const nx = CS.nextFloor(id); if (nx) u = nx; } } return u; }
+  function isUnlocked(id) { const i = CS.CAMPAIGN.indexOf(id); if (i <= 0) return true; return starsAny(CS.CAMPAIGN[i - 1]) > 0; }
   function todayUTC() { const d = new Date(); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
   const ACCOUNTS = [
     ['Room 217 has been “occupied” since 1969. Housekeeping does not knock.', 'The concierge logs every marker spent on the marble. Tonight’s count: yours.', 'The front desk keeps a list of names that check in and never out. Yours is penciled.'],
@@ -38,6 +40,9 @@
     ['The coin press runs at night. The night runs long.', 'Shield crews are paid by the dent. Audit their kevlar invoices.', 'One coin in every hundred is struck with the Director’s profile. Keep it.'],
     ['Accounts payable pays in lead when the ink runs dry.', 'Ghost payroll: forty-one names, no faces, one desk that is always warm.', 'The lift to the roof requires a signature. In triplicate. Notarized.'],
     ['The helipad was poured over the old garden. Some things still grow.', 'The Director’s dashes are timed to the lighthouse across the bay. Count five.', 'KJP GEAR requisitions route through the rooftop office. All sales final, half burned.'],
+    ['Five service corridors, one menu. The sous-chef bones everything the same way.', 'The walk-in holds more than veal. Housekeeping stopped asking in ’94.', 'Every plate that leaves the pass is counted. So is every man.'],
+    ['The quartet has played the same four bars since the Marquis bought the room.', 'The parquet was laid over the old vault door. Listen for the hollow step.', 'A waltz is three counts. So is the reload he taught them.'],
+    ['The scotch is 1926. The Elder is older. He does not drink it.', 'The penthouse has one way in and no way to be late.', 'Whoever holds this floor holds the ledger. Nobody has held it twice.'],
   ];
   const redact = (line, idx) => line.split(' ').map((w, i) => ((i + idx) % 4 === 0 ? w.slice(0, 1) + '█'.repeat(Math.max(2, w.length - 1)) : '█'.repeat(Math.max(2, w.length)))).join(' ');
 
@@ -255,8 +260,8 @@
       button(this, W / 2 + 250, by, 220, 46, 'DAILY CONTRACT', () => this.scene.start('Battle', { floor: ct.floor, difficulty: ct.difficulty, mode: 'daily', mutators: ct.mutators, seed: ct.seed, contract: ct }), { sub: 'F' + ct.floor + ' · ' + CS.DIFFS[ct.difficulty].name + (dailyBest ? ' · BEST ' + dailyBest : '') });
       // wallet — a REAL button under the menu (the old bottom-right text line was invisible to players)
       walletButton(this, W / 2, by + 60, 360, 36, () => this.scene.restart());
-      const unlockedLines = ACCOUNTS.reduce((n, fl, i) => n + Math.min(3, starsAny(i + 1)), 0);
-      const acct = mono(this, 16, H - 16, '⬦ HOUSE ACCOUNTS ' + unlockedLines + '/18', 12, GOLD).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
+      const unlockedLines = CS.CAMPAIGN.reduce((n, id) => n + Math.min(3, starsAny(id)), 0);
+      const acct = mono(this, 16, H - 16, '⬦ HOUSE ACCOUNTS ' + unlockedLines + '/' + (CS.CAMPAIGN.length * 3), 12, GOLD).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       acct.on('pointerdown', () => { AUD.unlock(); AUD.play('ui'); showAccounts(this); });
       const soundT = mono(this, 200, H - 16, '♪ ' + AUD.soundLabel(), 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       soundT.on('pointerdown', () => { AUD.unlock(); const md = AUD.cycleSound(); soundT.setText('♪ ' + AUD.soundLabel()); if (md !== 'off') AUD.play('ui'); });
@@ -338,7 +343,7 @@
     const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.86).setDepth(90).setInteractive();
     const panel = scene.add.nineslice(W / 2, H / 2, 'ui_panel', undefined, 940, 660, 14, 14, 14, 14).setDepth(91);
     const parts = ['HOUSE ACCOUNTS — LEDGER OF THE CONTINENTAL', ''];
-    for (let f = 1; f <= 6; f++) { const st = starsAny(f); parts.push(CS.floorById(f).name + '  ' + '★'.repeat(st) + '☆'.repeat(3 - st)); for (let i = 0; i < 3; i++) parts.push('  ' + (st > i ? ACCOUNTS[f - 1][i] : redact(ACCOUNTS[f - 1][i], i))); parts.push(''); }
+    for (const f of CS.CAMPAIGN) { const st = starsAny(f); parts.push(CS.floorById(f).name + '  ' + '★'.repeat(st) + '☆'.repeat(3 - st)); for (let i = 0; i < 3; i++) { const lore = ACCOUNTS[CS.stageOf(f) - 1] || ACCOUNTS[0]; parts.push('  ' + (st > i ? lore[i] : redact(lore[i], i))); } parts.push(''); }
     parts.push('EARN STARS TO UNSEAL THE LEDGER · TAP TO CLOSE');
     const t = mono(scene, W / 2, H / 2, parts.join('\n'), 12, INK, { align: 'left', lineSpacing: 4, wordWrap: { width: 880 } }).setOrigin(0.5).setDepth(92);
     dim.on('pointerdown', () => { dim.destroy(); panel.destroy(); t.destroy(); });
@@ -356,13 +361,13 @@
       const unlocked = unlockedFloor();
       // the highest floor you hold, blurred and dim, behind the panel
       if (this.textures.exists('floor_' + unlocked)) { const back = this.add.image(W / 2, H / 2 + 20, 'floor_' + unlocked).setScale(1.2).setAlpha(0.22); try { back.postFX.addBlur(0, 2, 2, 1.2); } catch (e) {} const veil = this.add.graphics(); veil.fillGradientStyle(0x05070c, 0x05070c, 0x05070c, 0x05070c, 0.55, 0.55, 0.85, 0.85).fillRect(0, 0, W, H); }
-      txt(this, W / 2, 46, 'THE ELEVATOR', 34, GOLD).setOrigin(0.5);
-      mono(this, W / 2, 82, 'PICK A FLOOR · PICK YOUR TERMS · THE DOORS CLOSE BEHIND YOU', 11, DIM).setOrigin(0.5);
+      txt(this, W / 2, 32, 'THE ELEVATOR', 28, GOLD).setOrigin(0.5);
+      mono(this, W / 2, 58, 'PICK A FLOOR · PICK YOUR TERMS · THE DOORS CLOSE BEHIND YOU', 10, DIM).setOrigin(0.5);
       const floors = CS.FLOORS.filter(f => !f.endless);
-      const CW = 304, CH = 216, TW = 280, TH = 168;
+      const CW = 300, CH = 176, TW = 276, TH = 128;
       floors.forEach((f, i) => {
-        const x = W / 2 + ((i % 3) - 1) * 332, y = 214 + Math.floor(i / 3) * 236;
-        const locked = f.id > unlocked;
+        const x = W / 2 + ((i % 3) - 1) * 326, y = 176 + Math.floor(i / 3) * 190;
+        const locked = !isUnlocked(f.id);
         const card = this.add.nineslice(x, y, 'ui_panel', undefined, CW, CH, 14, 14, 14, 14).setOrigin(0.5).setInteractive({ useHandCursor: !locked });
         const frame = this.add.nineslice(x, y, 'ui_frameGold', undefined, CW, CH, 14, 14, 14, 14).setOrigin(0.5).setAlpha(locked ? 0.25 : 0.7);
         const ty = y - CH / 2 + 10 + TH / 2; // thumbnail centre
@@ -371,13 +376,15 @@
         if (locked) thumb.setTint ? thumb.setTint(0x55606e).setAlpha(0.6) : thumb.setAlpha(0.6);
         // name plate over the bottom of the thumbnail
         const plate = this.add.graphics(); plate.fillGradientStyle(0x05070c, 0x05070c, 0x05070c, 0x05070c, 0, 0, 0.9, 0.9).fillRect(x - TW / 2, ty + TH / 2 - 44, TW, 44);
-        txt(this, x - TW / 2 + 10, ty + TH / 2 - 30, 'FLOOR ' + f.id, 10, locked ? DIM : GOLD_D).setOrigin(0, 0.5);
-        txt(this, x - TW / 2 + 10, ty + TH / 2 - 13, f.name, 17, locked ? DIM : '#fff').setOrigin(0, 0.5);
+        txt(this, x - TW / 2 + 10, ty + TH / 2 - 30, 'FLOOR ' + CS.stageOf(f.id), 10, locked ? DIM : GOLD_D).setOrigin(0, 0.5);
+        const nameT = txt(this, x - TW / 2 + 10, ty + TH / 2 - 13, f.name, 16, locked ? DIM : '#fff').setOrigin(0, 0.5);
+        for (let fs = 16; fs > 10 && nameT.width > TW - 90; fs--) nameT.setFontSize(fs);
         const st = starsFor(f.id, this.diff);
         for (let s = 0; s < 3; s++) this.add.image(x + TW / 2 - 66 + s * 24, ty + TH / 2 - 22, s < st ? 'ui_starOn' : 'ui_starOff').setScale(0.5).setAlpha(locked ? 0.4 : 1);
         // footer row: intro / lock line + waves
         const fy = y + CH / 2 - 16;
-        mono(this, x - CW / 2 + 12, fy, locked ? 'LOCKED — CLEAR FLOOR ' + (f.id - 1) : f.intro.split('.')[0].toUpperCase(), 9, locked ? DIM : INK).setOrigin(0, 0.5);
+        const prev = CS.CAMPAIGN[CS.CAMPAIGN.indexOf(f.id) - 1];
+        mono(this, x - CW / 2 + 12, fy, locked ? 'LOCKED — CLEAR ' + (CS.floorById(prev) ? CS.floorById(prev).name : '') : f.intro.split('.')[0].toUpperCase(), 8, locked ? DIM : INK).setOrigin(0, 0.5);
         mono(this, x + CW / 2 - 12, fy, f.waves + ' WAVES', 9, locked ? DIM : GOLD).setOrigin(1, 0.5);
         if (locked) { this.add.image(x, ty - 10, 'ui_lockIcon').setScale(1.1).setAlpha(0.9); }
         else {
@@ -388,18 +395,18 @@
       });
       // difficulty + perk — every option explained ON the button so nobody has to click around to learn what it does.
       // Defaults (OPERATIVE + HOUSE STANDARD) are the intended game: a new player can just pick a floor.
-      const dy = 634;
+      const dy = 700;
       const DIFF_SUB = { operative: 'STANDARD · intended game', ghost: 'HARDER · +35% enemy hp', babayaga: 'BRUTAL · +80% enemy hp' };
       const DOCT_SUB = { none: 'no trade-off · default', iron: '+8% dmg / −20⛁ bonus', ledger: '+10% bounty / −5% rof', doors: '+4 markers / −40⛁ start' };
-      mono(this, 120, dy - 40, 'DIFFICULTY  — how hard they come up the stairs', 11, DIM);
+      mono(this, 120, dy - 30, 'DIFFICULTY  — how hard they come up the stairs', 10, DIM);
       let dx = 120;
       for (const d in CS.DIFFS) { const on = d === this.diff; button(this, dx + 80, dy, 160, 36, CS.DIFFS[d].name, () => { this.diff = d; LS.set('cs_diff', d); this.scene.restart(); }, { hot: on, size: 13, sub: DIFF_SUB[d] }); dx += 172; }
-      mono(this, 700, dy - 40, 'PERK (optional)  — one trade-off for the whole floor, or leave HOUSE STANDARD', 11, DIM);
+      mono(this, 700, dy - 30, 'PERK (optional)  — one trade-off for the whole floor, or leave HOUSE STANDARD', 10, DIM);
       let ox = 700; for (const k in CS.DOCTRINES) { const on = k === this.doct; button(this, ox + 66, dy, 132, 36, CS.DOCTRINES[k].name, () => { this.doct = k; LS.set('cs_doct', k); this.scene.restart(); }, { hot: on, size: 11, sub: DOCT_SUB[k] }); ox += 140; }
       const chosen = (this.diff === 'operative' && this.doct === 'none') ? 'YOUR TERMS: OPERATIVE · HOUSE STANDARD — the intended experience. New here? Just pick a floor.' : 'YOUR TERMS: ' + CS.DIFFS[this.diff].name + ' · ' + CS.DOCTRINES[this.doct].name + ' — ' + CS.DOCTRINES[this.doct].desc.toLowerCase();
-      mono(this, W / 2, dy + 52, chosen, 11, GOLD).setOrigin(0.5);
-      mono(this, W / 2, dy + 70, 'ON THE FLOOR: pick an operative card (1-9), click a tile to post them, SEND WAVE. Upgrade with U, MAX with M, AUTO-SEND with A. Connect a wallet to put your Arsenal guns in their hands.', 10, DIM).setOrigin(0.5);
-      button(this, 90, H - 40, 140, 36, '◂ LOBBY', () => this.scene.start('Title'), { size: 12 });
+      mono(this, W / 2, dy + 42, chosen, 10, GOLD).setOrigin(0.5);
+      mono(this, W / 2, dy + 58, 'ON THE FLOOR: pick an operative (1-9), click a tile to post, SEND WAVE · click a posted unit for targeting orders · THE HOUSE spends a fat bank', 9, DIM).setOrigin(0.5);
+      button(this, 84, 32, 132, 30, '◂ LOBBY', () => this.scene.start('Title'), { size: 11 });
       walletButton(this, W - 196, 46, 352, 32, () => this.scene.restart(), { size: 11 });
       AUD.setState({ scene: 'floors', intensity: 0, active: false, danger: false, boss: false });
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.95, 0.28); } catch (e) {}

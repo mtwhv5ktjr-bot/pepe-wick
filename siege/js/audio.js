@@ -62,8 +62,9 @@
       const dOut = ctx.createGain(); dOut.gain.value = 0.5;
       if (pl) { dl.connect(pl); pl.connect(dOut); dr.connect(pr); pr.connect(dOut); } else { dl.connect(dOut); dr.connect(dOut); }
       dOut.connect(master);
-      muted = LS.get('cs_mute') === '1'; applyMode(LS.get('cs_sound') || 'on', true);
-      master.gain.value = muted ? 0 : 0.55; musicBus.gain.value = musicOff ? 0 : MUSIC_LVL; sfxBus.gain.value = sfxOff ? 0 : SFX_LVL;
+      muted = false; try { localStorage.removeItem('cs_mute'); } catch (e) {}  // migrate: kill the legacy master mute for good
+      applyMode(LS.get('cs_sound') || 'on', true);
+      master.gain.value = 0.55; musicBus.gain.value = musicOff ? 0 : MUSIC_LVL; sfxBus.gain.value = sfxOff ? 0 : SFX_LVL;
       startScheduler();
       return true;
     } catch (e) { return false; }
@@ -305,7 +306,7 @@
     play(name) { if (!ctx || muted || sfxOff) return; const f = SFX[name]; if (f) try { f(); } catch (e) {} },
     cue(kind) { if (!ctx || muted || musicOff) return; try { cadence(kind); } catch (e) {} },
     setState(o) { try { setState(o); } catch (e) {} },
-    toggleMute() { muted = !muted; LS.set('cs_mute', muted ? '1' : '0'); if (master) master.gain.value = muted ? 0 : 0.55; return muted; },
+    toggleMute() { return applyMode(mode === 'off' ? 'on' : 'off') === 'off'; },   // legacy shim → the single switch
     cycleSound() { return applyMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]); },   // ON → SFX ONLY → OFF → ON
     setSound(m) { return applyMode(m); },
     soundMode() { return LS.get('cs_sound') || mode; },
@@ -314,7 +315,7 @@
     toggleSfx() { return applyMode(mode === 'off' ? 'on' : 'off') === 'off'; },
     isMusicOff() { return musicOff || LS.get('cs_music') === '0'; },
     isSfxOff() { return sfxOff || LS.get('cs_sfx') === '0'; },
-    isMuted() { return muted || LS.get('cs_mute') === '1'; },
+    isMuted() { return (LS.get('cs_sound') || mode) === 'off'; },
     _state: S,
   };
   global.CS_AUDIO = AUDIO;
