@@ -286,17 +286,17 @@
     // ⚙ popover: music, gunfire and screen shake are three independent switches (all persisted)
     toggleSettings() {
       if (this.setPanel) { this.setPanel.forEach(o => o.destroy()); this.setPanel = null; this.selRect = null; return; }
-      const x = W / 2 - 300, y = HUD_H + 96, wdt = 250, hgt = 170;
+      const x = W / 2 - 300, y = HUD_H + 88, wdt = 260, hgt = 148;
       const panel = this.add.nineslice(x, y, 'ui_panel', undefined, wdt, hgt, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
-      const title = txt(this, x, y - 62, 'HOUSE SETTINGS', 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
+      const title = txt(this, x, y - 52, 'HOUSE SETTINGS', 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
       const mk2 = (yy, label, isOff, onClick) => {
         const b = button(this, x, yy, 210, 30, label + (isOff() ? ' — OFF' : ' — ON'), () => { onClick(); b.t.setText(label + (isOff() ? ' — OFF' : ' — ON')); b.t.setColor(isOff() ? DIM : GOLD); }, { size: 11, depth: D.panel + 1, color: isOff() ? DIM : GOLD });
         return b;
       };
-      const b1 = mk2(y - 26, '♪ MUSIC', () => AUD.isMusicOff(), () => AUD.toggleMusic());
-      const b2 = mk2(y + 10, '✷ GUNFIRE', () => AUD.isSfxOff(), () => { const off = AUD.toggleSfx(); if (!off) AUD.play('ui'); });
-      const b3 = mk2(y + 46, '⌁ SCREEN SHAKE', () => LS.get('cs_shake') === '0', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); if (!off) this.shake(0, 0.006); });
-      this.setPanel = [panel, title, b1.bg, b1.t, b2.bg, b2.t, b3.bg, b3.t];
+      // ONE sound button cycling ON → SFX ONLY → OFF
+      const bSound = button(this, x, y - 20, 216, 30, '♪ ' + AUD.soundLabel(), () => { const m = AUD.cycleSound(); bSound.t.setText('♪ ' + AUD.soundLabel()); bSound.t.setColor(m === 'off' ? DIM : GOLD); if (m !== 'off') AUD.play('ui'); }, { size: 11, depth: D.panel + 1, color: AUD.soundMode() === 'off' ? DIM : GOLD });
+      const b3 = mk2(y + 22, '⌁ SCREEN SHAKE', () => LS.get('cs_shake') === '0', () => { const off = LS.get('cs_shake') !== '0'; LS.set('cs_shake', off ? '0' : '1'); if (!off) this.shake(0, 0.006); });
+      this.setPanel = [panel, title, bSound.bg, bSound.t, b3.bg, b3.t];
       this.selRect = { x0: x - wdt / 2, y0: y - hgt / 2, x1: x + wdt / 2, y1: y + hgt / 2 }; // board clicks must not pass under it
     }
     togglePause() {
