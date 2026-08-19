@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const S = window.__CS_SHARED;
-  const { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, button, HOTKEYS, starsFor, setStars, gunModsFor, walletLine } = S;
+  const { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, button, HOTKEYS, starsFor, setStars, gunModsFor, walletLine } = S;
   const AUD = window.CS_AUDIO;
   const D = { floor: 0, floorFx: 1, deco: 2, ground: 3, shadow: 4, world: 10, /* world objects sort within 10..2000 by y */ air: 2100, fxTop: 2200, hud: 3000, panel: 3100, banner: 3200, overlay: 4000 };
   const ANIM_MS = 1000 / 60;
@@ -18,7 +18,7 @@
     init(opts) {
       this.opts = opts || { floor: 1, difficulty: 'operative', mode: 'campaign' };
       // Phaser reuses this scene instance across start/restart — every per-run flag must be reset here, not assumed fresh
-      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null;
+      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false;
       this.propSprites = []; this.ambientObjs = []; this.bannerObjs = null; this.selPanel = null; this.tipPanel = null; this.dmgTexts = [];
     }
     async create() {
@@ -45,6 +45,7 @@
       this.fxLayer = this.add.layer().setDepth(D.fxTop);
       try { this.fxLayer.postFX.addBloom(0xffffff, 1, 1, 0.9, 1.15); } catch (e) {}
       this.banner('FLOOR ' + f.id + ' — ' + f.name, f.intro, 2600);
+      AUD.setState({ scene: 'battle', floor: f.id, intensity: 0.08, active: false, boss: false, danger: false });
       this.input.once('pointerdown', () => AUD.unlock());
       // the HTML arcade links share the top-left with the floor name — hide them while the floor is live
       const links = document.getElementById('links'); if (links) links.style.display = 'none';
@@ -117,13 +118,14 @@
       this.hudBg = this.add.nineslice(W / 2, hy - 14, 'ui_panel', undefined, W + 28, HUD_H + 28, 14, 14, 14, 14).setDepth(D.hud); // the 14px nineslice padding hangs OFF the top edge, never over the cornice
       this.hudFloor = txt(this, 16, hy, c.floor.name + (this.opts.mode === 'daily' ? ' · DAILY' : this.opts.mode === 'endless' ? ' · ENDLESS' : '') + (c.doctrine.id !== 'none' ? ' · ' + c.doctrine.name : ''), 15, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.hudWave = txt(this, W / 2 - 40, hy, '', 14, INK).setOrigin(0.5).setDepth(D.hud + 1);
-      this.add.image(W - 330, hy, 'ui_coinIcon').setDepth(D.hud + 1).setScale(0.9);
-      this.hudCoins = txt(this, W - 316, hy, '', 16, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
-      this.add.image(W - 200, hy, 'ui_markerIcon').setDepth(D.hud + 1).setScale(0.9);
-      this.hudMarkers = txt(this, W - 186, hy, '', 16, GREEN).setOrigin(0, 0.5).setDepth(D.hud + 1);
-      this.btnWave = button(this, W - 70, hy, 124, 32, 'SEND WAVE', () => this.sendWave(), { hot: true, size: 12, depth: D.hud + 1 });
+      this.add.image(W - 392, hy, 'ui_coinIcon').setDepth(D.hud + 1).setScale(0.9);
+      this.hudCoins = txt(this, W - 378, hy, '', 16, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.add.image(W - 268, hy, 'ui_markerIcon').setDepth(D.hud + 1).setScale(0.9);
+      this.hudMarkers = txt(this, W - 254, hy, '', 16, GREEN).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.btnWave = button(this, W - 64, hy, 116, 32, 'SEND WAVE', () => this.sendWave(), { hot: true, size: 12, depth: D.hud + 1 });
+      this.auto = false; this.btnAuto = button(this, W - 156, hy, 60, 28, 'AUTO', () => this.toggleAuto(), { size: 11, depth: D.hud + 1 });
       this.btnSpeed = button(this, W / 2 + 130, hy, 56, 28, '×1', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.btnSpeed.t.setText('×' + this.speed); }, { size: 12, depth: D.hud + 1 });
-      this.btnPause = button(this, W / 2 + 194, hy, 56, 28, '❚❚', () => { this.paused = !this.paused; this.btnPause.t.setText(this.paused ? '▶' : '❚❚'); }, { size: 12, depth: D.hud + 1 });
+      this.btnPause = button(this, W / 2 + 194, hy, 56, 28, '❚❚', () => this.togglePause(), { size: 12, depth: D.hud + 1 });
       this.btnQuit = button(this, W / 2 - 230, hy, 84, 28, '◂ QUIT', () => this.scene.start('Floors'), { size: 11, depth: D.hud + 1 });
       // ghost cursor + range ring
       this.ghost = this.add.sprite(0, 0, 'op_pistol_stand').setOrigin(0.5, 0.94).setAlpha(0.6).setDepth(D.air).setVisible(false);
@@ -134,7 +136,7 @@
       this.dmgTexts = [];
       const ly = BY + BH + (H - BY - BH) / 2;
       this.add.rectangle(BX + BW / 2, ly, BW, H - BY - BH, 0x05070c, 1).setDepth(D.hud);
-      this.legend = mono(this, BX + 12, ly, '1-9 PICK AN OPERATIVE · CLICK A TILE TO POST THEM · SHIFT-CLICK TO KEEP PLACING · SPACE SENDS THE WAVE · U UPGRADE · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
+      this.legend = mono(this, BX + 12, ly, '1-9 PICK · CLICK A TILE TO POST · SHIFT-CLICK KEEPS PLACING · SPACE SENDS · A AUTO-SEND · U UPGRADE · M MAX · S SELL · P PAUSE', 10, DIM).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.toastT = mono(this, BX + BW / 2, BY + 30, '', 12, GOLD).setOrigin(0.5).setDepth(D.banner).setAlpha(0);
     }
     buildTray() {
@@ -143,6 +145,9 @@
       const cardW = railW - 22, cardH = 72, gap = 4; const x0 = railCX, y0 = HUD_H + 8 + cardH / 2;
       const railBg = this.add.nineslice(railCX + 14, HUD_H + (H - HUD_H) / 2, 'ui_panel', undefined, railW + 28, H - HUD_H + 28, 14, 14, 14, 14).setDepth(D.hud - 1); // padding hangs off the right edge, not over column 19
       this.railTitle = mono(this, railCX, H - 12, 'THE STAFF · 1-9', 9, DIM).setOrigin(0.5).setDepth(D.hud + 1);
+      // wallet: bottom-right of the legend strip; connecting mid-floor re-skins the staff live
+      const ly = BY + BH + (H - BY - BH) / 2;
+      this.walletBtn = walletButton(this, RAIL_X - 150, ly, 280, 22, r => this.applyWallet(r), { size: 10, depth: D.hud + 2 });
       this.cards = {};
       defs.forEach((def, i) => {
         const x = x0, y = y0 + i * (cardH + gap);
@@ -163,6 +168,15 @@
       this.tipPanel = null;
       this.selPanel = null;
     }
+    // wallet connected during a floor: mods into the sim, gear markers (leak-relative: startMarkers too), tray + turret guns re-skinned
+    applyWallet(r) {
+      const c = this.core; this.wallet = r; this.gunMods = gunModsFor(r); c.gunMods = this.gunMods;
+      if (!c.holder && r.count > 0) { c.holder = true; c.gearCount = r.count; const add = Math.min(10, r.count); c.markers += add; c.startMarkers += add; }
+      for (const k in this.cards) { const cd = this.cards[k]; const gt = this.gunTypeFor(k); if (cd.gun && gt && ART.guns[gt]) cd.gun.setTexture('gun_' + gt); }
+      for (const [tid, v] of this.turretViews) { const t = c.turrets.find(x => x.tid === tid); if (!t) continue; const gt = this.gunTypeFor(t.def); if (v.gun && gt && ART.guns[gt] && v.gunType !== gt) { const g = ART.guns[gt]; v.gun.setTexture('gun_' + gt).setOrigin(g.grip.x / g.w, g.grip.y / g.h); v.gunType = gt; if (gt >= 11) { try { v.gun.postFX.addGlow(0xffd23f, 2, 0, false, 0.1, 8); } catch (e) {} } } }
+      if (this.selDef) { const gt = this.gunTypeFor(this.selDef); if (gt && ART.guns[gt]) { const g = ART.guns[gt]; this.ghostGun.setTexture('gun_' + gt).setOrigin(g.grip.x / g.w, g.grip.y / g.h); } }
+      this.syncHud(); this.toast('LEDGER READ — YOUR IRON IS ON THE FLOOR' + (r.count > 0 ? ' · +' + Math.min(10, r.count) + ' MARKERS' : ''), 2000); AUD.play('upgrade');
+    }
     gunTypeFor(defId) { const m = this.gunMods[defId]; if (m && m.gunType) return m.gunType; const sp = CS_CAST.OPERATIVES[defId]; return sp && sp.gun; }
     showCardTip(c) {
       this.hideCardTip();
@@ -178,6 +192,7 @@
     }
     hideCardTip() { if (this.tipPanel) { this.tipPanel.forEach(o => o.destroy()); this.tipPanel = null; } }
     selectDef(id) {
+      if (this.paused) { this.toast('PAUSED — NO ACTIONS', 800); AUD.play('deny'); return; }
       const def = CS.TURRETS[id];
       if (def.holderOnly && !this.core.holder) { this.toast('HOLDERS ONLY — KJP GEAR', 1400); AUD.play('deny'); return; }
       if (this.banned === id) { this.toast('CONFISCATED FOR TODAY’S CONTRACT', 1400); AUD.play('deny'); return; }
@@ -210,7 +225,7 @@
     onMove(p) {
       if (this.finished) return;
       const cell = this.cellFromPointer(p); this.hoverCell = cell;
-      if (!cell || !this.selDef || p.x >= RAIL_X || p.y < BY) { this.hideGhost(); return; } // off the board: never leave a ghost hanging over the HUD/rail
+      if (!cell || !this.selDef || this.paused || p.x >= RAIL_X || p.y < BY || this.overUI(p)) { this.hideGhost(); return; } // off the board: never leave a ghost hanging over the HUD/rail
       if (this.selDef && cell) {
         const cx = BX + cell.c * CELL + CELL / 2, cy = BY + cell.r * CELL + CELL / 2;
         const ok = CS.canPlace(this.core, this.selDef, cell.c, cell.r).ok && this.core.coins >= CS.TURRETS[this.selDef].cost;
@@ -224,7 +239,8 @@
       }
     }
     onDown(p) {
-      if (this.finished || p.x >= RAIL_X || p.y < BY) return; // results panel up / rail / hud
+      if (this.finished || p.x >= RAIL_X || p.y < BY || this.overUI(p)) return; // results panel up / rail / hud / selection panel
+      if (this.paused) { this.toast('PAUSED — NO ACTIONS', 800); AUD.play('deny'); return; }
       const cell = this.cellFromPointer(p); if (!cell) return;
       const here = CS.turretAt(this.core, cell.c, cell.r);
       if (this.selDef && !here) {
@@ -242,11 +258,24 @@
       if (k === 'Escape') { if (this.selDef) this.selectDef(this.selDef); this.closeSel(); }
       const idx = HOTKEYS.findIndex(id => CS.TURRETS[id].hotkey === k); if (idx >= 0) this.selectDef(HOTKEYS[idx]);
       if (k === ' ') { this.sendWave(); }
-      if (k === 'p' || k === 'P') this.btnPause.bg.emit('pointerdown');
+      if (k === 'a' || k === 'A') this.toggleAuto();
+      if (k === 'm' || k === 'M') { if (this.selTid != null) this.maxUpgrade(); }
+      if (k === 'p' || k === 'P') { this.togglePause(); return; }
+      if (this.paused) { if (k !== 'Escape') { this.toast('PAUSED — NO ACTIONS', 800); } return; }
       if (k === 'u' || k === 'U') { if (this.selTid != null) this.doUpgrade(); }
       if (k === 's' && this.selTid != null) this.doSell();
     }
-    sendWave() { const r = CS.startWave(this.core); if (r.ok) { AUD.play('wave'); this.hideCardTip(); } }
+    sendWave() { if (this.paused) { this.toast('PAUSED — UNPAUSE FIRST', 900); AUD.play('deny'); return { ok: false }; } const r = CS.startWave(this.core); if (r.ok) { AUD.play('wave'); this.hideCardTip(); } return r; }
+    // House rule: no pausing mid-wave (only between waves), and a paused floor takes NO actions — pause is a break, not a planning exploit
+    togglePause() {
+      if (!this.paused && this.core.waveActive) { this.toast('NO PAUSING MID-WAVE — HOLD THE FLOOR', 1200); AUD.play('deny'); return; }
+      this.paused = !this.paused; this.btnPause.t.setText(this.paused ? '▶' : '❚❚');
+      if (this.paused) { this.hideGhost(); this.hideCardTip(); this.closeSel(); if (!this.pauseVeil) { this.pauseVeil = this.add.rectangle(BX + BW / 2, BY + BH / 2, BW, BH, 0x05070c, 0.45).setDepth(D.panel - 1); this.pauseT = txt(this, BX + BW / 2, BY + BH / 2, 'PAUSED', 40, GOLD).setOrigin(0.5).setDepth(D.panel); this.pauseS = mono(this, BX + BW / 2, BY + BH / 2 + 34, 'the floor waits · no actions while paused · P or ▶ to resume', 11, INK).setOrigin(0.5).setDepth(D.panel); } }
+      else { [this.pauseVeil, this.pauseT, this.pauseS].forEach(o => o && o.destroy()); this.pauseVeil = this.pauseT = this.pauseS = null; }
+    }
+    // AUTO: the next wave is called ~1.6 s after the floor is held (power-user request) — off by default, hotkey A
+    toggleAuto() { this.auto = !this.auto; this.btnAuto.bg.setTexture(this.auto ? 'ui_btnHot' : 'ui_btn'); this.btnAuto.t.setColor(this.auto ? '#0b0e15' : GOLD); this.btnAuto.t.setText(this.auto ? 'AUTO ✓' : 'AUTO'); this.toast(this.auto ? 'AUTO-SEND ON — waves roll as soon as the floor is held' : 'AUTO-SEND OFF', 1400); AUD.play('ui'); if (this.auto && !this.core.waveActive && !this.core.over) this.sendWave(); }
+    maxUpgrade() { const c = this.core; let n = 0; while (this.selTid != null) { const r = CS.upgrade(c, this.selTid); if (!r.ok) break; n++; } if (n) { AUD.play('upgrade'); const t = c.turrets.find(x => x.tid === this.selTid); if (t) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); this.openSel(this.selTid); } else { AUD.play('deny'); this.toast(c.turrets.find(x => x.tid === this.selTid) && c.turrets.find(x => x.tid === this.selTid).tier >= CS.TIERS ? 'ALREADY MAX TIER' : 'NOT ENOUGH COIN', 1000); } }
 
     // ---------------------------------------------------------------- selection panel
     openSel(tid) {
@@ -257,17 +286,20 @@
       const x = px + 150 > RAIL_X - 20 ? px - 150 : px + 150, y = Math.max(BY + 110, Math.min(H - 110, py));
       const rr = SR(st.range); this.selRing.setPosition(px, py).setScale(rr * 2 / 128).setVisible(rr > 0);
       const panel = this.add.nineslice(x, y, 'ui_panel', undefined, 260, 200, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
+      this.selRect = { x0: x - 130, y0: y - 100, x1: x + 130, y1: y + 100 }; // scene pointer handlers must not fall through the panel onto the board
       const title = txt(this, x, y - 82, sp.title + ' · T' + t.tier, 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
       const m = this.gunMods[t.def];
       const info = mono(this, x, y - 40, ['DMG ' + st.dmg.toFixed(1) + ' · ROF ' + st.rof.toFixed(2) + '/s', 'RANGE ' + (st.range * K / CELL).toFixed(1) + ' cells' + (t.gilded ? ' · GILDED +10%' : ''), 'KILLS ' + (t.kills || 0) + ' · DEALT ' + Math.round(t.dealt || 0), m ? 'IRON: ' + m.gunName : (t.auraDmg ? 'RALLIED' : '')].join('\n'), 11, INK, { align: 'center' }).setOrigin(0.5).setDepth(D.panel + 1);
       const up = t.tier < CS.TIERS ? CS.tierCost(def, t.tier + 1) : null;
-      const b1 = button(this, x - 62, y + 42, 116, 32, up ? 'UPGRADE ' + up + '⛁' : 'MAX TIER', () => this.doUpgrade(), { hot: !!up && this.core.coins >= up, size: 11, depth: D.panel + 1 });
+      const b1 = button(this, x - 74, y + 42, 100, 32, up ? 'UP ' + up + '⛁' : 'MAX TIER', () => this.doUpgrade(), { hot: !!up && this.core.coins >= up, size: 11, depth: D.panel + 1 });
+      const bMax = button(this, x + 8, y + 42, 54, 32, 'MAX', () => this.maxUpgrade(), { size: 10, depth: D.panel + 1, color: up ? GOLD : DIM });
       const refund = Math.round(def.cost * 0.7 + (t.tier > 1 ? CS.tierCost(def, 2) * 0.7 : 0) + (t.tier > 2 ? CS.tierCost(def, 3) * 0.7 : 0));
-      const b2 = button(this, x + 62, y + 42, 116, 32, 'SELL ' + refund + '⛁', () => this.doSell(), { size: 11, depth: D.panel + 1 });
+      const b2 = button(this, x + 82, y + 42, 84, 32, 'SELL ' + refund + '⛁', () => this.doSell(), { size: 10, depth: D.panel + 1 });
       const b3 = button(this, x, y + 80, 240, 28, 'PRIORITY: ' + (t.priority || 'first').toUpperCase(), () => { CS.cyclePriority(this.core, tid); this.openSel(tid); }, { size: 10, depth: D.panel + 1 });
-      this.selPanel = [panel, title, info, b1, b2, b3];
+      this.selPanel = [panel, title, info, b1, bMax, b2, b3];
     }
-    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } this.selTid = null; this.selRing.setVisible(false); }
+    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } this.selRect = null; this.selTid = null; this.selRing.setVisible(false); }
+    overUI(p) { const r = this.selRect; return !!(r && p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1); }
     doUpgrade() { const r = CS.upgrade(this.core, this.selTid); if (r.ok) { AUD.play('upgrade'); const t = this.core.turrets.find(x => x.tid === this.selTid); if (t) this.puff(SX(t.x), SY(t.y) - 20, 0xe8c576); this.openSel(this.selTid); } else { AUD.play('deny'); this.toast(r.err || 'NOT ENOUGH COIN', 1000); } }
     doSell() { const r = CS.sell(this.core, this.selTid); if (r.ok) { AUD.play('sell'); this.closeSel(); } }
 
@@ -283,6 +315,8 @@
         if (this.acc > 0.5) this.acc = 0.5;
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
+      // adaptive score: intensity from the floor state, throttled to 4 Hz
+      if ((this.musicT = (this.musicT || 0) + dtMs) > 250) { this.musicT = 0; const boss = c.enemies.some(e => e.boss); const I = c.waveActive ? Math.min(1, 0.3 + 0.45 * Math.min(1, c.enemies.length / 14) + 0.25 * (c.floor.endless ? Math.min(1, c.wave / 12) : c.wave / c.floor.waves)) : 0.08; AUD.setState({ scene: 'battle', floor: c.floorId, intensity: I, active: !!c.waveActive, boss, danger: c.markers > 0 && c.markers <= 5 }); }
       if (this.lightning != null) { if (Math.random() < 0.0015) { this.cameras.main.flash(180, 220, 230, 255, false); } }
       // dmg texts drift
       for (let i = this.dmgTexts.length - 1; i >= 0; i--) { const d = this.dmgTexts[i]; d.y -= 0.6 * this.speed; if (time > d.die) { d.destroy(); this.dmgTexts.splice(i, 1); } }
@@ -441,7 +475,7 @@
           case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.cameras.main.shake(300, 0.008); AUD.play('boss_die'); } else AUD.play('die'); break; }
           case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.cameras.main.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
           case 'wave_start': this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
-          case 'wave_clear': { this.banner('FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); break; }
+          case 'wave_clear': { this.banner('FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
           case 'mint': { const t = c.turrets.find(x => x.tid === ev.tid); if (t) { this.coinPop(SX(t.x), SY(t.y) - 30, ev.amount); AUD.play('mint'); } break; }
           case 'place': break;
@@ -534,7 +568,7 @@
       if (this.opts.mode === 'campaign' && win) setStars(c.floorId, this.opts.difficulty, st);
       if (this.opts.mode === 'endless') { const b = parseInt(LS.get('cs_pit_best') || '0', 10); if (c.wave > b) LS.set('cs_pit_best', String(c.wave)); }
       if (this.opts.mode === 'daily' && this.opts.contract) { const k = 'cs_daily_' + this.opts.contract.date; const b = parseInt(LS.get(k) || '0', 10); if (sc > b) LS.set(k, String(sc)); }
-      AUD.play(win ? 'win' : 'lose');
+      AUD.setState({ scene: 'results', intensity: 0, active: false, boss: false, danger: false }); AUD.play(win ? 'win' : 'lose');
       const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.72).setDepth(D.overlay).setInteractive();
       const panel = this.add.nineslice(W / 2, H / 2, 'ui_panel', undefined, 560, 420, 14, 14, 14, 14).setDepth(D.overlay + 1);
       txt(this, W / 2, H / 2 - 160, win ? (c.floor.endless ? 'THE PIT TOOK YOU' : 'FLOOR HELD') : 'ACCOUNT CLOSED', 34, win ? GOLD : RED).setOrigin(0.5).setDepth(D.overlay + 2);

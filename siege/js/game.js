@@ -64,8 +64,11 @@
   function txt(scene, x, y, s, size, color, extra) {
     return scene.add.text(x, y, s, Object.assign({ fontFamily: FONT, fontSize: size + 'px', color: color || INK }, extra || {}));
   }
+  // Consolas has no ⛁ (U+26C1) — the coin glyph only exists in the display face — so mono text swaps it for ¤ (Latin-1, everywhere)
+  const MONO_FIX = v => (typeof v === 'string' ? v.replace(/⛁/g, '¤') : v);
   function mono(scene, x, y, s, size, color, extra) {
-    return scene.add.text(x, y, s, Object.assign({ fontFamily: MONO, fontSize: size + 'px', color: color || INK }, extra || {}));
+    const t = scene.add.text(x, y, MONO_FIX(s), Object.assign({ fontFamily: MONO, fontSize: size + 'px', color: color || INK }, extra || {}));
+    const orig = t.setText.bind(t); t.setText = v => orig(Array.isArray(v) ? v.map(MONO_FIX) : MONO_FIX(v)); return t;
   }
   function nine(scene, key, x, y, w, h, depth) {
     const n = ART.ui && ART.ui.NINE ? ART.ui.NINE : { left: 14, top: 14, right: 14, bottom: 14 };
@@ -100,6 +103,12 @@
     }
     async bakeAll(prog) {
       const tex = this.textures;
+      // The display face MUST be resident before anything is baked — every canvas baker (title sign,
+      // neon, cards) measures and paints with it; on a slow link the woff2 can land AFTER Boot starts
+      // and the fallback face would be baked in forever. Wait for it (bounded), then re-measure the boot text.
+      prog(0.02, 'WAKING THE HOUSE FONT');
+      try { if (document.fonts && document.fonts.load) await Promise.race([Promise.all([document.fonts.load('58px "Black Ops One"'), document.fonts.load('bold 22px "Black Ops One"')]), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
+      this.children.list.forEach(o => { if (o.type === 'Text') o.updateText(); });
       const addSheet = (key, sheet) => { if (tex.exists(key)) tex.remove(key); tex.addSpriteSheet(key, sheet.canvas, { frameWidth: sheet.frameW, frameHeight: sheet.frameH }); };
       const addCanvas = (key, cv) => { if (tex.exists(key)) tex.remove(key); tex.addCanvas(key, cv); };
       // 1. operatives
@@ -244,24 +253,33 @@
       const ct = CS.dailyContract(todayUTC());
       const dailyBest = parseInt(LS.get('cs_daily_' + ct.date) || '0', 10);
       button(this, W / 2 + 250, by, 220, 46, 'DAILY CONTRACT', () => this.scene.start('Battle', { floor: ct.floor, difficulty: ct.difficulty, mode: 'daily', mutators: ct.mutators, seed: ct.seed, contract: ct }), { sub: 'F' + ct.floor + ' · ' + CS.DIFFS[ct.difficulty].name + (dailyBest ? ' · BEST ' + dailyBest : '') });
-      // wallet + accounts + mute
-      this.walletT = mono(this, W - 16, H - 16, walletLine(), 11, GREEN).setOrigin(1, 1).setDepth(20).setInteractive({ useHandCursor: true });
-      this.walletT.on('pointerdown', async () => {
-        AUD.unlock(); if (ART.wallet) return; this.walletT.setText('CHECKING THE LEDGER…');
-        const r = await CS_NFT.connect(); if (r.ok) ART.wallet = r;
-        // the player may have entered the hotel while the wallet prompt was open — the Text is destroyed then (glTexture deref)
-        if (!this.sys.isActive() || !this.walletT.active) return;
-        this.walletT.setText(r.ok ? walletLine() : r.err);
-      });
+      // wallet — a REAL button under the menu (the old bottom-right text line was invisible to players)
+      walletButton(this, W / 2, by + 60, 360, 36, () => this.scene.restart());
       const unlockedLines = ACCOUNTS.reduce((n, fl, i) => n + Math.min(3, starsAny(i + 1)), 0);
       const acct = mono(this, 16, H - 16, '⬦ HOUSE ACCOUNTS ' + unlockedLines + '/18', 12, GOLD).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       acct.on('pointerdown', () => { AUD.unlock(); AUD.play('ui'); showAccounts(this); });
       const muteT = mono(this, 200, H - 16, AUD.isMuted() ? '♪ OFF' : '♪ ON', 12, DIM).setOrigin(0, 1).setDepth(20).setInteractive({ useHandCursor: true });
       muteT.on('pointerdown', () => { AUD.unlock(); muteT.setText(AUD.toggleMute() ? '♪ OFF' : '♪ ON'); });
-      mono(this, W / 2, H - 46, 'A KJP GEAR OPERATION · YOUR WICK ARSENAL GUNS IN THEIR HANDS', 10, DIM).setOrigin(0.5).setDepth(20);
+      mono(this, W - 16, H - 16, 'A KJP GEAR OPERATION · YOUR WICK ARSENAL GUNS IN THEIR HANDS · FREE PLAY', 10, DIM).setOrigin(1, 1).setDepth(20);
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.92, 0.32); } catch (e) {}
       this.input.once('pointerdown', () => AUD.unlock());
+      AUD.setState({ scene: 'title', intensity: 0, active: false, danger: false, boss: false });
     }
+  }
+  // CONNECT WALLET button used by Title / Floors / Battle. Shows the connected summary once the
+  // ledger is read; `onDone(res)` lets the scene re-skin itself. Fails soft with the reason on the button.
+  function walletButton(scene, x, y, w, h, onDone, opts) {
+    opts = opts || {};
+    const label = () => ART.wallet ? '✓ GEAR ×' + ART.wallet.count + ' · GUNS ×' + ART.wallet.gunCount + (ART.wallet.gunTypes.length ? ' — IRON ON THE FLOOR' : '') : '🔗 CONNECT WALLET · USE YOUR ARSENAL GUNS';
+    const b = button(scene, x, y, w, h, label(), async () => {
+      if (ART.wallet || b.busy) return; b.busy = true; b.t.setText('CHECKING THE LEDGER…');
+      const r = await CS_NFT.connect(); if (r.ok) ART.wallet = r;
+      b.busy = false;
+      if (!scene.sys.isActive() || !b.t.active) return;
+      if (r.ok) { b.t.setText(label()); if (onDone) onDone(r); }
+      else { b.t.setText(r.err === 'NO WALLET DETECTED' ? 'NO WALLET — OPEN THIS PAGE IN METAMASK / RABBY' : r.err); scene.time.delayedCall(3200, () => { if (b.t.active) b.t.setText(label()); }); }
+    }, { hot: !ART.wallet, size: opts.size || 12, depth: opts.depth || 20, color: ART.wallet ? GREEN : GOLD });
+    return b;
   }
   // The title sign, baked at 2× and displayed at 0.5 so the tubes are smooth. Two textures: the sign itself
   // (glass tubes with a hot core + brass SIEGE) and a separate soft glow layer the scene pulses additively.
@@ -366,21 +384,26 @@
           card.on('pointerdown', () => { AUD.unlock(); AUD.play('ui'); this.scene.start('Battle', { floor: f.id, difficulty: this.diff, doctrine: this.doct, mode: 'campaign' }); });
         }
       });
-      // difficulty + doctrine
-      const dy = 640;
-      mono(this, 120, dy - 34, 'TERMS', 11, DIM);
+      // difficulty + perk — every option explained ON the button so nobody has to click around to learn what it does.
+      // Defaults (OPERATIVE + HOUSE STANDARD) are the intended game: a new player can just pick a floor.
+      const dy = 634;
+      const DIFF_SUB = { operative: 'STANDARD · intended game', ghost: 'HARDER · +35% enemy hp', babayaga: 'BRUTAL · +80% enemy hp' };
+      const DOCT_SUB = { none: 'no trade-off · default', iron: '+8% dmg / −20⛁ bonus', ledger: '+10% bounty / −5% rof', doors: '+4 markers / −40⛁ start' };
+      mono(this, 120, dy - 40, 'DIFFICULTY  — how hard they come up the stairs', 11, DIM);
       let dx = 120;
-      this.diffBtns = {};
-      for (const d in CS.DIFFS) { const on = d === this.diff; const b = button(this, dx + 80, dy, 160, 36, CS.DIFFS[d].name, () => { this.diff = d; LS.set('cs_diff', d); this.scene.restart(); }, { hot: on, size: 13 }); dx += 172; }
-      mono(this, 700, dy - 34, 'DOCTRINE (every option is a trade-off)', 11, DIM);
-      let ox = 700; for (const k in CS.DOCTRINES) { const on = k === this.doct; button(this, ox + 66, dy, 132, 36, CS.DOCTRINES[k].name, () => { this.doct = k; LS.set('cs_doct', k); this.scene.restart(); }, { hot: on, size: 11 }); ox += 140; }
-      mono(this, W / 2, dy + 40, CS.DOCTRINES[this.doct].desc + '   ·   ' + (this.diff === 'operative' ? 'the intended experience' : this.diff === 'ghost' ? 'they hit harder, you start lighter' : 'the boogeyman terms'), 11, INK).setOrigin(0.5);
+      for (const d in CS.DIFFS) { const on = d === this.diff; button(this, dx + 80, dy, 160, 36, CS.DIFFS[d].name, () => { this.diff = d; LS.set('cs_diff', d); this.scene.restart(); }, { hot: on, size: 13, sub: DIFF_SUB[d] }); dx += 172; }
+      mono(this, 700, dy - 40, 'PERK (optional)  — one trade-off for the whole floor, or leave HOUSE STANDARD', 11, DIM);
+      let ox = 700; for (const k in CS.DOCTRINES) { const on = k === this.doct; button(this, ox + 66, dy, 132, 36, CS.DOCTRINES[k].name, () => { this.doct = k; LS.set('cs_doct', k); this.scene.restart(); }, { hot: on, size: 11, sub: DOCT_SUB[k] }); ox += 140; }
+      const chosen = (this.diff === 'operative' && this.doct === 'none') ? 'YOUR TERMS: OPERATIVE · HOUSE STANDARD — the intended experience. New here? Just pick a floor.' : 'YOUR TERMS: ' + CS.DIFFS[this.diff].name + ' · ' + CS.DOCTRINES[this.doct].name + ' — ' + CS.DOCTRINES[this.doct].desc.toLowerCase();
+      mono(this, W / 2, dy + 52, chosen, 11, GOLD).setOrigin(0.5);
+      mono(this, W / 2, dy + 70, 'ON THE FLOOR: pick an operative card (1-9), click a tile to post them, SEND WAVE. Upgrade with U, MAX with M, AUTO-SEND with A. Connect a wallet to put your Arsenal guns in their hands.', 10, DIM).setOrigin(0.5);
       button(this, 90, H - 40, 140, 36, '◂ LOBBY', () => this.scene.start('Title'), { size: 12 });
-      mono(this, W - 16, H - 16, walletLine(), 10, GREEN).setOrigin(1, 1);
+      walletButton(this, W - 196, 46, 352, 32, () => this.scene.restart(), { size: 11 });
+      AUD.setState({ scene: 'floors', intensity: 0, active: false, danger: false, boss: false });
       try { this.cameras.main.postFX.addVignette(0.5, 0.5, 0.95, 0.28); } catch (e) {}
     }
   }
 
   window.__CS_SCENES = { Boot, Title, Floors };
-  window.__CS_SHARED = { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, nine, button, HOTKEYS, starsFor, setStars, starsAny, gunModsFor, walletLine, todayUTC };
+  window.__CS_SHARED = { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, nine, button, HOTKEYS, starsFor, setStars, starsAny, gunModsFor, walletLine, todayUTC };
 })();
