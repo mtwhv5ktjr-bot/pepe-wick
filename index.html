@@ -315,6 +315,31 @@ section{position:relative}
   .row p{grid-column:2}
 }
 
+/* ── tip jar ──────────────────────────────────────────── */
+.tip{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);
+  gap:clamp(20px,4vw,54px);align-items:start}
+.tip .say h3{font-weight:600;letter-spacing:-.03em;line-height:1.1;
+  font-size:clamp(22px,3.2vw,38px);margin-bottom:14px}
+.tip .say h3 .o{color:var(--hot)}
+.tip .say p{color:var(--mute);font-size:14.5px;line-height:1.55;letter-spacing:-.008em;max-width:46ch}
+.jar{border:1px solid var(--line);background:#0d0d0d;padding:clamp(18px,2.4vw,26px)}
+.jar .lbl{color:var(--dim);display:block;margin-bottom:9px}
+.jar .addr{font-family:var(--mono);font-size:clamp(11px,1.35vw,14px);letter-spacing:.02em;
+  line-height:1.55;word-break:break-all;color:var(--ink);
+  border:1px dashed var(--line-2);padding:12px 14px;background:#0a0a0a;user-select:all}
+.jar .amts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.jar .amt{height:38px;padding:0 15px;border:1px solid var(--line-2);background:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);
+  transition:background .09s linear,color .09s linear,border-color .09s linear}
+.jar .amt:hover{background:var(--ink);color:#000;border-color:var(--ink)}
+.jar .amt.sel{background:var(--hot);border-color:var(--hot);color:#000}
+.jar .go{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.jar .btn.hot{border-color:var(--hot);color:var(--hot)}
+.jar .btn.hot:hover{background:var(--hot);color:#000}
+.jar .note{color:var(--dim);margin-top:14px;display:block;line-height:1.6}
+.jar .note b{color:var(--mute);font-weight:500}
+@media (max-width:860px){ .tip{grid-template-columns:1fr} }
+
 /* ── footer ───────────────────────────────────────────── */
 footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
 /* 13.2vw is measured, not picked: "ARCADE ALLEY" in Geist 600 runs ~6.5x its
@@ -595,6 +620,34 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
     </div>
   </section>
 
+  <section id="tipSec" hidden>
+    <div class="rule mono">
+      <span class="idx">(03)</span><span class="ttl">Feed the machine</span><span class="rt">tip jar · PLS</span>
+    </div>
+    <div class="tip">
+      <div class="say">
+        <h3>Everything here is free to play. The <span class="o">quarters</span> are optional.</h3>
+        <p>No ads, no paywall, no launcher. If the arcade has eaten a few hours of your
+           life and you want to throw something in the jar, this is where it goes —
+           straight to the wallet, no middleman, no account.</p>
+      </div>
+      <div class="jar">
+        <span class="lbl mono">Tip jar · PulseChain</span>
+        <div class="addr" id="tipAddr">—</div>
+        <div class="amts" id="tipAmts">
+          <button class="amt" data-pls="100000">100K PLS</button>
+          <button class="amt sel" data-pls="500000">500K PLS</button>
+          <button class="amt" data-pls="1000000">1M PLS</button>
+        </div>
+        <div class="go">
+          <a class="btn hot" id="tipSend" href="#" role="button">Drop a coin <span class="ar">→</span></a>
+          <button class="btn" id="tipCopy">Copy address</button>
+        </div>
+        <span class="note mono" id="tipNote">Opens your wallet on <b>PulseChain</b>. Nothing is sent until you confirm.</span>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <footer class="shell">
@@ -866,6 +919,85 @@ footer{padding:clamp(60px,9vw,120px) 0 34px;position:relative;z-index:3}
 
   // expose for the preview harness only
   window.__hall = { cabs, draw, resize, get camZ(){ return camZ; } };
+})();
+</script>
+
+<script>
+/* ── tip jar ──────────────────────────────────────────────────────────────
+   Put the receiving address here. Until it is a real address the whole
+   section stays hidden — a tip jar pointing at nothing would quietly eat
+   people's money, so it must be impossible to ship half-configured.
+   Use a wallet you actually control. Do NOT use a bridge signer address
+   (those must stay empty) or the bridge treasury (that is toll revenue).   */
+const TIP_ADDRESS = '0xA1CD7D97455EDd40aA5c30d0482f0e8b94f31D54';   // e.g. '0xAbC...123'  — PulseChain (chain 369)
+
+(function(){
+  const sec = document.getElementById('tipSec');
+  if (!sec) return;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(TIP_ADDRESS)) {
+    console.info('[tip jar] no TIP_ADDRESS set — section hidden on purpose.');
+    return;                       // stays hidden; nothing to send to
+  }
+  sec.hidden = false;
+
+  const PULSE_HEX = '0x171';      // 369
+  const addrEl = document.getElementById('tipAddr');
+  const note   = document.getElementById('tipNote');
+  const amts   = document.getElementById('tipAmts');
+  const send   = document.getElementById('tipSend');
+  const copy   = document.getElementById('tipCopy');
+  addrEl.textContent = TIP_ADDRESS;
+
+  let pls = 500000;
+  amts.addEventListener('click', e => {
+    const b = e.target.closest('.amt'); if (!b) return;
+    amts.querySelectorAll('.amt').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel');
+    pls = Number(b.dataset.pls);
+  });
+
+  const say = (msg, hot) => { note.innerHTML = msg; note.style.color = hot ? 'var(--hot)' : ''; };
+
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(TIP_ADDRESS);
+      say('Address copied. Thank you.');
+    } catch {
+      // clipboard is blocked in some contexts — selecting the text still works
+      say('Copy blocked by the browser — the address above is selectable.', true);
+    }
+  });
+
+  send.addEventListener('click', async e => {
+    e.preventDefault();
+    const eth = window.ethereum;
+    if (!eth) { say('No wallet detected — copy the address instead.', true); return; }
+    try {
+      const accounts = await eth.request({ method: 'eth_requestAccounts' });
+      try {
+        await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: PULSE_HEX }] });
+      } catch (sw) {
+        if (sw && (sw.code === 4902 || /unrecognized/i.test(sw.message || ''))) {
+          await eth.request({ method: 'wallet_addEthereumChain', params: [{
+            chainId: PULSE_HEX, chainName: 'PulseChain',
+            rpcUrls: ['https://rpc.pulsechain.com'],
+            blockExplorerUrls: ['https://scan.pulsechain.com'],
+            nativeCurrency: { name: 'Pulse', symbol: 'PLS', decimals: 18 },
+          }] });
+        } else throw sw;
+      }
+      // whole PLS -> wei, as an exact integer (no float rounding at 1e18)
+      const wei = (BigInt(pls) * (10n ** 18n)).toString(16);
+      const hash = await eth.request({ method: 'eth_sendTransaction', params: [{
+        from: accounts[0], to: TIP_ADDRESS, value: '0x' + wei,
+      }] });
+      say('Sent — thank you. <b>' + hash.slice(0, 10) + '…' + hash.slice(-6) + '</b>');
+    } catch (err) {
+      const code = err && err.code;
+      if (code === 4001) say('Cancelled — no problem.');
+      else say('Wallet said: ' + String((err && (err.message || err.reason)) || err).slice(0, 90), true);
+    }
+  });
 })();
 </script>
 </body>

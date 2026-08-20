@@ -353,7 +353,10 @@
     return { ok: true, cost, level: st.house[kind], hit };
   }
   function wagerWave(st) {
-    if (st.over || st.waveActive) return { ok: false, err: 'MID-WAVE' };
+    // No waveActive guard: the contract is consumed at the NEXT wave start
+    // (see waveWager below), so signing during a wave is well defined. AUTO
+    // leaves only a 1.6s gap between waves, which made this unbuyable.
+    if (st.over) return { ok: false, err: 'FLOOR CLOSED' };
     if (st.wager) return { ok: false, err: 'ALREADY SIGNED' };
     const cost = wagerCost(st);
     if (st.coins < cost) return { ok: false, err: 'INSUFFICIENT COIN' };

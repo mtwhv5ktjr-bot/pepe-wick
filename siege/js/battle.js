@@ -394,10 +394,10 @@
       O.push(bank);
       // one row = title+cost button, a plain-English line, and a live level read-out
       const RW = MOBILE ? 700 : 300, RX = MOBILE ? x - 120 : x - 66, RS = MOBILE ? 1.55 : 1;
-      const row = (yy0, label, cost, sub, level, enabled, onBuy) => {
+      const row = (yy0, label, cost, sub, level, enabled, onBuy, disabledWhy) => {
         const yy = MOBILE ? y - 250 + (yy0 - (y - 116)) * RS : yy0;
         const afford = c.coins >= cost && enabled;
-        const bb = button(this, RX, yy, RW, 30, label + '  —  ' + cost + '⛁', () => { if (!enabled) { AUD.play('deny'); this.toast('BETWEEN WAVES ONLY', 1100); return; } onBuy(); }, { size: 11, depth: D.panel + 1, hot: afford, color: afford ? GOLD : DIM });
+        const bb = button(this, RX, yy, RW, 30, label + '  —  ' + cost + '⛁', () => { if (!enabled) { AUD.play('deny'); this.toast(disabledWhy || 'NOT AVAILABLE', 1100); return; } onBuy(); }, { size: 11, depth: D.panel + 1, hot: afford, color: afford ? GOLD : DIM });
         O.push(bb.bg, bb.t);
         O.push(mono(this, RX - RW / 2, yy + (MOBILE ? 34 : 20), sub, 9, DIM).setOrigin(0, 0.5).setDepth(D.panel + 1));
         O.push(mono(this, RX + RW / 2 + (MOBILE ? 130 : 90), yy, level, 10, level && level !== '—' ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
@@ -410,7 +410,7 @@
       row(y + 46, 'SANCTION', CS.houseCost(c, 'sanction'), 'instant: 35% max hp off everything on the floor', H.sanction ? '×' + H.sanction : '—', true, () => buy('sanction'));
       row(y + 100, 'SIGN A MARKER', CS.markerCost(c), 'buy a life back · never buys score or stars', c.markersBought ? '×' + c.markersBought : '—', true, () => { const r = CS.buyMarker(c); if (r.ok) { AUD.play('coin'); this.toast('MARKER SIGNED · ' + r.markers + ' ON THE BOOK', 1600); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err, 1200); } });
       const signed = !!c.wager;
-      row(y + 154, signed ? '◉ CONTRACT SIGNED' : 'DOUBLE OR NOTHING', CS.wagerCost(c), '+45% bodies, tougher — pays DOUBLE bounty & 2.5× bonus', signed ? 'NEXT WAVE' : '—', !c.waveActive && !signed, () => { const r = CS.wagerWave(c); if (r.ok) { AUD.play('wave'); this.shake(0, 0.004); this.toast('CONTRACT SIGNED — THEY COME HARDER, THEY PAY DOUBLE', 2000); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'SIGN IT BETWEEN WAVES' : r.err, 1300); } });
+      row(y + 154, signed ? '◉ CONTRACT SIGNED' : 'DOUBLE OR NOTHING', CS.wagerCost(c), '+45% bodies, tougher — pays DOUBLE bounty & 2.5× bonus', signed ? 'NEXT WAVE' : '—', !signed, () => { const r = CS.wagerWave(c); if (r.ok) { AUD.play('wave'); this.shake(0, 0.004); this.toast('CONTRACT SIGNED — THEY COME HARDER, THEY PAY DOUBLE', 2000); this.syncHud(); this.rebuildHouse(); } else { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'SIGN IT BETWEEN WAVES' : r.err, 1300); } });
       O.push(mono(this, x - 216, y + 186, 'TIER 4 — THE HIGH TABLE: click any operative → UP (3.6× its price)', 9, GOLD).setOrigin(0, 0.5).setDepth(D.panel + 1));
       const bc = button(this, x + 172, y + 186, 90, 24, 'CLOSE', () => this.toggleHouse(), { size: 10, depth: D.panel + 1 });
       O.push(bc.bg, bc.t);
@@ -718,13 +718,21 @@
       const dist = Math.hypot(tx - mx, ty - my);
       const tr = this.add.image(mx, my, 'fx_tracer').setOrigin(1, 0.5).setRotation(ang).setTint(acc).setBlendMode(Phaser.BlendModes.ADD).setDepth(D.air).setScale(Math.max(0.5, Math.min(2.2, dist / 48)), 1); this.fxLayer.add(tr);
       this.tweens.add({ targets: tr, x: tx, y: ty, alpha: 0, duration: Math.min(140, 40 + dist * 0.25), onComplete: () => tr.destroy() });
-      // shell casing
+      // shell casing - decoration only, so it is the first thing to drop on a
+      // fast weapon. At gatling rof (8/s base, more with BLACK MARKET AMMO) one
+      // casing per shot per turret is thousands of sprites a minute.
+      tv.lastShell = tv.lastShell || 0;
+      const fastGun = def.id === 'smg' || def.id === 'gatling';
+      if (!fastGun || this.time.now - tv.lastShell > 110) { tv.lastShell = this.time.now;
       const sh = this.add.image(mx - (tv.faceLeft ? -8 : 8), my, 'fx_shell').setDepth(D.air).setAngle(Math.random() * 90); this.tweens.add({ targets: sh, x: sh.x - (tv.faceLeft ? -18 : 18) - Math.random() * 10, y: sh.y + 34, angle: sh.angle + 220, alpha: 0, duration: 420, ease: 'Quad.easeIn', onComplete: () => sh.destroy() });
+      }
       // hit
       // hit: flash the victim, sparks + damage number (dmg numbers throttled per turret so SMG/gatling don't wallpaper the floor)
       const v = e ? this.enemyViews.get(e.eid) : null;
       if (v) v.hitT = 2;
-      this.sparks(tx, ty, ev.crit ? 0xffd23f : acc, ev.crit ? 8 : def.id === 'shotgun' ? 6 : 3);
+      // sparks scale with rate of fire too: a crit still pops, but a sustained
+      // gatling stream drops to a single particle instead of three.
+      this.sparks(tx, ty, ev.crit ? 0xffd23f : acc, ev.crit ? 8 : def.id === 'shotgun' ? 6 : fastGun ? 1 : 3);
       const now = this.time.now; tv.lastNum = tv.lastNum || 0;
       if (ev.crit || now - tv.lastNum > (MOBILE ? 420 : (def.id === 'smg' || def.id === 'gatling' ? 260 : 90))) { tv.lastNum = now; this.dmgText(tx + (Math.random() * 16 - 8), ty - 12, (ev.crit ? '✦' : '') + shown, ev.crit ? GOLD : '#e6ecf5'); }
       if (ev.crit) { const cr = this.add.image(tx, ty, 'fx_crit').setBlendMode(Phaser.BlendModes.ADD).setDepth(D.air); this.fxLayer.add(cr); this.tweens.add({ targets: cr, scale: 1.8, alpha: 0, duration: 260, onComplete: () => cr.destroy() }); }
