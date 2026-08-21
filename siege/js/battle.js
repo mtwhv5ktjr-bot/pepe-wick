@@ -7,7 +7,7 @@
   const S = window.__CS_SHARED;
   const { W, H, CELL, HUD_H, BX, BY, BW, BH, RAIL_X, K, LS, walletButton, MOBILE, US, TRAY, inBoard, SX, SY, SR, FONT, MONO, GOLD, GOLD_D, DIM, GREEN, RED, INK, ART, mk, txt, mono, button, HOTKEYS, starsFor, setStars, gunModsFor, walletLine } = S;
   const AUD = window.CS_AUDIO;
-  const D = { floor: 0, floorFx: 1, deco: 2, ground: 3, shadow: 4, world: 10, /* world objects sort within 10..2000 by y */ air: 2100, fxTop: 2200, hud: 3000, panel: 3100, banner: 3200, overlay: 4000 };
+  const D = { floor: 0, floorFx: 1, deco: 2, ground: 3, shadow: 4, world: 10, /* world objects sort within 10..2000 by y */ air: 2100, fxTop: 2200, hud: 3000, banner: 3200, panel: 3400, overlay: 4000 };
   const ANIM_MS = 1000 / 60;
   const ENEMY_SCALE = { goon: 0.62, runner: 0.58, heavy: 0.7, shield: 0.66, hound: 1.0, medic: 0.6, ghost: 0.62, boss: 0.74 };
   const SHOT_SFX = { pistol: 'shot_pistol', smg: 'shot_smg', shotgun: 'shot_shotgun', sniper: 'shot_sniper', gatling: 'shot_gatling', tesla: 'tesla', keg: 'lob' };
@@ -20,7 +20,7 @@
     init(opts) {
       this.opts = opts || { floor: 1, difficulty: 'operative', mode: 'campaign' };
       // Phaser reuses this scene instance across start/restart — every per-run flag must be reset here, not assumed fresh
-      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null; this.setPanel = null; this.trauma = 0; this.groupPri = {}; this.groupMode = {}; this.housePanel = null;
+      this.finished = false; this.grain = null; this.lightning = null; this.floorImg = null; this.fallbackG = null; this.pauseVeil = this.pauseT = this.pauseS = null; this.auto = false; this.hoverP = null; this.selRect = null; this.setPanel = null; this.uiGuard = 0; this.trauma = 0; this.groupPri = {}; this.groupMode = {}; this.housePanel = null;
       this.propSprites = []; this.ambientObjs = []; this.bannerObjs = null; this.selPanel = null; this.tipPanel = null; this.dmgTexts = [];
     }
     async create() {
@@ -331,7 +331,10 @@
       const cd = this.cards[this.selDef]; if (cd) cd.cost.setColor(afford ? GOLD : RED);
     }
     onDown(p) {
-      if (this.finished || !inBoard(p) || this.overUI(p)) return; // results panel up / off-board / selection panel
+      if (this.finished) return;
+      if (this.uiGuard > 0) return;                       // the click that closed a menu stops here
+      if (this.anyPanel() && !this.overUI(p)) { this.closePanels(); return; }  // tap outside a menu = close it
+      if (!inBoard(p) || this.overUI(p)) return;
       if (this.paused) { this.toast('PAUSED — NO ACTIONS', 800); AUD.play('deny'); return; }
       const cell = this.cellFromPointer(p); if (!cell) return;
       const here = CS.turretAt(this.core, cell.c, cell.r);
@@ -367,7 +370,8 @@
     // House rule: no pausing mid-wave (only between waves), and a paused floor takes NO actions — pause is a break, not a planning exploit
     // ⚙ popover: music, gunfire and screen shake are three independent switches (all persisted)
     toggleSettings() {
-      if (this.setPanel) { this.setPanel.forEach(o => o.destroy()); this.setPanel = null; this.selRect = null; return; }
+      if (this.setPanel) { this.closePanels(); return; }
+      this.closePanels();
       const x = MOBILE ? W / 2 : W / 2 - 300, y = MOBILE ? BY + BH / 2 : HUD_H + 88, wdt = Math.round(260 * US), hgt = Math.round(148 * US);
       const panel = this.add.nineslice(x, y, 'ui_panel', undefined, wdt, hgt, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel);
       const title = txt(this, x, y - 52, 'HOUSE SETTINGS', 14, GOLD).setOrigin(0.5).setDepth(D.panel + 1);
@@ -384,8 +388,8 @@
     // THE HOUSE: the late-game coin sink. Everything here is priced out of reach early and escalates,
     // so a rich bank turns into difficulty + score instead of a victory lap.
     toggleHouse() {
-      if (this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; this.selRect = null; return; }
-      this.closeSel();
+      if (this.housePanel) { this.closePanels(); return; }
+      this.closePanels();
       const c = this.core, PW = MOBILE ? 1080 : 470, PH = MOBILE ? 620 : 400, x = MOBILE ? W / 2 : W / 2 - 40, y = MOBILE ? BY + BH / 2 : BY + PH / 2 + 18;
       const O = [];
       O.push(this.add.nineslice(x, y, 'ui_panel', undefined, PW, PH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.panel));
@@ -438,7 +442,7 @@
 
     // ---------------------------------------------------------------- selection panel
     openSel(tid) {
-      this.closeSel(); this.selTid = tid;
+      this.closePanels('sel'); this.closeSel(); this.selTid = tid;
       const t = this.core.turrets.find(x => x.tid === tid); if (!t) return;
       const def = CS.TURRETS[t.def], sp = CS_CAST.OPERATIVES[t.def], st = CS.turretStats(this.core, t);
       const px = SX(t.x), py = SY(t.y);
@@ -482,7 +486,18 @@
       objs.push(mono(this, x, y + 102, groupOn ? 'new ' + nm + 's you post follow this order too' : 'tap to command every ' + nm + ' at once', 9, groupOn ? GREEN : DIM).setOrigin(0.5).setDepth(D.panel + 1));
       this.selPanel = objs;
     }
-    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; } if (!this.setPanel && !this.housePanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); if (this.deadRing) this.deadRing.setVisible(false); }
+    // ONE menu at a time. Closing anything also arms a two-frame input guard: the pointerdown that
+    // closed a panel used to fall straight through to the board and select the unit underneath it.
+    closePanels(keep) {
+      if (keep !== 'set' && this.setPanel) { this.setPanel.forEach(o => o.destroy()); this.setPanel = null; }
+      if (keep !== 'house' && this.housePanel) { this.housePanel.forEach(o => o.destroy()); this.housePanel = null; }
+      if (keep !== 'sel' && this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; this.selTid = null; this.selRing.setVisible(false); if (this.deadRing) this.deadRing.setVisible(false); }
+      if (!this.setPanel && !this.housePanel && !this.selPanel) this.selRect = null;
+      this.uiGuard = 2;
+      this.hideCardTip();
+    }
+    anyPanel() { return !!(this.setPanel || this.housePanel || this.selPanel); }
+    closeSel() { if (this.selPanel) { this.selPanel.forEach(o => o.destroy()); this.selPanel = null; this.uiGuard = 2; } if (!this.setPanel && !this.housePanel) this.selRect = null; this.selTid = null; this.selRing.setVisible(false); if (this.deadRing) this.deadRing.setVisible(false); }
     overUI(p) { const r = this.selRect; return !!(r && p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1); }
     // core only exposes cyclePriority(), so walk the cycle (first → strong → last) until it matches
     setPriority(tid, want) { const t = this.core.turrets.find(x => x.tid === tid); if (!t) return; for (let i = 0; i < 3 && (t.priority || 'first') !== want; i++) CS.cyclePriority(this.core, tid); }
@@ -511,6 +526,7 @@
         if (this.acc > 0.5) this.acc = 0.5;
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
+      if (this.uiGuard > 0) this.uiGuard--;
       this.updateShake(time, Math.min(0.1, dtMs / 1000));
       // THE HOUSE lights up the moment the bank can actually buy something (players were missing it entirely)
       if (this.btnHouse && !this.finished) { const rich = c.coins >= Math.min(CS.houseCost(c, 'sanction'), CS.markerCost(c)); if (rich !== this.houseHot) { this.houseHot = rich; this.btnHouse.bg.setTexture(rich ? 'ui_btnHot' : 'ui_btn'); this.btnHouse.t.setColor(rich ? '#0b0e15' : GOLD).setText(rich ? 'THE HOUSE ⛁' : 'THE HOUSE'); } }
