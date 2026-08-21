@@ -255,7 +255,21 @@
     showCardTip(c) {
       this.hideCardTip();
       const def = c.def, sp = CS_CAST.OPERATIVES[def.id], m = this.gunMods[def.id];
+      const ROLE = {
+        pistol: 'ROLE: cheap generalist · plate armour blunts it',
+        smg: 'ROLE: shreds runners & hounds · useless against plate',
+        shotgun: 'ROLE: crowd answer — hits everything around the mark',
+        sniper: 'ROLE: PIERCES PLATE · slow — cannot cover a swarm alone',
+        keg: 'ROLE: SHAPED BLAST — half of plate ignored, oils the floor · leads badly vs runners',
+        tesla: 'ROLE: PIERCES PLATE, slows, SHOCKS (+25% taken), reveals ghosts',
+        mint: 'ROLE: pays for the crew — no gun',
+        banner: 'ROLE: rally aura for its neighbours — no gun',
+        gatling: 'ROLE: holder ordnance — raw rate of fire',
+      };
       const lines = [sp.title + ' — ' + def.name, sp.line, def.desc, ''];
+      if (ROLE[def.id]) lines.push(ROLE[def.id]);
+      lines.push('CROSSFIRE: 3 different types on one mark = +35% damage');
+      lines.push('');
       lines.push('DMG ' + def.dmg + ' · ROF ' + def.rof + '/s · RANGE ' + Math.round(def.range * K / CELL * 10) / 10 + ' cells' + (def.kind !== 'hitscan' ? ' · ' + def.kind.toUpperCase() : ''));
       if (m) lines.push('YOUR ' + m.gunName + ' · ×' + m.dmgMult + ' dmg · ×' + m.rofMult + ' rof' + (m.rangeMult !== 1 ? ' · ×' + m.rangeMult + ' range' : ''));
       if (this.groupPri[def.id]) lines.push('STANDING ORDER — TARGET ' + PRI_NAME[this.groupPri[def.id]]);
@@ -569,13 +583,15 @@
         // hp bar
         const frac = Math.max(0, e.hp / e.maxHp);
         const by = Math.max(HUD_H + 8, y - v.h - 6); // row-0 walkers: never tuck the bar under the HUD
+        if (v.plate) v.plate.setPosition(x - 34, by).setVisible(v.hpBg.visible);
         v.hpBg.setPosition(x, by).setVisible(frac < 1 || e.boss); v.hp.setPosition(x - 28, by).setVisible(v.hpBg.visible).setScale(frac, 1);
         v.hp.setTint(e.boss ? 0xff5c5c : frac > 0.5 ? 0x7cf9a5 : frac > 0.25 ? 0xffd75e : 0xff5c5c);
         // states
         const cloak = e.cloaked;
         v.body.setAlpha(cloak ? 0.28 : 1); if (v.gun) v.gun.setAlpha(cloak ? 0.28 : 1);
         v.shimmer.setPosition(x, y - v.h / 2).setVisible(!!e.type.match(/ghost/) && cloak);
-        if (e.slowT > 0) { v.body.setTint(0x9ff3ff); v.slow.setPosition(x, y + 4).setVisible(true).setAngle(v.slow.angle + 2); } else { if (v.hitT > 0) { v.hitT -= 1; v.body.setTint(0xffffff); } else v.body.clearTint(); v.slow.setVisible(false); }
+        if (e.oilT > 0 && !(v.hitT > 0)) v.body.setTint(0x6f8a5a);
+        if (e.slowT > 0) { v.body.setTint(e.shockT > 0 ? 0xbdf7ff : 0x9ff3ff); v.slow.setPosition(x, y + 4).setVisible(true).setAngle(v.slow.angle + 2); } else { if (v.hitT > 0) { v.hitT -= 1; v.body.setTint(0xffffff); } else v.body.clearTint(); v.slow.setVisible(false); }
         if (v.hitT > 0 && !(e.slowT > 0)) v.body.setTintFill(0xffffff);
         v.name.setPosition(x, Math.max(HUD_H + 8, y - v.h - 6) - 14).setVisible(!!e.boss);
       }
@@ -598,14 +614,15 @@
       let gun = null;
       if (ch.gun && ART.guns[ch.gun]) { const g = ART.guns[ch.gun]; gun = this.add.image(x, y, 'gun_' + ch.gun).setOrigin(g.grip.x / g.w, g.grip.y / g.h).setScale(scale * 1.15).setDepth(D.world + y + 1); }
       const name = txt(this, x, y - h - 20, e.boss ? (this.core.floor.endless ? 'THE COLLECTOR' : CS.BOSS_NAMES[(CS.stageOf(this.core.floorId) - 1) % CS.BOSS_NAMES.length]) : '', 12, RED).setOrigin(0.5).setDepth(D.air + 2).setVisible(!!e.boss);
-      const v = { body, shadow, hpBg, hp, shimmer, slow, gun, name, ch, h, hitT: 0, lastX: null, type };
+      const plate = e.arm > 0.2 ? mono(this, x - 34, y, '▣', 11, '#9fb4e0').setOrigin(0.5).setDepth(D.air + 2).setVisible(false) : null;
+      const v = { body, shadow, hpBg, hp, shimmer, slow, gun, name, plate, ch, h, hitT: 0, lastX: null, type };
       this.enemyViews.set(e.eid, v);
       if (e.boss) { this.banner(name.text, 'BOSS ON THE FLOOR', 1800); AUD.play('boss'); }
       return v;
     }
     killEnemyView(eid, v) {
       this.enemyViews.delete(eid);
-      [v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o.destroy());
+      [v.hpBg, v.hp, v.shimmer, v.slow, v.name, v.plate].forEach(o => o && o.destroy());
       // fall + fade (death) — leaks are removed by the leak handler instantly
       const dir = v.body.flipX ? 1 : -1;
       this.tweens.add({ targets: v.body, angle: 82 * dir, y: v.body.y + 6, alpha: 0, duration: 520, ease: 'Quad.easeIn', onComplete: () => v.body.destroy() });
@@ -690,9 +707,26 @@
             const scorch = this.add.image(x, y + 4, 'fx_bulletHole').setDepth(D.floorFx).setScale(R / 4, R / 6).setAlpha(0.42); this.tweens.add({ targets: scorch, alpha: 0, delay: 5000, duration: 3000, onComplete: () => scorch.destroy() });
             this.shake(140, 0.005); AUD.play('splash'); break; }
           case 'die': { const v = this.enemyViews.get(ev.eid); const x = v ? v.body.x : SX(ev.x), y = v ? v.body.y - v.h * 0.5 : SY(ev.y) - 20; this.sparks(x, y, 0xffd27f, 6); this.coinPop(x, y, ev.bounty); if (ev.boss) { this.ringFx(x, y, 0xffd23f, 3); this.shake(300, 0.008); AUD.play('boss_die'); } else { AUD.play('die'); if (ev.type === 'heavy' || ev.type === 'shield') this.shake(0, 0.0022); } break; }
-          case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
+          case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name, v.plate].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
           case 'wager': this.banner('CONTRACT SIGNED', 'THE NEXT WAVE COMES HARDER — AND PAYS DOUBLE', 1800); break;
           case 'marker_bought': break;
+          case 'armored': { // your shots are bouncing — say so, once in a while, on the target itself
+            const v = this.enemyViews.get(ev.eid);
+            if (v && this.time.now - (this.lastClang || 0) > 320) {
+              this.lastClang = this.time.now;
+              this.dmgText(v.body.x + 10, v.body.y - v.h - 4, 'PLATE −' + ev.pct + '%', '#9fb4e0');
+              this.sparks(v.body.x, v.body.y - v.h * 0.5, 0x9fb4e0, 3);
+              if (!this.taughtPlate) { this.taughtPlate = true; this.toast('PLATE ARMOUR — SNIPER & COIL PIERCE IT, KEGS BLAST THROUGH', 2600); }
+            }
+            break; }
+          case 'crossfire': { // three different guns on one mark = +35% for everyone
+            const v = this.enemyViews.get(ev.eid);
+            if (v) {
+              this.dmgText(v.body.x - 6, v.body.y - v.h - 18, 'CROSSFIRE ×' + ev.kinds, GOLD);
+              this.ringFx(v.body.x, v.body.y - v.h * 0.5, 0xe8c576, 1.5);
+              if (!this.taughtXf) { this.taughtXf = true; this.toast('CROSSFIRE — 3 DIFFERENT OPERATIVE TYPES ON ONE MARK: +35% DAMAGE', 2800); }
+            }
+            break; }
           case 'wave_start': this.shake(0, ev.wager ? 0.008 : 0.0035);
             if (ev.rule && ev.rule.id !== this.lastRule) { this.lastRule = ev.rule.id; if (ev.rule.id !== 'clean') this.banner('HOUSE RULE — ' + ev.rule.name, ev.rule.desc.toUpperCase(), 2200); } if (ev.wager) this.banner('DOUBLE OR NOTHING', ev.count + ' COMING UP THE STAIRS · DOUBLE BOUNTIES', 1900); else this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
           case 'wave_clear': { this.banner(ev.wager ? 'CONTRACT HELD' : 'FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.wager ? ' · DOUBLE OR NOTHING PAID' : '') + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }

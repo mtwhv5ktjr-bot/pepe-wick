@@ -274,7 +274,7 @@
   const TURRETS = {
     pistol: {
       id: 'pistol', name: 'SENTRY 9', desc: 'Reliable service pistol on a swivel. Cheap, honest work.',
-      cost: 100, range: 150, rof: 1.8, dmg: 13, kind: 'hitscan', hotkey: '1',
+      cost: 100, range: 150, rof: 1.8, dmg: 13, kind: 'hitscan', hotkey: '1',   // cheap generalist — ARMOUR is what stops spamming it, not price
     },
     smg: {
       id: 'smg', name: 'SMG NEST', desc: 'Hoses down runners and hounds. Short reach, no manners.',
@@ -282,7 +282,7 @@
     },
     shotgun: {
       id: 'shotgun', name: 'THE DOORMAN', desc: 'Buckshot burst. Hits everything crowding the primary mark.',
-      cost: 230, range: 112, rof: 0.9, dmg: 9, kind: 'burst', burstRadius: 64, burstMax: 5, hotkey: '3',
+      cost: 230, range: 112, rof: 0.95, dmg: 12, kind: 'burst', burstRadius: 68, burstMax: 6, hotkey: '3',  // crowd answer: was the worst buy in the game
     },
     sniper: {
       id: 'sniper', name: 'PENTHOUSE RIFLE', desc: 'Ignores armor, crits, and outranges everything. Slow. Pick its window.',
@@ -290,11 +290,11 @@
     },
     keg: {
       id: 'keg', name: 'KEG MORTAR', desc: 'Lobbed powder keg. Splash hits cloaked marks. Blind up close.',
-      cost: 270, range: 265, minRange: 90, rof: 0.5, dmg: 34, kind: 'lob', splash: 72, lobTime: 0.5, hotkey: '5',
+      cost: 290, range: 230, minRange: 90, rof: 0.5, dmg: 38, kind: 'lob', splash: 62, lobTime: 0.85, hotkey: '5',  // slow shell: crowds yes, runners no
     },
     tesla: {
       id: 'tesla', name: 'JAMMER COIL', desc: 'Chain arc. Ignores armor, slows, and burns ghost cloaks.',
-      cost: 250, range: 132, rof: 1.2, dmg: 11, kind: 'chain', chain: 4, chainRange: 70, slow: 0.35, slowDur: 1.2, pierceArmor: true, reveals: true, hotkey: '6',
+      cost: 250, range: 132, rof: 1.2, dmg: 11, kind: 'chain', chain: 3, chainRange: 70, chainFalloff: 0.65, slow: 0.35, slowDur: 1.2, pierceArmor: true, reveals: true, shock: 2.5, hotkey: '6',
     },
     mint: {
       id: 'mint', name: 'GOLD MINT', desc: 'Presses coins mid-wave. Does not fight. Earns.',
@@ -372,19 +372,19 @@
   const ENEMIES = {
     goon:   { id: 'goon',   name: 'GOON',      hp: 40,  spd: 62,  bounty: 8,  armor: 0, r: 15 },
     runner: { id: 'runner', name: 'RUNNER',    hp: 27,  spd: 108, bounty: 9,  armor: 0, r: 13 },
-    heavy:  { id: 'heavy',  name: 'HEAVY',     hp: 155, spd: 38,  bounty: 18, armor: 3, r: 19 },
-    shield: { id: 'shield', name: 'SHIELD',    hp: 95,  spd: 54,  bounty: 16, armor: 10, r: 17 },
+    heavy:  { id: 'heavy',  name: 'HEAVY',     hp: 155, spd: 38,  bounty: 18, armor: 3, arm: 0.45, r: 19 },
+    shield: { id: 'shield', name: 'SHIELD',    hp: 95,  spd: 54,  bounty: 16, armor: 10, arm: 0.75, r: 17, leak: 2 }, // a shield crew walking the floor costs TWO markers — armour must be answered, not tanked
     hound:  { id: 'hound',  name: 'HOUND',     hp: 15,  spd: 138, bounty: 5,  armor: 0, r: 11 },
     medic:  { id: 'medic',  name: 'MEDIC',     hp: 75,  spd: 50,  bounty: 20, armor: 0, r: 15, healRate: 12, healRadius: 92 },
     ghost:  { id: 'ghost',  name: 'GHOST',     hp: 62,  spd: 72,  bounty: 22, armor: 0, r: 15, cloak: { vis: 1.6, hid: 1.4 } },
-    boss:   { id: 'boss',   name: 'BOSS',      hp: 900, spd: 30,  bounty: 150, armor: 5, r: 26, leak: 5, boss: true },
+    boss:   { id: 'boss',   name: 'BOSS',      hp: 900, spd: 30,  bounty: 150, armor: 5, arm: 0.35, r: 26, leak: 5, boss: true },
   };
   // THE PIT rotates a house rule every 4 waves — the endless run stops being one long ramp
   const PIT_RULES = [
     { id: 'clean',   name: 'CLEAN HOUSE',   desc: 'no rule — just them and you' },
     { id: 'fog',     name: 'SMOKE',         desc: 'sightlines cut: −25% turret range', range: 0.75 },
     { id: 'rush',    name: 'THE RUSH',      desc: 'they sprint: +22% speed, +30% bounty', spd: 1.22, bounty: 1.3 },
-    { id: 'armor',   name: 'PLATE CARRIERS', desc: 'every body armoured: +3 armor', armor: 3 },
+    { id: 'armor',   name: 'PLATE CARRIERS', desc: 'every body armoured — bring pierce or blast', armor: 3 },
     { id: 'horde',   name: 'THE HORDE',     desc: 'twice the bodies, two-thirds the health', count: 2, hp: 0.66 },
     { id: 'iron',    name: 'IRON NIGHT',    desc: 'tougher crews: +35% health, +25% bounty', hp: 1.35, bounty: 1.25 },
   ];
@@ -443,13 +443,15 @@
     }
     // scripted ramp with per-floor type introductions
     g('goon', 4 + I * 1.1, Math.max(0.4, 0.9 - I * 0.02));
-    if (W >= (F === 1 ? 3 : 2)) g('runner', 2 + I * 0.5, 0.55, 2.5);
-    if (W >= (F === 1 ? 6 : 3)) g('hound', 3 + I * 0.4, 0.3, 4);
-    if (F >= 2 && W >= 4) g('heavy', I * 0.22, 1.5, 5);
-    if (F >= 3 && W >= 5) g('medic', Math.max(1, I * 0.12), 2.0, 6);
-    if (F >= 4 && W >= 4) g('shield', Math.max(1, I * 0.15), 1.4, 7);
-    if (F >= 5 && W >= 4) g('ghost', Math.max(1, I * 0.15), 1.3, 8);
-    if (W % 4 === 0 && W > 0) g('runner', 4 + I * 0.4, 0.32, 9); // rush punctuation
+    const swarm = 1 + 0.05 * (stageOf(F) - 1);
+    if (W >= (F === 1 ? 3 : 2)) g('runner', (2 + I * 0.5) * swarm, 0.5, 2.5);
+    if (W >= (F === 1 ? 6 : 3)) g('hound', (3 + I * 0.45) * swarm, 0.28, 4);
+    if (stageOf(F) >= 2 && W >= 4) g('heavy', Math.max(1, I * 0.26), 1.5, 5);
+    if (stageOf(F) >= 3 && W >= 5) g('medic', Math.max(1, I * 0.14), 2.0, 6);
+    if (stageOf(F) >= 3 && W >= 5) g('shield', Math.max(1, I * 0.20), 1.4, 7);          // armour is the answer to spam — it has to be common
+    if (stageOf(F) >= 4 && W >= 6) g('ghost', Math.max(1, I * 0.16), 1.3, 8);
+    if (stageOf(F) >= 5 && W >= 7) { const esc = Math.max(1, Math.round(I * 0.08)); g('shield', esc, 0.9, 10); g('medic', esc, 0.9, 10.4); } // ESCORT: shields walking their medic
+    if (W % 4 === 0 && W >= 6) g('runner', 4 + I * 0.4, 0.32, 9); // rush punctuation — not while the crew is still two guns
     return groups;
   }
   function floorById(id) { return FLOORS.find(f => f.id === id); }
@@ -640,10 +642,11 @@
     const e = {
       eid: st.nextEid++, type, name: base.name,
       hp, maxHp: hp, spd: base.spd * spdScale, baseSpd: base.spd * spdScale,
-      armor: base.armor + (rule && rule.armor ? rule.armor : 0),
+      armor: base.armor,
+      arm: (() => { const base0 = base.arm || (rule && rule.armor ? 0.30 : 0); if (!base0) return 0; const depth = st.floor.endless ? st.wave / 4 : (st.stage || 1); return Math.min(0.88, base0 + 0.015 * (depth - 1) + (rule && rule.armor ? 0.12 : 0)); })(),
       bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1) * (rule && rule.bounty ? rule.bounty : 1)),
       r: base.r, d: -st.rng() * 8, // slight stagger back from spawn
-      slowT: 0, slowF: 1, cloaked: false, cloakT: base.cloak ? base.cloak.vis * (0.5 + st.rng() * 0.5) : 0,
+      slowT: 0, slowF: 1, shockT: 0, oilT: 0, hitBy: null, xfT: -9, cloaked: false, cloakT: base.cloak ? base.cloak.vis * (0.5 + st.rng() * 0.5) : 0,
       healRate: base.healRate || 0, healRadius: base.healRadius || 0,
       leak: base.leak || 1, boss: !!base.boss,
       dashT: 0,
@@ -676,12 +679,32 @@
     return best;
   }
 
+  const CROSSFIRE_WINDOW = 3.0, CROSSFIRE_NEED = 3, CROSSFIRE_MULT = 1.35;
   function damage(st, e, amount, opts) {
     if (e.hp <= 0) return false; // corpses never re-pay bounty or re-emit 'die'
     opts = opts || {};
     let dmg = amount;
     if (e.marked) { dmg *= 1.25; e.marked = false; emit(st, { t: 'mark_hit', eid: e.eid }); } // EXCOM mark consumed
-    if (!opts.pierceArmor && e.armor > 0) dmg = Math.max(1, dmg - e.armor);
+    // SHOCKED (tesla) and OILED (keg) are debuffs any operative can cash in — that is the point of them
+    if (e.shockT > 0) dmg *= 1.25;
+    if (e.oilT > 0) dmg *= 1.30;
+    // CROSSFIRE: three DIFFERENT operative types on the same mark inside 3s → +35% for everyone
+    if (opts.srcT) {
+      e.hitBy = e.hitBy || {};
+      e.hitBy[opts.srcT.def] = st.time;
+      let kinds = 0; for (const k in e.hitBy) if (st.time - e.hitBy[k] <= CROSSFIRE_WINDOW) kinds++; else delete e.hitBy[k];
+      if (kinds >= CROSSFIRE_NEED) {
+        dmg *= CROSSFIRE_MULT;
+        if (!(e.xfT > st.time - 0.6)) { e.xfT = st.time; emit(st, { t: 'crossfire', eid: e.eid, kinds }); }
+      }
+    }
+    if (!opts.pierceArmor && e.arm > 0) {
+      const eff = e.arm * (1 - (opts.armorBypass || 0));   // keg blast is shaped: half the plate does not count
+      const before = dmg;
+      dmg = Math.max(1, dmg * (1 - eff));
+      // tell the player their shots are bouncing — this used to be silent
+      if (before - dmg > before * 0.35) emit(st, { t: 'armored', eid: e.eid, blocked: Math.round(before - dmg), pct: Math.round(eff * 100) });
+    }
     e.hp -= dmg;
     if (opts.srcT) opts.srcT.dealt += dmg;
     const mod = opts.srcT ? st.gunMods[opts.srcT.def] : (opts.mods || null);
@@ -764,12 +787,13 @@
       }
       const pts = hits.map(e => { const p = posAlong(st.parsed, e.d); return { x: p.x, y: p.y }; });
       emit(st, { t: 'chain', tid: t.tid, x: t.x, y: t.y, points: pts });
-      for (const e of hits) {
+      hits.forEach((e, hop) => {
         e.slowT = Math.max(e.slowT, def.slowDur);
         e.slowF = 1 - def.slow;
         if (def.reveals && e.cloaked) { e.cloaked = false; e.cloakT = ENEMIES.ghost.cloak.vis; emit(st, { t: 'reveal', eid: e.eid }); }
-        damage(st, e, S.dmg, { pierceArmor: true, srcT: t });
-      }
+      if (def.shock) e.shockT = def.shock; // JAMMER COIL leaves them twitching: +25% damage taken from ANY source
+        damage(st, e, S.dmg * Math.pow(def.chainFalloff || 1, hop), { pierceArmor: true, srcT: t }); // each jump lands softer
+      });
     } else if (def.kind === 'lob') {
       st.lobs.push({ x: t.x, y: t.y, tx: tp.x, ty: tp.y, tAir: def.lobTime, dmg: S.dmg, splash: def.splash, srcTid: t.tid });
       emit(st, { t: 'lob', tid: t.tid, x: t.x, y: t.y, tx: tp.x, ty: tp.y, air: def.lobTime });
@@ -807,7 +831,9 @@
       }
       // slow decay
       if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 1; }
-      let spd = e.baseSpd * e.slowF;
+      if (e.shockT > 0) e.shockT -= dt;
+      if (e.oilT > 0) e.oilT -= dt;
+      let spd = e.baseSpd * e.slowF * (e.oilT > 0 ? 0.8 : 1); // oiled floors slow them too
       if (e.director && e.dashT > 0) spd *= 3;
       e.d += spd * dt;
       // medic heal
@@ -846,7 +872,8 @@
           const dd = Math.hypot(p.x - L.tx, p.y - L.ty);
           if (dd <= L.splash) {
             const fall = 1 - 0.5 * (dd / L.splash);
-            damage(st, e, L.dmg * fall, { pierceArmor: false, srcT }); // splash hits cloaked (no targeting needed)
+            damage(st, e, L.dmg * fall * (e.boss ? 0.5 : 1), { pierceArmor: false, armorBypass: 0.5, srcT }); // shaped charge: half the plate ignored; still hits cloaked
+            e.oilT = 3.0; // powder and oil: +30% damage taken and slower for 3s — the keg is a force multiplier, not a killer
           }
         }
       }
@@ -923,8 +950,8 @@
     opts = opts || {};
     const st = createGame(opts);
     const banned = st.mutators.banned;
-    const buyOrder = ['pistol', 'pistol', 'sniper', 'smg', 'tesla', 'keg', 'sniper', 'tesla', 'banner', 'smg', 'sniper', 'keg', 'tesla', 'sniper', 'smg', 'sniper']
-      .filter(d => d !== banned);
+    const buyOrder = (opts.buyOrder || ['pistol', 'pistol', 'sniper', 'smg', 'tesla', 'keg', 'sniper', 'tesla', 'banner', 'smg', 'sniper', 'keg', 'tesla', 'sniper', 'smg', 'sniper']
+      ).filter(d => d !== banned);
     let buyIdx = 0;
     // precompute best cells by pistol-range coverage
     const spots = [];
