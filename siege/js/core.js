@@ -594,20 +594,50 @@
     const doc = st.doctrine || DOCTRINES.none;
     return {
       dmg: def.dmg * m.dmg * (1 + (t.auraDmg || 0)) * (t.gilded ? 1.1 : 1)
-        * (mod ? mod.dmgMult : 1) * (doc.dmg || 1) * (1 + ((st.house && st.house.dmg) || 0)),
+        * (mod ? mod.dmgMult : 1) * (doc.dmg || 1) * (1 + ((st.house && st.house.dmg) || 0)) * (st.term && st.term.dmg ? st.term.dmg : 1),
       rof: def.rof * m.rof * (1 + (t.auraRate || 0))
         * (mod ? mod.rofMult : 1) * (doc.rof || 1) * (1 + ((st.house && st.house.rof) || 0)),
-      range: def.range * m.range * (mod ? mod.rangeMult : 1) * (st.ruleNow && st.ruleNow.range ? st.ruleNow.range : 1),
+      range: def.range * m.range * (mod ? mod.rangeMult : 1) * (st.ruleNow && st.ruleNow.range ? st.ruleNow.range : 1) * (st.term && st.term.range ? st.term.range : 1),
       income: (def.income || 0) * m.income,
     };
   }
 
   // ---------- WAVES ----------
+  const TERMS = [
+    { id: 'clean',    name: 'CLEAN WORK',      desc: 'no amendments',                         },
+    { id: 'purse',    name: 'A FATTER PURSE',  desc: '+60% bounty · they bring +25% health',  bounty: 1.6, hp: 1.25 },
+    { id: 'crowd',    name: 'THE CROWD',       desc: '+50% bodies · +40% wave bonus',         count: 1.5, bonus: 1.4 },
+    { id: 'plated',   name: 'PLATE NIGHT',     desc: 'everyone armoured · +80% bounty',       plate: 0.25, bounty: 1.8 },
+    { id: 'quick',    name: 'IN A HURRY',      desc: 'they move +25% · double wave bonus',    spd: 1.25, bonus: 2.0 },
+    { id: 'quiet',    name: 'KEEP IT QUIET',   desc: 'no leaks allowed: a leak ends the floor · +900⛁ if held', perfect: true, purse: 900 },
+    { id: 'lean',     name: 'LEAN CREW',       desc: 'your damage −15% this wave · +700⛁ now', dmg: 0.85, purse: 700 },
+    { id: 'blind',    name: 'LIGHTS OUT',      desc: 'turret range −20% · +500⛁ now',          range: 0.8, purse: 500 },
+  ];
+  function offerTerms(st, force) { // three: always CLEAN + two seeded picks; idempotent until the wave starts
+    if (st.offers && !force) return st.offers;
+    const pool = TERMS.slice(1);
+    const rng = mulberry32((st.floorId * 7919 + st.wave * 104729 + (st.seed || 0)) >>> 0);
+    const picked = [];
+    while (picked.length < 2 && pool.length) picked.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+    st.offers = [TERMS[0], ...picked];
+    st.termChosen = null;
+    return st.offers;
+  }
+  function chooseTerm(st, idx) {
+    if (st.waveActive || st.over) return { ok: false, err: 'MID-WAVE' };
+    if (!st.offers) offerTerms(st);
+    const t = st.offers[idx]; if (!t) return { ok: false, err: 'NO SUCH TERM' };
+    st.termChosen = t;
+    if (t.purse) { st.coins += t.purse; st.stats.earned += t.purse; }
+    emit(st, { t: 'term', id: t.id, name: t.name, desc: t.desc, purse: t.purse || 0 });
+    return { ok: true, term: t };
+  }
   function startWave(st) {
     if (st.over || st.waveActive) return { ok: false };
     st.wave++;
     st.waveWager = !!st.wager; st.wager = false; // the signed contract applies to THIS wave only
     st.ruleNow = activeRule(st);                    // THE PIT: which house rule is running this wave
+    st.term = st.termChosen || null; st.termChosen = null; st.offers = null; // the night's terms apply to THIS wave
     st.waveActive = true;
     st.stats.startTime = st.time;
     for (const t of st.turrets) { t.incomeClock = 0; t.incomeTicks = 0; } // mint cap resets per wave
@@ -617,7 +647,7 @@
     const comp = waveComp(st.floorId, st.wave, st.rng);
     const lvl = hpLevel(st, st.wave) + (st.waveWager ? 3 : 0); // a signed contract comes up the stairs angrier
     for (const grp of comp) {
-      const ruleCount = st.ruleNow && st.ruleNow.count ? st.ruleNow.count : 1;
+      const ruleCount = (st.ruleNow && st.ruleNow.count ? st.ruleNow.count : 1) * (st.term && st.term.count ? st.term.count : 1);
       const count = Math.round((st.waveWager ? Math.max(grp.n, grp.n * 1.45) : grp.n) * ruleCount);
       for (let i = 0; i < count; i++) {
         st.spawnQueue.push({ at: st.time + grp.delay + i * grp.gap * (st.waveWager ? 0.8 : 1), type: grp.type, lvl });
@@ -631,8 +661,9 @@
   function spawnEnemy(st, type, lvl) {
     const base = ENEMIES[type];
     const rule = st.ruleNow || null; // THE PIT house rule for this wave
-    const hpScale = (1 + 0.11 * (lvl - 1)) * st.diff.hp * (st.mutators.enemyHp || 1) * (rule && rule.hp ? rule.hp : 1);
-    const spdScale = Math.min(1.35, 1 + 0.005 * (lvl - 1)) * st.diff.spd * (st.mutators.enemySpeed || 1) * (rule && rule.spd ? rule.spd : 1);
+    const term = st.term || null;
+    const hpScale = (1 + 0.11 * (lvl - 1)) * st.diff.hp * (st.mutators.enemyHp || 1) * (rule && rule.hp ? rule.hp : 1) * (term && term.hp ? term.hp : 1);
+    const spdScale = Math.min(1.5, 1 + 0.005 * (lvl - 1)) * st.diff.spd * (st.mutators.enemySpeed || 1) * (rule && rule.spd ? rule.spd : 1) * (term && term.spd ? term.spd : 1);
     let hp = base.hp * hpScale;
     if (base.boss) {
       hp = st.floor.endless
@@ -643,8 +674,8 @@
       eid: st.nextEid++, type, name: base.name,
       hp, maxHp: hp, spd: base.spd * spdScale, baseSpd: base.spd * spdScale,
       armor: base.armor,
-      arm: (() => { const base0 = base.arm || (rule && rule.armor ? 0.30 : 0); if (!base0) return 0; const depth = st.floor.endless ? st.wave / 4 : (st.stage || 1); return Math.min(0.88, base0 + 0.015 * (depth - 1) + (rule && rule.armor ? 0.12 : 0)); })(),
-      bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1) * (rule && rule.bounty ? rule.bounty : 1)),
+      arm: (() => { const base0 = base.arm || (rule && rule.armor ? 0.30 : 0) || (term && term.plate ? term.plate : 0); if (!base0) return 0; const depth = st.floor.endless ? st.wave / 4 : (st.stage || 1); return Math.min(0.88, base0 + 0.015 * (depth - 1) + (rule && rule.armor ? 0.12 : 0)); })(),
+      bounty: Math.round(base.bounty * st.diff.bounty * (st.mutators.bounty || 1) * (st.doctrine.bounty || 1) * (st.waveWager ? 2 : 1) * (rule && rule.bounty ? rule.bounty : 1) * (term && term.bounty ? term.bounty : 1)),
       r: base.r, d: -st.rng() * 8, // slight stagger back from spawn
       slowT: 0, slowF: 1, shockT: 0, oilT: 0, hitBy: null, xfT: -9, cloaked: false, cloakT: base.cloak ? base.cloak.vis * (0.5 + st.rng() * 0.5) : 0,
       healRate: base.healRate || 0, healRadius: base.healRadius || 0,
@@ -852,6 +883,8 @@
         e.hp = 0;
         st.markers -= e.leak;
         st.stats.leaks++;
+        // KEEP IT QUIET was signed on the promise of a clean floor — one body through ends it
+        if (st.term && st.term.perfect) { st.markers = 0; emit(st, { t: 'term_broken', name: st.term.name }); }
         emit(st, { t: 'leak', eid: e.eid, type: e.type, leak: e.leak, markers: st.markers });
       }
     }
@@ -891,10 +924,12 @@
     // wave clear
     if (st.waveActive && st.spawnQueue.length === 0 && st.enemies.length === 0) {
       st.waveActive = false;
-      const bonus = Math.round(Math.max(20, 60 + 10 * st.wave + (st.doctrine.waveBonus || 0)) * (st.waveWager ? 2.5 : 1));
+      const bonus = Math.round(Math.max(20, 60 + 10 * st.wave + (st.doctrine.waveBonus || 0)) * (st.waveWager ? 2.5 : 1) * (st.term && st.term.bonus ? st.term.bonus : 1));
       st.coins += bonus; st.stats.earned += bonus;
       st.stats.waveTimes.push(st.time - st.stats.startTime);
-      emit(st, { t: 'wave_clear', wave: st.wave, bonus, wager: !!st.waveWager });
+      if (st.term && st.term.purse && st.term.perfect) { st.coins += st.term.purse; st.stats.earned += st.term.purse; }
+      emit(st, { t: 'wave_clear', wave: st.wave, bonus, wager: !!st.waveWager, term: st.term ? st.term.name : null });
+      st.term = null;
       if (st.waveWager) { st.stats.wagersHeld = (st.stats.wagersHeld || 0) + 1; st.waveWager = false; }
       if (!st.floor.endless && st.wave >= st.floor.waves) {
         st.over = true; st.victory = true;
@@ -967,6 +1002,8 @@
     let steps = 0;
     const dt = 0.05;
     while (!st.over && steps++ < maxSteps) {
+      // sign the night's terms before calling the wave (opts.termPick: 0 = play it safe, 1 = take the risk)
+      if (!st.waveActive && !st.over) { offerTerms(st); if (!st.termChosen) chooseTerm(st, Math.min((opts.termPick || 0), st.offers.length - 1)); }
       // shop between and during waves; spend the bank BEFORE calling a wave
       let acted = false;
       if (buyIdx < buyOrder.length) {
@@ -1014,6 +1051,7 @@
     mulberry32, parseMap, posAlong, waveComp,
     createGame, step, drainEvents, place, canPlace, upgrade, sell, cyclePriority, damage,
     buyMarker, markerCost, wagerWave, wagerCost, buyHouse, houseCost, HOUSE,
+    TERMS, offerTerms, chooseTerm,
     CAMPAIGN, nextFloor, stageOf, PIT_RULES, pitRule,
     startWave, turretStats, tierCost, tierMult, turretAt, cellAt,
     stars, score, dailyContract, botPlay, coverageScore, floorById,

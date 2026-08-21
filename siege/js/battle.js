@@ -40,6 +40,7 @@
       this.buildFloor(f);
       this.buildHud();
       this.buildTray();
+      this.buildTerms();
       this.input.on('pointermove', p => this.onMove(p));
       this.input.on('pointerdown', p => { if (p.rightButtonDown()) { if (this.selDef) this.selectDef(this.selDef); this.closeSel(); return; } this.onDown(p); });
       this.input.mouse && this.input.mouse.disableContextMenu();
@@ -112,6 +113,46 @@
       for (let r = 0; r < CS.ROWS; r++) for (let c = 0; c < CS.COLS; c++) { const ch = f.map[r][c]; const x = BX + c * CELL, y = BY + r * CELL; if (ch === '#' || ch === 'S' || ch === 'E') g.fillStyle(0x5a1620, 1).fillRect(x + 4, y + 4, CELL - 8, CELL - 8); else if (ch === 'X') g.fillStyle(0x0b0e15, 1).fillRect(x + 8, y + 8, CELL - 16, CELL - 16); else if (ch === 'G') g.fillStyle(0x3a2f14, 1).fillRect(x + 2, y + 2, CELL - 4, CELL - 4); else g.lineStyle(1, 0x222b38, 0.5).strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1); }
     }
 
+    // ---------------------------------------------------------------- TONIGHT'S TERMS
+    // Between waves the house offers three terms and you take one. This is the decision layer: the floor
+    // is no longer just "place, send, repeat" — every wave you price risk against money and tempo.
+    buildTerms() {
+      this.termBtns = [];
+      this.refreshTerms();
+    }
+    // The strip is an OVERLAY along the bottom of the board, shown only between waves — the HUD strips are
+    // full and the board is static while you are choosing, so this is the one place it can live on both
+    // form factors without fighting for room.
+    refreshTerms() {
+      (this.termBtns || []).forEach(o => o.destroy()); this.termBtns = [];
+      const c = this.core; if (!c || c.over) return;
+      const offers = CS.offerTerms(c);
+      const cx = BX + BW / 2, panelH = MOBILE ? 104 : 92, cy = BY + BH - panelH / 2 - 6;
+      const wide = Math.min(MOBILE ? 330 : 300, (BW - 60) / 3), gap = MOBILE ? 14 : 16;
+      const bg = this.add.nineslice(cx, cy, 'ui_panel', undefined, wide * 3 + gap * 2 + 40, panelH, 14, 14, 14, 14).setOrigin(0.5).setDepth(D.hud + 1).setAlpha(0.96);
+      const title = mono(this, cx, cy - panelH / 2 + 14, "TONIGHT'S TERMS — TAKE ONE, THEN SEND THE WAVE", 9, GOLD).setOrigin(0.5).setDepth(D.hud + 2);
+      this.termBtns.push(bg, title);
+      const x0 = cx - (wide * 3 + gap * 2) / 2 + wide / 2;
+      offers.forEach((t, i) => {
+        const chosen = c.termChosen && c.termChosen.id === t.id;
+        const y = cy + 2;
+        const btn = button(this, x0 + i * (wide + gap), y, wide, MOBILE ? 40 : 34, t.name, () => this.takeTerm(i), { size: MOBILE ? 11 : 11, depth: D.hud + 2, hot: chosen, noScale: true });
+        const d = mono(this, x0 + i * (wide + gap), y + (MOBILE ? 28 : 26), t.desc, MOBILE ? 8 : 8, chosen ? GREEN : DIM, { align: 'center', wordWrap: { width: wide - 10 } }).setOrigin(0.5, 0).setDepth(D.hud + 2);
+        this.termBtns.push(btn.bg, btn.t, d);
+      });
+      this.showTerms(!c.waveActive);
+    }
+    takeTerm(i) {
+      const r = CS.chooseTerm(this.core, i);
+      if (!r.ok) { AUD.play('deny'); this.toast(r.err === 'MID-WAVE' ? 'TERMS ARE SIGNED BETWEEN WAVES' : r.err, 1200); return; }
+      AUD.play('ui');
+      if (r.term.purse) this.toast(r.term.name + ' — ' + r.term.purse + '⛁ ON THE TABLE', 1600);
+      else if (r.term.id !== 'clean') this.toast(r.term.name + ' — ' + r.term.desc.toUpperCase(), 1800);
+      this.refreshTerms(); this.syncHud();
+    }
+    showTerms(on) {
+      (this.termBtns || []).forEach(o => o.setVisible(on));
+    }
     // ---------------------------------------------------------------- HUD
     buildHud() {
       if (MOBILE) return this.buildHudMobile();
@@ -124,6 +165,7 @@
       for (let fs = 15; fs > 8 && this.hudFloor.width > 186; fs--) this.hudFloor.setFontSize(fs); // ⚙ starts at x=216
       this.hudWave = txt(this, W / 2 - 40, hy, '', 14, INK).setOrigin(0.5).setDepth(D.hud + 1);
       this.hudRule = mono(this, W / 2 - 40, hy + 15, '', 9, RED).setOrigin(0.5).setDepth(D.hud + 1);
+      this.hudTerm = mono(this, W / 2 - 40, hy - 15, '', 9, GOLD).setOrigin(0.5).setDepth(D.hud + 1);
       this.add.image(W - 392, hy, 'ui_coinIcon').setDepth(D.hud + 1).setScale(0.9);
       this.hudCoins = txt(this, W - 378, hy, '', 16, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.add.image(W - 268, hy, 'ui_markerIcon').setDepth(D.hud + 1).setScale(0.9);
@@ -159,6 +201,7 @@
       for (let fs = 13; fs > 8 && this.hudFloor.width > 300; fs--) this.hudFloor.setFontSize(Math.round(fs * US));
       this.hudWave = txt(this, W / 2 + 90, r1, '', 13, INK).setOrigin(0.5).setDepth(D.hud + 1);
       this.hudRule = mono(this, W / 2 + 90, r1 + 24, '', 8, RED).setOrigin(0.5).setDepth(D.hud + 1);
+      this.hudTerm = mono(this, W / 2 + 90, r1 - 18, '', 8, GOLD).setOrigin(0.5).setDepth(D.hud + 1);
       this.add.image(W - 300, r1, 'ui_coinIcon').setDepth(D.hud + 1).setScale(1.3);
       this.hudCoins = txt(this, W - 280, r1, '', 15, GOLD).setOrigin(0, 0.5).setDepth(D.hud + 1);
       this.add.image(W - 150, r1, 'ui_markerIcon').setDepth(D.hud + 1).setScale(1.3);
@@ -380,7 +423,8 @@
       if (k === 'u' || k === 'U') { if (this.selTid != null) this.doUpgrade(); }
       if (k === 's' && this.selTid != null) this.doSell();
     }
-    sendWave() { if (this.paused) { this.toast('PAUSED — UNPAUSE FIRST', 900); AUD.play('deny'); return { ok: false }; } const r = CS.startWave(this.core); if (r.ok) { AUD.play('wave'); this.hideCardTip(); } return r; }
+    sendWave() { if (!this.core.termChosen && !this.core.waveActive && !this.core.over) CS.chooseTerm(this.core, 0); // no pick = CLEAN WORK
+      if (this.paused) { this.toast('PAUSED — UNPAUSE FIRST', 900); AUD.play('deny'); return { ok: false }; } const r = CS.startWave(this.core); if (r.ok) { AUD.play('wave'); this.hideCardTip(); } return r; }
     // House rule: no pausing mid-wave (only between waves), and a paused floor takes NO actions — pause is a break, not a planning exploit
     // ⚙ popover: music, gunfire and screen shake are three independent switches (all persisted)
     toggleSettings() {
@@ -536,7 +580,8 @@
         this.acc += Math.min(0.1, dtMs / 1000) * this.speed;
         const step = 1 / 60; let n = 0;
         // CS.step() RETURNS the drained event queue (core contract) — never drain again after it
-        while (this.acc >= step && n++ < 24) { const evs = CS.step(c, step); this.acc -= step; this.handleEvents(evs); } // 24 = ×3 speed at ~8 fps still keeps up; beyond that we drop time rather than spiral
+        while (this.acc >= step && n++ < 24) { const evs = CS.step(c, step); this.acc -= step; this.handleEvents(evs); }
+        if (this.termsShown !== !c.waveActive) { this.termsShown = !c.waveActive; this.showTerms(this.termsShown); } // 24 = ×3 speed at ~8 fps still keeps up; beyond that we drop time rather than spiral
         if (this.acc > 0.5) this.acc = 0.5;
       }
       this.syncEnemies(); this.syncTurrets(); this.syncLobs(); this.syncHud();
@@ -710,6 +755,8 @@
           case 'leak': { const v = this.enemyViews.get(ev.eid); if (v) { this.enemyViews.delete(ev.eid); [v.body, v.gun, v.shadow, v.hpBg, v.hp, v.shimmer, v.slow, v.name, v.plate].forEach(o => o && o.destroy()); } this.shake(160, 0.006); this.cameras.main.flash(120, 255, 40, 40, false); this.toast('THEY MADE THE STAIRWELL  −' + (ev.leak || 1) + ' MARKER' + ((ev.leak || 1) > 1 ? 'S' : ''), 1200); AUD.play('leak'); break; }
           case 'wager': this.banner('CONTRACT SIGNED', 'THE NEXT WAVE COMES HARDER — AND PAYS DOUBLE', 1800); break;
           case 'marker_bought': break;
+          case 'term': { if (ev.id !== 'clean') this.hudTerm.setText('⚑ ' + ev.name).setColor(GOLD); else this.hudTerm.setText(''); break; }
+          case 'term_broken': { this.banner('TERMS BROKEN', ev.name + ' — ONE BODY THROUGH AND THE FLOOR IS CLOSED', 2400); break; }
           case 'armored': { // your shots are bouncing — say so, once in a while, on the target itself
             const v = this.enemyViews.get(ev.eid);
             if (v && this.time.now - (this.lastClang || 0) > 320) {
@@ -729,7 +776,7 @@
             break; }
           case 'wave_start': this.shake(0, ev.wager ? 0.008 : 0.0035);
             if (ev.rule && ev.rule.id !== this.lastRule) { this.lastRule = ev.rule.id; if (ev.rule.id !== 'clean') this.banner('HOUSE RULE — ' + ev.rule.name, ev.rule.desc.toUpperCase(), 2200); } if (ev.wager) this.banner('DOUBLE OR NOTHING', ev.count + ' COMING UP THE STAIRS · DOUBLE BOUNTIES', 1900); else this.banner('WAVE ' + ev.wave, ev.count + ' COMING UP THE STAIRS', 1500); break;
-          case 'wave_clear': { this.banner(ev.wager ? 'CONTRACT HELD' : 'FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.wager ? ' · DOUBLE OR NOTHING PAID' : '') + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
+          case 'wave_clear': { this.time.delayedCall(60, () => { if (this.sys.isActive() && !this.finished) this.refreshTerms(); }); this.banner(ev.wager ? 'CONTRACT HELD' : 'FLOOR HELD', '+' + (ev.bonus || 0) + '⛁ WAVE BONUS' + (ev.wager ? ' · DOUBLE OR NOTHING PAID' : '') + (ev.early ? ' · EARLY CALL' : ''), 1400); AUD.play('coin'); AUD.cue('clear'); if (this.auto) this.time.delayedCall(1600, () => { if (this.auto && !this.finished && this.sys.isActive() && !this.core.waveActive && !this.core.over) this.sendWave(); }); break; }
           case 'interest': this.toast('+' + ev.amount + '⛁ INTEREST', 900); break;
           case 'mint': { const t = c.turrets.find(x => x.tid === ev.tid); if (t) { this.coinPop(SX(t.x), SY(t.y) - 30, ev.amount); AUD.play('mint'); } break; }
           case 'place': break;
