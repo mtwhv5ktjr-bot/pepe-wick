@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Pond Report</title>
+<meta name="description" content="A friend's field report on compute.wick.pics: what the station actually does, what is genuinely novel, how stealable it is, and a ten-iteration roadmap.">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="The Pond Report">
+<meta property="og:description" content="What compute.wick.pics actually does, what's novel, how stealable it is, and ten iterations to make it stronger.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐸</text></svg>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Martian+Mono:wght@300..700&display=swap">
+<style>
+:root{
+  --stock:#0C110E; --raised:#121814; --ink:#E8EDE9; --ink2:#A8B3AA;
+  --hair:rgba(232,237,233,.14); --amber:#F0A868; --phos:#7FD99A;
+  --serif:'Instrument Serif',Georgia,serif;
+  --mono:'Martian Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--stock)}
+body{background:var(--stock);color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:16px}
+.wrap{max-width:760px;margin:0 auto;padding:0 clamp(20px,5vw,48px)}
+a{color:var(--ink);text-decoration-color:var(--hair);text-underline-offset:3px}
+a:hover{text-decoration-color:var(--amber)}
+a:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+
+header{padding:clamp(48px,9vh,110px) 0 0}
+.eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(3rem,8vw,4.6rem);line-height:1.02;letter-spacing:-.01em;margin-top:18px;text-wrap:balance}
+.dek{margin-top:20px;color:var(--ink2);max-width:62ch}
+.dek b{color:var(--ink);font-weight:600}
+
+.panel{margin:44px 0 0;background:var(--raised);border:1px solid var(--hair);padding:22px 26px}
+.panel .plabel{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.verdicts{list-style:none;margin-top:14px;display:flex;flex-direction:column}
+.verdicts li{display:flex;gap:14px;align-items:baseline;padding:9px 0;border-top:1px solid rgba(232,237,233,.07);font-size:.92rem;color:var(--ink2)}
+.verdicts li:first-child{border-top:0}
+.verdicts b{color:var(--ink);font-weight:600}
+.tick{flex:0 0 auto;font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;padding:2px 10px;border-radius:999px;border:1px solid var(--hair)}
+.tick.keep{color:var(--phos);border-color:rgba(127,217,154,.4)}
+.tick.fix{color:var(--amber);border-color:rgba(240,168,104,.45)}
+
+section{margin-top:clamp(56px,9vh,90px);padding-top:34px;border-top:1px solid var(--hair)}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,4vw,2.5rem);line-height:1.1;letter-spacing:-.005em;text-wrap:balance}
+h3{font-family:var(--serif);font-weight:400;font-size:1.35rem;margin-top:38px;letter-spacing:0}
+section>p, section li{color:var(--ink2)}
+section p{margin-top:14px;max-width:66ch}
+p b, li b{color:var(--ink);font-weight:600}
+p em{color:var(--ink)}
+code{font-family:var(--mono);font-size:.82em;color:var(--ink)}
+
+.ladder{list-style:none;margin-top:20px}
+.ladder li{padding:16px 0;border-top:1px solid rgba(232,237,233,.07);max-width:70ch}
+.ladder li:first-child{border-top:0}
+.ladder .rung{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);display:block;margin-bottom:5px}
+
+.tscroll{overflow-x:auto;margin-top:24px;border-top:1px solid var(--hair)}
+table{width:100%;border-collapse:collapse;min-width:620px;font-size:.88rem}
+th{font-family:var(--mono);font-weight:400;font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);text-align:left;padding:12px 18px 12px 0;vertical-align:bottom}
+td{padding:12px 18px 12px 0;border-top:1px solid rgba(232,237,233,.07);vertical-align:top;color:var(--ink2)}
+td.c{font-weight:600;color:var(--ink);white-space:nowrap}
+td.v{font-family:var(--mono);font-size:.72rem;white-space:nowrap}
+.novel{color:var(--phos)}
+.partly{color:var(--amber)}
+.commodity{color:var(--ink2)}
+
+.callout{margin-top:26px;background:var(--raised);border:1px solid var(--hair);padding:18px 22px;max-width:70ch}
+.callout .plabel{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.callout p{margin-top:8px}
+.callout.good .plabel{color:var(--phos)}
+
+.fixes{list-style:none;margin-top:18px}
+.fixes li{padding:12px 0;border-top:1px solid rgba(232,237,233,.07);max-width:70ch}
+.fixes li:first-child{border-top:0}
+
+.actors{margin-top:20px}
+.actors dt{font-family:var(--mono);font-size:.78rem;color:var(--ink);margin-top:18px}
+.actors dd{color:var(--ink2);margin-top:4px;max-width:68ch}
+
+footer{margin-top:clamp(64px,10vh,110px);border-top:1px solid var(--hair);padding:30px 0 70px;font-family:var(--mono);font-size:.72rem;color:var(--ink2);line-height:2}
+footer a{color:var(--ink2)}
+footer a:hover{color:var(--ink)}
+.srcs{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="eyebrow">A friend's field report &middot; compute.wick.pics &middot; 24 Aug 2026</p>
+  <h1>The Pond Report</h1>
+  <p class="dek">What the station actually does, whether it is new, how fast someone could take it, and what to fix &mdash; written by someone who read the code, ran the app, and checked the claims against the outside world. <b>Nothing here was changed; everything here is a recommendation.</b></p>
+
+  <div class="panel">
+    <p class="plabel">The instrument panel &middot; six readings</p>
+    <ul class="verdicts">
+      <li><span class="tick keep">sound</span><span><b>The build is honest and unusually well made.</b> Every number is live, staleness is declared, the FAQ answers skeptics preemptively, and the accessibility work is near-perfect.</span></li>
+      <li><span class="tick keep">novel</span><span><b>Three pieces are genuinely new:</b> the open chained index, non-custodial signed-ticket execution, and cross-provider standing refill. The aggregation around them is commodity.</span></li>
+      <li><span class="tick fix">exposed</span><span><b>The features are stealable in weeks; the tape is not.</b> Defense is distribution and accumulated history, not the code &mdash; and mostly hasn't been built yet.</span></li>
+      <li><span class="tick fix">deadline</span><span><b>CME lists compute futures October 5.</b> GPU price indexes are about to become a topic. The seat marked &ldquo;the open one&rdquo; is empty today and will not stay empty.</span></li>
+      <li><span class="tick fix">claim</span><span><b>One homepage superlative is falsifiable.</b> SF Compute already runs a cleared order book with limit orders. The honest, still-strong claim is <em>first non-custodial, cross-marketplace</em>.</span></li>
+      <li><span class="tick fix">door</span><span><b>pangle.online is a broken front door:</b> no TLS certificate, an insecure redirect, dropped paths &mdash; and a name ByteDance's ad network owns in search.</span></li>
+    </ul>
+  </div>
+</header>
+
+<section>
+  <p class="eyebrow">Reading one</p>
+  <h2>What it actually does.</h2>
+  <p>One Python process, one SQLite file, no external services. It polls twelve GPU rental marketplaces &mdash; Vast.ai and RunPod every five minutes with keys, the keyless catalogs every thirty &mdash; and normalizes everything to one comparable number, dollars per GPU per hour. On top of that book it runs a ladder, and the ladder is the product:</p>
+  <ul class="ladder">
+    <li><span class="rung">Read</span>A ranked live table (site, JSON API, and MCP for agents, all keyless), a half-hourly price tape kept since first boot, and six derived instruments: value per dollar, the idle discount, price timing, feed reliability, a market wire, and the spot index &mdash; a ten-model basket chained so that feeds joining or leaving <b>cannot</b> move it, only prices can. Methodology published and frozen per version.</li>
+    <li><span class="rung">Watch</span>The tripwire: accountless price alerts. Set a line under the market; when the best live price crosses it, a private RSS feed or webhook fires. The watch id is the only key.</li>
+    <li><span class="rung">Execute</span>Limit orders with a custody story I have not seen anywhere else: the server holds the <em>order</em>, never money or keys. When the line is crossed it cuts an HMAC-signed fill ticket naming the exact offer; a ~180-line open-source daemon (&ldquo;the keyholder&rdquo;) running on the renter's own machine verifies the signature and places the rental with the renter's own provider key. Fills re-quote live, refuse above the line, and are idempotent. A <b>standing</b> order goes further: the keyholder heartbeats the rented machine, and a confirmed death re-arms the order against the whole book &mdash; it refills from the current best offer, possibly on a different provider. Machine, not work: resume rides the renter's own checkpoints. There is also a spend watchdog and a hard USD kill-cap the renter sets.</li>
+    <li><span class="rung">Verify</span>A probe script renters run on machines they already paid for: it reads what the box actually is versus what was advertised and posts to a public trust tape, with readings tiered verified or anonymous and no badge granted under five verified readings.</li>
+    <li><span class="rung">Settle, someday</span>A broker rail exists behind a flag, and a receipts page pre-committed to publishing the house's own rentals before any money moved. The fee is zero and stated in every API response; outbound links carry disclosed referral tags; the fee lever is public and priced only forward.</li>
+  </ul>
+  <p>What it deliberately is not: it runs no hardware, sells no SLA, holds no customer funds, and skips the hyperscalers on purpose. It is a market-data layer with a non-custodial execution rail bolted on &mdash; Google Flights with a limit-order book, aimed at the cheap, open half of the GPU market.</p>
+</section>
+
+<section>
+  <p class="eyebrow">Reading two</p>
+  <h2>Is it novel?</h2>
+  <p>Component by component, checked against what exists:</p>
+  <div class="tscroll"><table>
+    <thead><tr><th>Component</th><th>Prior art</th><th>Reading</th></tr></thead>
+    <tbody>
+      <tr><td class="c">Price aggregation</td><td>Shadeform (30+ clouds, $20M raised), Prime Intellect, SkyPilot's GPU Compass, a graveyard of static comparison sheets.</td><td class="v commodity">commodity</td></tr>
+      <tr><td class="c">Queryable price history</td><td>SkyPilot keeps spot trends; nobody else serves a half-hourly cross-marketplace tape with a public API.</td><td class="v partly">rare</td></tr>
+      <tr><td class="c">Open spot index</td><td>Proprietary analogs exist and are about to matter: Silicon Data's H100/B200 rental indexes settle CME futures from Oct 5. An <b>open, auditable, chained</b> index of the marketplaces has no incumbent.</td><td class="v novel">novel, in the open</td></tr>
+      <tr><td class="c">Accountless tripwires</td><td>None found on any source marketplace or aggregator.</td><td class="v partly">novel, trivial to copy</td></tr>
+      <tr><td class="c">Non-custodial limit orders</td><td>SF Compute runs real limit orders &mdash; custodially, inside its own venue, at cluster scale. Nobody rests non-custodial orders across the open marketplaces.</td><td class="v novel">novel architecture</td></tr>
+      <tr><td class="c">Cross-provider standing refill</td><td>SkyPilot's managed spot jobs recover within your own cloud accounts; hyperscaler spot fleets restart same-cloud. Refilling from a live cross-market book, any provider, is new.</td><td class="v novel">novel</td></tr>
+      <tr><td class="c">Public trust tape</td><td>Marketplaces verify hosts internally; none publish advertised-vs-delivered readings.</td><td class="v partly">novel, unproven</td></tr>
+      <tr><td class="c">Agent-first / MCP-native</td><td>GPUsMarket shares the thesis but sells its own market. The cross-market MCP data layer seat is contested and early.</td><td class="v partly">early</td></tr>
+    </tbody>
+  </table></div>
+  <p>So: the aggregation everyone sees first is the least original thing on the page, and the three genuinely new things &mdash; the open index, the signed-ticket custody model, the standing refill &mdash; are exactly the ones the homepage currently underplays.</p>
+</section>
+
+<section>
+  <p class="eyebrow">Reading three</p>
+  <h2>How easily can it be stolen?</h2>
+  <p>Split the question in two, because the answers are opposite.</p>
+  <h3>The features: weeks, by anyone funded.</h3>
+  <p>The whole station is open source under AGPL. Copying the code outright is legal but sticky &mdash; anyone serving a modified version must publish their changes, which is exactly the poison pill funded competitors avoid; expect clean-room reimplementation instead. For a team like Shadeform's, every visible feature &mdash; the table, the tape, the instruments, even the tripwire &mdash; is an engineering-weeks problem, not a research problem. Ideas here are unprotectable and patents are not a realistic lever for a solo AGPL project. Assume every feature ships in a competitor's changelog the quarter after it gets noticed.</p>
+  <h3>The compounding assets: effectively not stealable.</h3>
+  <ul class="fixes">
+    <li><b>The tape.</b> The half-hourly history is append-only and started 23 Aug 2026. A cloner's tape starts the day they clone; the past cannot be backfilled. Every quiet week widens this moat &mdash; it is the single asset that compounds while nobody is watching.</li>
+    <li><b>The index's track record.</b> An index is only worth what cites it. Uninterrupted history plus external citations is a first-mover asset a copy cannot inherit &mdash; but it accrues only if the index actually travels (CSV, feed, badge, archive), which today it does not.</li>
+    <li><b>The keyholder's installed base and the resting book.</b> Daemons running on renters' machines and orders resting on the book are switching costs. Tiny today; real if it grows.</li>
+    <li><b>The honesty posture.</b> Zero fee stated in the API, staleness declared, receipts pre-published: a reseller structurally cannot copy this, because their margin is the conflict. A neutral tape that undercuts their own pricing is a product they cannot ship.</li>
+  </ul>
+  <h3>Who would actually take it</h3>
+  <dl class="actors">
+    <dt>Shadeform / Prime Intellect &mdash; capable, conflicted</dt>
+    <dd>Could rebuild everything; won't publish a neutral cross-market tape that prices against their own reselling. Watch them copy the <em>instruments</em>, not the neutrality.</dd>
+    <dt>SkyPilot &mdash; the closest real threat</dt>
+    <dd>Open-source culture, existing price history, huge distribution among exactly the right users. If they publish an open index, they win the citation race by default. The defense is to be established first.</dd>
+    <dt>The marketplaces themselves</dt>
+    <dd>Vast could publish an index tomorrow, but a single-venue index of your own prices is not credible as the market's number. Structural handicap.</dd>
+    <dt>Silicon Data / DRW &mdash; owns the institutional lane</dt>
+    <dd>Their indexes settle CME contracts; they sell licenses. They will not open their methodology, which is precisely the gap an open index lives in. Not a thief &mdash; the incumbent the open version defines itself against.</dd>
+    <dt>Indie cloners</dt>
+    <dd>Certain to appear, likely already forking. No tape, no citations, no distribution. Annoying, not fatal.</dd>
+  </dl>
+  <div class="callout">
+    <p class="plabel">The race, stated plainly</p>
+    <p>Features are stealable in weeks; the tape, the citations, and the neutrality are not. So spend effort where copying fails: make the index quotable everywhere (CSV, weekly feed, badge, embed, a how-to-cite line), archive it externally so primacy is provable (the Wayback Machine on a schedule; even hash-chaining the tape), and get the MCP endpoint into agent registries before the seat is taken. The CME listing on <b>October 5</b> is the starting gun for &ldquo;what did GPU spot do this month&rdquo; becoming a question normal people ask. Whoever owns the open answer by then keeps it.</p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Reading four</p>
+  <h2>The site.</h2>
+  <div class="callout good">
+    <p class="plabel">What is already excellent &mdash; and rare</p>
+    <p>All 144 form controls labeled, every button named, ~9:1 text contrast, honest empty and error states, zero broken links across 32 internal targets, clean mobile at 375px, and a trust architecture (skeptic FAQ, receipts published before revenue, per-feed staleness) that most funded products never attempt. Say so to your friend: this part is craft.</p>
+  </div>
+  <ul class="fixes">
+    <li><b>Fix the front door first.</b> pangle.online rides GoDaddy's free forwarding: HTTPS fails outright (no certificate), the redirect hops through insecure http, and every deep link 404s. Ten minutes on Cloudflare &mdash; proxied DNS plus one redirect rule to <code>https://compute.wick.pics/$1</code> &mdash; fixes all three. Separately: &ldquo;Pangle&rdquo; is ByteDance's ad network in every search result; as a brand for this product it is rented ground.</li>
+    <li><b>Edge-cache the aggregate APIs.</b> The history, sparks, and index endpoints each take 0.9&ndash;1.3 seconds and push page load to ~4.5s, yet the tape only changes every thirty minutes. A <code>s-maxage</code> of a few minutes at Cloudflare turns them into ~50ms responses. Biggest UX win per line of config anywhere on the site.</li>
+    <li><b>Stop leading with e-waste.</b> Cheapest-first means a visitor's first three rows are a laptop 3060, a Tesla P4, and a 1050 Ti at prices that read fake (the FAQ explains why they're real &mdash; but the table shouldn't need the FAQ). Default the landing view to the marquee models the tape already features, or to a verified-host floor, and keep absolute-cheapest as a sort.</li>
+    <li><b>Draw the order flow.</b> The resting-order section explains order &rarr; ticket &rarr; keyholder &rarr; standing in one dense paragraph. It is the most novel thing on the site and the hardest to parse; a three-step diagram would carry the custody story faster than prose.</li>
+    <li><b>Small dust:</b> the first frog image has no <code>alt</code> attribute at all; pond-gl.js logs a WebGL <code>texImage2D</code> warning; <code>og:title</code> is just the domain (put the value proposition in it &mdash; unfurls are ad space); the 207KB frog cutout is worth recompressing; and one referral-disclosure clause belongs on the homepage next to the zero-fee panel, not only in the FAQ.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="eyebrow">Reading five</p>
+  <h2>The concept.</h2>
+  <ul class="fixes">
+    <li><b>Retire the falsifiable superlative.</b> &ldquo;First resting order on GPU compute anywhere&rdquo; breaks on first contact with SF Compute's cleared order book (real limit orders, real volume, cluster blocks). The claim that survives scrutiny is stronger anyway: <em>the first non-custodial resting order, on a book that spans the open marketplaces instead of one venue.</em> Give SF Compute a row on the competition page and a straight FAQ answer &mdash; a trust-first brand cannot afford one checkable overstatement.</li>
+    <li><b>Lead with the standing order.</b> One-shot limit fills are a niche while spot prices sit near their floor. &ldquo;Keep me on the cheapest matching machine, and when it dies, refill me from the whole market&rdquo; is a fleet primitive &mdash; the thing worth paying for, and the natural place a future fee sits since it is a metered service, not a data read. Today it is one sentence of fine print; it should be the flagship.</li>
+    <li><b>Ship the index distribution kit.</b> CSV endpoint, weekly RSS digest, hotlinkable badge, iframe embed, and a &ldquo;cite this&rdquo; block with the frozen-methodology guarantee. This is the moat-construction work &mdash; small, boring, decisive. (A tested reference implementation of exactly this plus the claim edits exists as a patch on this side, built against a clone and applied nowhere; yours to offer.)</li>
+    <li><b>Monetize like Bloomberg, not like a broker.</b> Referral tags are pennies and an execution fee is avoidable by the architecture's own design. The natural business is data tiers &mdash; free delayed basics, paid realtime depth, history, webhooks, SLAs &mdash; plus enterprise price-discovery reports the /biz page already gestures at. Sell what compounds.</li>
+    <li><b>Decide which market the index speaks for.</b> Today it indexes the scavenger tier; the tier people argue about (H100/B200 blocks) clears elsewhere. Either add the serious-tier feeds so the index covers what the futures market trades, or own &ldquo;the open-marketplace floor index&rdquo; explicitly. An index of a tier nobody cites never becomes the reference.</li>
+    <li><b>Name the platform risk.</b> ~70% of the book is one feed (Vast); one ToS enforcement or referral change guts the tape. Diversification is underway (twelve feeds now) &mdash; add a &ldquo;claim your feed&rdquo; door so providers opt in, since for the long tail this site is free demand.</li>
+    <li><b>Keep the ecology honest.</b> The idle-share number is measured and the refusal to publish carbon math is the right instinct &mdash; keep the frog as market efficiency, not environmentalism, and it stays unattackable.</li>
+    <li><b>Watch the falsifiable demand signal.</b> Armed tripwires, resting orders, and the receipts page are a built-in truth serum: if nobody arms anything in eight weeks, the execution rail is a museum piece and the data layer is the product. The instrumentation to know is already live &mdash; trust it.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="eyebrow">Reading six</p>
+  <h2>Ten iterations.</h2>
+  <p>A sequenced roadmap, each step independently valuable &mdash; stopping after any of them still leaves the station better off. The ordering is the argument: credibility before moat work, non-backfillable history before distribution, the October 5 moment before product, monetization groundwork last. Generated from four planning lenses and then adversarially audited three ways (solo feasibility, moat honesty, trust posture); the audit's fixes are already folded in.</p>
+  <div class="callout">
+    <p class="plabel">Day zero &mdash; before iteration one, one afternoon</p>
+    <p>Two things are perishable and cost almost nothing: start a crude cluster-tier price collector (Lambda and Voltage Park posted rates into SQLite, published nowhere yet &mdash; rows never collected are gone forever), and open a SkyPilot RFC issue proposing the index as a data source (review lead time is not in your control, so start the clock now).</p>
+  </div>
+  <ul class="ladder">
+    <li><span class="rung">Iteration 1 &middot; small</span><b>Claim surgery and the domain decision.</b> Apply the tested reference patch: the SF-Compute-honest wording, the standing-order flagship copy, and the index distribution kit (CSV, weekly RSS, badge, embed, cite block). Decide the domain the same week &mdash; it is the only decision that gets more expensive daily, because every citation from here on lands permanently on whatever URL exists. If the rebrand is declined, the cite block and all later permanence artifacts point at compute.wick.pics explicitly, and the broken pangle.online forwarding dies either way.</li>
+    <li><span class="rung">Iteration 2 &middot; medium</span><b>Anchor the tape.</b> Nightly Merkle root over the day's tape rows, chained to yesterday's and anchored via OpenTimestamps, plus an append-only CSV commit to a public GitHub repo and a daily Wayback save. Copy discipline: anchoring proves <em>when</em> rows existed and that they never changed &mdash; never claim it proves &ldquo;first&rdquo; (SkyPilot holds history too; say so in the explainer, the disclosure is the brand). Standing rule ships here: every cron job alerts its own failure through the site's tripwire rail, and nothing recurring ships without a one-line deprecation path.</li>
+    <li><span class="rung">Iteration 3 &middot; medium</span><b>Publish the cluster tier.</b> The day-zero collector becomes /spot/clusters: a separately chained H100/B200 index over posted rates, its own frozen methodology, labeled plainly as a <em>posted-rate composite, not transacted prices</em>, with a minimal provenance note per source at launch. Never merged with the open-marketplace index. The futures settle on H100/B200; this series must exist and have age before October 5.</li>
+    <li><span class="rung">Iteration 4 &middot; medium</span><b>Index-administrator posture.</b> Versioned methodology with a 30-day public-notice policy, corrections and cessation policies, an honest three-column IOSCO self-assessment (meets / partial / structurally can't), provenance in full for the top four feeds, CC&nbsp;BY&nbsp;4.0 on tape and index values so every reuse is a forced citation, and a /coverage page that turns the ~70% Vast concentration into a disclosed stat &mdash; with an ex-Vast continuity variant pre-committed in the methodology before anyone needs it. Long-tail feed additions start here, one per week, only when the alert queue is empty.</li>
+    <li><span class="rung">Iteration 5 &middot; small</span><b>The publication engine.</b> The weekly digest becomes &ldquo;Field Notes&rdquo; on a free mail tier (exit path named before subscriber 101), plus a permalinked monthly review &mdash; August hand-assembled, automated from September &mdash; where every number links to a raw tape row. Zenodo DOIs land here with the monthly review as the citable unit. No uniqueness superlatives anywhere; &ldquo;every figure resolves to an open row&rdquo; is the true differentiator.</li>
+    <li><span class="rung">Iteration 6 &middot; medium</span><b>Symbols and registries.</b> Stable per-GPU index symbols with per-symbol JSON/CSV under the CC-BY license &mdash; whoever's tickers get used first sets the vocabulary futures commentary will borrow. One outreach week: MCP registries (official, Smithery, PulseMCP, mcp.so), the awesome-lists, public-apis. The SkyPilot integration stays timeboxed: code only on maintainer interest, merge is upside, the registries are the definition of done.</li>
+    <li><span class="rung">Iteration 7 &middot; medium</span><b>The October 5 basis tracker.</b> Pre-build /futures and /basis; from listing day, publish only the <em>derived</em> basis &mdash; open index versus settlement, one manually keyed number per day, linking out to CME for the print itself (their market data carries redistribution terms a zero-budget project must not test). The posted-versus-settled gap is not a weakness to hide but the story itself: what's quoted versus what clears. Pre-pitch the analysts with that honest framing inside the pitch. If the calendar slips, the shed order is declared in advance: keep 1, the anchoring core of 2, the collector of 3, the list of 5, and the scaffold-plus-pitches of 7; everything else slips without guilt.</li>
+    <li><span class="rung">Iteration 8 &middot; medium</span><b>The ten-minute keyholder.</b> First slice: a real installable on PyPI, <code>init</code> and <code>doctor</code> commands, generated service units, and a write-ahead journal so a crash mid-fill can never rent a second machine &mdash; chaos tests public. A /start page measured on one number: first armed order in under ten minutes. Second, community-paced slice: the adapter interface, conformance harness, and good-first-issues. Checkpoint-resume is documented as one worked recipe and stated plainly as the renter's job.</li>
+    <li><span class="rung">Iteration 9 &middot; medium</span><b>Public execution evidence.</b> Paper-mode standing orders ship first &mdash; server-side replay against the live tape, zero installs required &mdash; with any shareable card carrying &ldquo;SIMULATED: assumes availability at quoted price&rdquo; baked into the image itself. Then ed25519-signed fill receipts feeding /receipts, labeled <em>signed</em>, never &ldquo;verified&rdquo; (the signature attests origin, not the numbers), and a fleet counter that renders nothing below ten reporters except an honest &ldquo;collecting&rdquo;.</li>
+    <li><span class="rung">Iteration 10 &middot; medium</span><b>Pre-committed data tiers.</b> A /data-tiers page that states the model before any fee exists: the tape, the index, and the full history are free forever &mdash; the CC-BY license and the mirrors already made that irrevocable, and admitting it <em>is</em> the neutrality pitch. Potential future fees sit only on realtime depth, SLA'd delivery, convenience APIs, and support; any delay change follows the 30-day notice policy. Anonymous metering keys (id-is-the-key, like everything else) lay the plumbing, and a live /revenue ledger of referral income by provider &mdash; including &ldquo;no program&rdquo; rows &mdash; proves the ranking was never for sale.</li>
+  </ul>
+</section>
+
+<footer>
+  Checked against the outside world: <span class="srcs"><a href="https://docs.sfcompute.com/docs/how-the-market-works" rel="noopener">SF Compute market docs</a> &middot; <a href="https://www.cmegroup.com/media-room/press-releases/2026/8/11/cme_group_and_silicondatatolaunchcomputefuturesonoctober5tounloc.html" rel="noopener">CME &times; Silicon Data, Oct 5 listing</a> &middot; <a href="https://www.cnbc.com/2026/08/11/ai-computing-power-becomes-a-tradable-asset-class-as-cme-starts-futures.html" rel="noopener">CNBC on compute futures</a> &middot; <a href="https://dailydropout.substack.com/p/sf-compute-the-stock-market-for-gpus" rel="noopener">SF Compute volume reporting</a> &middot; <a href="https://www.bcg.com/publications/2026/understanding-the-new-economics-of-ai-compute-markets" rel="noopener">BCG on compute markets</a> &middot; <a href="https://getdeploying.com/runpod-vs-vast-ai" rel="noopener">GetDeploying</a> &middot; <a href="https://computeprices.com/compare/runpod-vs-vast" rel="noopener">ComputePrices</a></span><br>
+  Method: full read of the public AGPL source, the app run locally against live feeds, every page and endpoint exercised, claims searched. No changes were made to the site, the repo, or anything public.
+</footer>
+</div>
+</body>
+</html>
