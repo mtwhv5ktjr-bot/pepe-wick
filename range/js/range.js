@@ -284,6 +284,11 @@ const wisps = [];
 }
 
 const muzzleLight = new THREE.PointLight(0xffd27f, 0, 8);
+// gun-hands fill, parented to the camera so it travels with the viewmodel.
+// OFF in the range (the hall rig already lights the gun); ON in the house.
+const vmLight = new THREE.PointLight(0xfff0d6, 0, 3.2, 1.2);
+vmLight.position.set(0.25, 0.15, 0.35);
+camera.add(vmLight);
 scene.add(muzzleLight);
 
 // ---------------------------------------------------------------- NFT guns
@@ -347,7 +352,7 @@ function disposeGunModel(grp) {
 }
 
 // ---------------------------------------------------------------- state
-const MODES = { GATE: 'gate', MENU: 'menu', COUNTDOWN: 'countdown', DRILL: 'drill', END: 'end', LOCKER: 'locker', INSPECT: 'inspect' };
+const MODES = { HOUSE: 'house', GATE: 'gate', MENU: 'menu', COUNTDOWN: 'countdown', DRILL: 'drill', END: 'end', LOCKER: 'locker', INSPECT: 'inspect' };
 let mode = MODES.GATE;
 let member = null;           // { addr, guns: [{id,type}], mods: [{id,type}], gunTypes, specs: [realGun] }
 let equipped = null;         // realGun spec — .stats already has the bolted mods applied, .base is the card
@@ -692,6 +697,63 @@ function stepFx(dt) {
 let yaw = 0, pitch = 0;          // what the camera shows
 let aimYaw = 0, aimPitch = 0;    // where the hand is
 const PITCH_LIM = 1.25;
+
+/* ---------------- SHOOT HOUSE: locomotion ----------------
+   The range is a firing point - you stand still. The house is walked. Single
+   storey and every wall axis-aligned, so collision is circle-vs-AABB resolved
+   one axis at a time: push out of X, then out of Z. That cannot tunnel at these
+   speeds and never needs a physics step. */
+const PLAYER = { r: 0.38, eye: 1.62, accel: 42, maxSpd: 3.4, sprint: 1.55, friction: 11 };
+const move = { f: 0, b: 0, l: 0, r: 0, sprint: false };
+let pvx = 0, pvz = 0;                 // velocity in world XZ
+let house = null;                     // { group, walls, spots, start, bounds }
+let houseRun = null;                  // active clear-the-house run
+let stepPhase = 0;                    // footstep + head bob
+
+function houseBlocked(x, z) {
+  if (!house) return false;
+  for (const w of house.walls)
+    if (x > w.x0 - PLAYER.r && x < w.x1 + PLAYER.r && z > w.z0 - PLAYER.r && z < w.z1 + PLAYER.r) return true;
+  return false;
+}
+function stepPlayer(dt) {
+  if (!house) return;
+  // desired direction in camera space, flattened to the floor
+  const fwd = (move.f ? 1 : 0) - (move.b ? 1 : 0);
+  const strafe = (move.r ? 1 : 0) - (move.l ? 1 : 0);
+  let ax = 0, az = 0;
+  if (fwd || strafe) {
+    const sy = Math.sin(yaw), cy = Math.cos(yaw);
+    // camera looks down -Z at yaw 0
+    const dx = (-sy * fwd) + (cy * strafe);
+    const dz = (-cy * fwd) - (sy * strafe);
+    const len = Math.hypot(dx, dz) || 1;
+    ax = dx / len * PLAYER.accel; az = dz / len * PLAYER.accel;
+  }
+  pvx += ax * dt; pvz += az * dt;
+  const fr = Math.exp(-PLAYER.friction * dt);
+  if (!fwd && !strafe) { pvx *= fr; pvz *= fr; }
+  const cap = PLAYER.maxSpd * (move.sprint ? PLAYER.sprint : 1);
+  const sp = Math.hypot(pvx, pvz);
+  if (sp > cap) { pvx = pvx / sp * cap; pvz = pvz / sp * cap; }
+
+  // resolve one axis at a time so sliding along a wall feels right
+  const px = camera.position.x, pz = camera.position.z;
+  let nx = px + pvx * dt;
+  if (houseBlocked(nx, pz)) { nx = px; pvx = 0; }
+  let nz = pz + pvz * dt;
+  if (houseBlocked(nx, nz)) { nz = pz; pvz = 0; }
+  camera.position.x = nx; camera.position.z = nz;
+
+  // head bob + footsteps, both driven by distance travelled not time
+  const moved = Math.hypot(nx - px, nz - pz);
+  if (moved > 0.0005) {
+    const was = stepPhase;
+    stepPhase += moved * 2.6;
+    if (Math.floor(stepPhase) !== Math.floor(was)) AUD.play && AUD.play('step');
+  }
+  camera.position.y = PLAYER.eye + Math.sin(stepPhase * Math.PI) * 0.035;
+}
 const BASE_SENS = 0.0021;        // rad / px at sensitivity 1.0
 const AIM = {
   sens: (() => { const v = parseFloat(localStorage.getItem('ar_sens') || '1'); return isNaN(v) ? 1 : Math.max(0.3, Math.min(2.5, v)); })(),
@@ -772,7 +834,18 @@ document.addEventListener('mouseup', e => {
 canvas.addEventListener('wheel', e => {
   if (mode === MODES.INSPECT) inspectDist = Math.max(0.8, Math.min(3.0, inspectDist + e.deltaY * 0.0012));
 });
+const MOVE_KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+document.addEventListener('keyup', e => {
+  if (MOVE_KEYS[e.code]) move[MOVE_KEYS[e.code]] = 0;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') move.sprint = false;
+});
 document.addEventListener('keydown', e => {
+  if (mode === MODES.HOUSE) {
+    if (MOVE_KEYS[e.code]) { move[MOVE_KEYS[e.code]] = 1; e.preventDefault(); }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') move.sprint = true;
+    if (e.code === 'KeyR') startReload();
+    if (e.code === 'Escape' && !document.pointerLockElement) quitHouse();
+  }
   if (e.code === 'KeyR' && mode === MODES.DRILL) startReload();
   if (e.code === 'Escape' && !document.pointerLockElement && (mode === MODES.DRILL || mode === MODES.COUNTDOWN)) quitDrill();
 });
@@ -825,7 +898,11 @@ function castRound(dirBase, muzzleWorld, accent) {
   const st = equipped.stats;
   const hits = (() => {
     raycaster.set(camera.position, dirBase);
-    return raycaster.intersectObjects([...targetMeshes.values()], true);
+    const t = raycaster.intersectObjects([...targetMeshes.values()], true);
+    if (mode !== MODES.HOUSE || !house) return t;
+    const w = raycaster.intersectObject(house.group, true);
+    const wallD = w.length ? w[0].distance : Infinity;
+    return t.filter(h => h.distance < wallD);
   })();
   let scored = null, pierceLeft = st.pierce, endPoint = null;
   const hitTids = new Set();
@@ -834,6 +911,16 @@ function castRound(dirBase, muzzleWorld, accent) {
     if (!tid) { endPoint = h.point; addHole(h.point, h.face ? h.face.normal.clone() : new THREE.Vector3(0, 0, 1)); addSparks(h.point, 0x8b6b40); break; }
     if (hitTids.has(tid)) continue;
     hitTids.add(tid);
+    if (mode === MODES.HOUSE) {
+      // the house keeps its own board state; there is no drill to register against
+      const rec = houseRun && houseRun.tids.get(tid);
+      if (!rec || rec.down) continue;
+      addSparks(h.point, rec.kind === 'civ' ? 0xff5c5c : 0xffd27f);
+      endPoint = h.point;
+      houseHit(tid, rec.kind === 'civ');
+      if (--pierceLeft <= 0) break;
+      continue;
+    }
     const target = drill.targets.find(t => t.tid === tid && t.alive);
     if (!target) continue;
     const center = new THREE.Vector3(target.x, target.y, target.z);
@@ -845,7 +932,8 @@ function castRound(dirBase, muzzleWorld, accent) {
     if (--pierceLeft <= 0) break;
   }
   if (!endPoint) {
-    const wallT = (-(HALL.d - 3.1) - camera.position.z) / dirBase.z;
+    const reach = mode === MODES.HOUSE ? 24 : (HALL.d - 3.1);
+    const wallT = mode === MODES.HOUSE ? reach : (-(HALL.d - 3.1) - camera.position.z) / dirBase.z;
     endPoint = wallT > 0 ? camera.position.clone().addScaledVector(dirBase, wallT) : camera.position.clone().addScaledVector(dirBase, 30);
     addHole(endPoint, new THREE.Vector3(0, 0, 1));
     addSparks(endPoint, 0x8b6b40);
@@ -854,7 +942,9 @@ function castRound(dirBase, muzzleWorld, accent) {
   return scored;
 }
 function fire() {
-  if (mode !== MODES.DRILL || !drill || drill.over || !equipped) return;
+  const inHouse = mode === MODES.HOUSE;
+  if (inHouse) { if (!houseRun || houseRun.over || !equipped) return; }
+  else if (mode !== MODES.DRILL || !drill || drill.over || !equipped) return;
   if (fireCd > 0 || reloading > 0) return;
   if (ammo <= 0) { AUD.play('dry'); startReload(); return; }
   ammo--;
@@ -886,7 +976,8 @@ function fire() {
     const res = castRound(dir.normalize(), muzzleWorld, accent);
     if (res) { any = true; if (!best || (res.delta || 0) > (best.delta || 0)) best = res; }
   }
-  if (!any) DR.registerShot(drill, null, {}); // whole trigger pull whiffed
+  if (!any && mode !== MODES.HOUSE) DR.registerShot(drill, null, {}); // whole trigger pull whiffed
+  if (!any && mode === MODES.HOUSE && houseRun) houseRun.misses++;
   if (best && !best.miss) hitFeedback(best);
   updateAmmoHud();
   if (ammo <= 0) startReload();
@@ -896,7 +987,7 @@ function hitFeedback(res) {
   ch.classList.add('hitmark');
   setTimeout(() => ch.classList.remove('hitmark'), 90);
   if (res.dq) return;
-  if (res.delta < 0) { AUD.play('civAlarm'); flashBanner('CIVILIAN — STRIKE ' + drill.strikes + '/3', 'var(--red)'); }
+  if (res.delta < 0) { AUD.play('civAlarm'); flashBanner('CIVILIAN — STRIKE ' + ((drill && drill.strikes) || 0) + '/3', 'var(--red)'); }
   else if (res.ring !== null && res.ring < 0.18) AUD.play('bullseye');
   else AUD.play('ding');
 }
@@ -920,6 +1011,96 @@ function feedLine(msg, cls) {
 
 // ---------------------------------------------------------------- drill flow
 let countIv = null;
+/* ---------------- SHOOT HOUSE: the run ----------------
+   Clear every hostile. Every no-shoot board you hit costs you. The clock runs
+   from the first step, so standing in the doorway thinking is not free. */
+function enterHouse() {
+  if (!equipped) { flashBanner('PICK A GUN FIRST', '#ff5c5c'); return; }
+  if (!window.SHOOTHOUSE) { console.warn('house.js not loaded'); return; }
+  clearTargetMeshes();
+  // tear down any previous house first: leaving the old group in the scene
+  // leaves its walls raycasting, which silently blocks every subsequent shot
+  if (house) { scene.remove(house.group); house = null; }
+  renderer.toneMappingExposure = 1.3;      // a dim drill leaves this at 0.72 - the house sets its own
+  vmLight.intensity = 2.6;                 // hall rig is about to go dark - light the gun ourselves
+  house = window.SHOOTHOUSE.build(THREE, houseMats());
+  scene.add(house.group);
+  hall.visible = false;
+
+  // targets reuse the range's own boards, so hit detection is unchanged
+  houseRun = { t: 0, started: false, hits: 0, misses: 0, civ: 0, total: 0, over: false, tids: new Map() };
+  let tid = 90000;
+  for (const sp of house.spots) {
+    const t = { tid: tid++, kind: sp.kind === 'civ' ? 'civ' : 'mark' };
+    addTargetMesh(t);
+    const g = targetMeshes.get(t.tid);
+    g.position.set(sp.x, 1.15, sp.z);
+    g.rotation.y = sp.ry;
+    houseRun.tids.set(t.tid, { kind: t.kind, down: false });
+    if (t.kind !== 'civ') houseRun.total++;
+  }
+  camera.position.set(house.start.x, PLAYER.eye, house.start.z);
+  yaw = aimYaw = house.start.yaw; pitch = aimPitch = 0;
+  pvx = pvz = 0; stepPhase = 0;
+  ammo = equipped.stats.mag; reloading = 0; updateAmmoHud();
+  mode = MODES.HOUSE;
+  $('menu').classList.add('hidden');
+  $('end').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  $('drillname') && ($('drillname').textContent = 'THE SHOOT HOUSE');
+  flashBanner('CLEAR THE HOUSE — ' + houseRun.total + ' HOSTILES, MIND THE CIVILIANS', '#c9a227');
+  canvas.requestPointerLock && canvas.requestPointerLock();
+}
+function houseMats() {
+  const M = (c, r, m, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: r, metalness: m }, extra || {}));
+  return {
+    floor: M(0x20262f, 0.92, 0.04),
+    wall:  M(0x2f3746, 0.86, 0.06),
+    trim:  M(0xc9a227, 0.35, 0.9, { emissive: 0xc9a227, emissiveIntensity: 0.25 }),
+    ceil:  M(0x131820, 0.95, 0.05),
+    crate: M(0x3c2f20, 0.83, 0.1),
+  };
+}
+function quitHouse() {
+  vmLight.intensity = 0;
+  if (house) { scene.remove(house.group); house = null; }
+  houseRun = null;
+  clearTargetMeshes();
+  hall.visible = true;
+  camera.position.set(0, 1.6, 0);
+  yaw = aimYaw = 0; pitch = aimPitch = 0;
+  pvx = pvz = 0;
+  for (const k in move) move[k] = (k === 'sprint' ? false : 0);
+  firing = false; reloading = 0; zooming = false;
+  mode = MODES.MENU;
+  $('hud').classList.add('hidden');
+  $('end').classList.add('hidden');
+  $('menu').classList.remove('hidden');
+  document.exitPointerLock && document.exitPointerLock();
+  renderMenu();
+}
+function houseHit(tid, isCiv) {
+  if (!houseRun || houseRun.over) return;
+  const rec = houseRun.tids.get(tid);
+  if (!rec || rec.down) return;
+  rec.down = true;
+  const g = targetMeshes.get(tid);
+  if (g) g.rotation.x = -1.35;                 // board falls flat - instant read
+  if (isCiv) { houseRun.civ++; AUD.play && AUD.play('deny'); }
+  else { houseRun.hits++; AUD.play && AUD.play('hit'); }
+  if (houseRun.hits >= houseRun.total) endHouse();
+}
+function endHouse() {
+  if (!houseRun || houseRun.over) return;
+  houseRun.over = true;
+  const t = houseRun.t, pen = houseRun.civ * 5;
+  const total = t + pen;
+  const prev = parseFloat(localStorage.getItem('ar_house_best') || '0');
+  if (!prev || total < prev) { try { localStorage.setItem('ar_house_best', total.toFixed(2)); } catch (e) {} }
+  flashBanner('HOUSE CLEAR — ' + t.toFixed(2) + 's' + (pen ? '  +' + pen + 's PENALTY' : '  CLEAN'), pen ? '#ff5c5c' : '#7cf9a5');
+  $('timer').textContent = total.toFixed(2) + 's';
+  setTimeout(() => { if (mode === MODES.HOUSE) quitHouse(); }, 3400);
+}
 function startDrill(kind, opts) {
   DR.resetTids();
   drillKind = kind;
@@ -1044,6 +1225,19 @@ function medalDot(kind) {
 function renderMenu() {
   const list = $('drilllist');
   list.innerHTML = '';
+  {
+    // THE SHOOT HOUSE - the only mode you walk through rather than stand in
+    const bestH = parseFloat(localStorage.getItem('ar_house_best') || '0');
+    const el = document.createElement('div');
+    el.className = 'drill';
+    el.style.gridColumn = '1 / -1';
+    el.style.borderColor = '#7cf9a5';
+    el.innerHTML = '<b style="color:#7cf9a5">▶ THE SHOOT HOUSE — WALK IT</b>' +
+      '<span>WASD to move, mouse to look, SHIFT to sprint. Clear every hostile, leave the civilians standing. +5s for each one you drop.</span>' +
+      '<div class="best">' + (bestH ? 'BEST ' + bestH.toFixed(2) + 's' : 'NOT YET RUN') + '</div>';
+    el.onclick = () => { AUD.unlock(); AUD.play('ui'); enterHouse(); };
+    list.appendChild(el);
+  }
   {
     const ct = DR.dailyMarksman(todayUTC());
     const best = parseInt(localStorage.getItem('ar_daily_' + ct.date) || '0', 10);
@@ -1309,6 +1503,19 @@ function tick(dtOverride) {
       : left !== null ? left.toFixed(1) + 's' : (drill.spawned + '/' + (drillKind === 'qualifier' ? 20 : 12));
     bobT += dt * 3;
   }
+  if (mode === MODES.HOUSE) {
+    stepPlayer(dt);
+    if (firing && equipped && equipped.stats.auto) fire();
+    fireCd -= dt;
+    if (reloading > 0) { reloading -= dt; if (reloading <= 0) { reloading = 0; ammo = equipped.stats.mag; } updateAmmoHud(); }
+    if (houseRun && !houseRun.over) {
+      if (!houseRun.started && (Math.abs(pvx) + Math.abs(pvz)) > 0.2) houseRun.started = true;
+      if (houseRun.started) houseRun.t += dt;
+      $('score').textContent = houseRun.hits + '/' + houseRun.total;
+      $('combo').textContent = houseRun.civ ? '✖ ' + houseRun.civ : '';
+      $('timer').textContent = houseRun.t.toFixed(1) + 's';
+    }
+  }
   // ADS zoom lerp
   const targetFov = (mode === MODES.DRILL && zooming && equipped) ? BASE_FOV / equipped.stats.zoom : BASE_FOV;
   if (Math.abs(camera.fov - targetFov) > 0.1) {
@@ -1324,7 +1531,7 @@ function tick(dtOverride) {
   stepAim(dt);
   applyAim();
   if (viewmodel) {
-    viewmodel.visible = (mode === MODES.DRILL || mode === MODES.COUNTDOWN);
+    viewmodel.visible = (mode === MODES.DRILL || mode === MODES.COUNTDOWN || mode === MODES.HOUSE);
     viewmodel.position.z += (-0.52 - viewmodel.position.z) * Math.min(1, dt * 9);
     const zoomShift = zooming ? -0.1 : 0;
     viewmodel.position.x += (0.27 + zoomShift - viewmodel.position.x) * Math.min(1, dt * 8);
@@ -1345,7 +1552,9 @@ function tick(dtOverride) {
     inspectModel.rotation.y = inspectYaw;
     camera.position.set(0, 1.62, -3.4 + inspectDist);
     setAim(0, -0.04); applyAim();
-  } else {
+  } else if (mode !== MODES.HOUSE) {
+    // the range is a fixed firing point and re-pins the camera every frame;
+    // the house is walked, so locomotion owns the position while it is running
     camera.position.set(0, 1.6, 0);
   }
   syncTargets();
@@ -1391,6 +1600,34 @@ window.qaAimState = function () { return { aimYaw, aimPitch, yaw, pitch, recoilP
 window.qaSetAim = function (o) { if (o.smooth != null) AIM.smooth = o.smooth; if (o.sens != null) AIM.sens = o.sens; return window.qaAimState(); };
 window.qaFire = function () { fireCd = 0; reloading = 0; if (ammo <= 0 && equipped) ammo = equipped.stats.mag; fire(); return { ammo, score: drill ? drill.score : null }; };
 window.qaStartDrill = function (kind) { startDrill(kind); $('countdown').classList.add('hidden'); if (countIv) { clearInterval(countIv); countIv = null; } mode = MODES.DRILL; return true; };
+window.qaHouse = function () { enterHouse(); return !!house; };
+window.qaHouseState = function () {
+  if (!house || !houseRun) return null;
+  return { mode, t: houseRun.t, hits: houseRun.hits, total: houseRun.total, civ: houseRun.civ,
+    over: houseRun.over, started: houseRun.started,
+    pos: { x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) },
+    walls: house.walls.length, boards: houseRun.tids.size };
+};
+window.qaMove = function (o, frames) {   // drive the REAL locomotion path
+  for (const k in move) move[k] = (k === "sprint" ? false : 0);
+  Object.assign(move, o);
+  for (let i = 0; i < (frames || 30); i++) tick(1 / 60);
+  for (const k in move) move[k] = (k === "sprint" ? false : 0);
+  return window.qaHouseState();
+};
+window.qaProbe = function (x, z) {
+  const hits = house ? house.walls.filter(w => x > w.x0 - PLAYER.r && x < w.x1 + PLAYER.r && z > w.z0 - PLAYER.r && z < w.z1 + PLAYER.r) : [];
+  return { blocked: hits.length > 0, hits: hits.slice(0, 3), vel: { x: +pvx.toFixed(2), z: +pvz.toFixed(2) }, yaw: +yaw.toFixed(3) };
+};
+window.qaTeleport = function (x, z) { if (!house) return null; camera.position.set(x, PLAYER.eye, z); pvx = pvz = 0; return window.qaHouseState(); };
+window.qaHouseSpots = function () { return house ? house.spots : null; };
+window.qaRay = function () {
+  const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  raycaster.set(camera.position, dir);
+  const t = raycaster.intersectObjects([...targetMeshes.values()], true).map(h => ({ d:+h.distance.toFixed(2), tid:h.object.userData.tid }));
+  const w = house ? raycaster.intersectObject(house.group, true).map(h => +h.distance.toFixed(2)).slice(0,2) : [];
+  return { targets: t.slice(0,3), firstWall: w[0] ?? null, boards: targetMeshes.size };
+};
 window.qaMem = function () { return { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }; };
 window.qaDrillState = function () {
   return drill ? {
