@@ -801,14 +801,20 @@ function tryPointerLock() {
     }
   } catch (e) {}
 }
+// EVERY live-fire mode, not just drills. The shoot house shipped unplayable
+// because look/trigger/reload/ADS were all bound to MODES.DRILL alone — you
+// could walk around and nothing else. fire() and the tick loop already knew
+// about the house; only these bindings did not.
+const playing = () => mode === MODES.DRILL || mode === MODES.HOUSE;
+
 canvas.addEventListener('click', () => {
   AUD.unlock();
-  if (mode === MODES.DRILL && !document.pointerLockElement && lastPointerType === 'mouse') tryPointerLock();
+  if (playing() && !document.pointerLockElement && lastPointerType === 'mouse') tryPointerLock();
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 let inspectVel = 0;
 document.addEventListener('mousemove', e => {
-  if (mode === MODES.DRILL && document.pointerLockElement === canvas) {
+  if (playing() && document.pointerLockElement === canvas) {
     const dx = e.movementX || 0, dy = e.movementY || 0;
     if (Math.abs(dx) > 400 || Math.abs(dy) > 400) return; // lock-acquire glitch, not a hand
     const sens = BASE_SENS * AIM.sens * (zooming ? 0.55 : 1);
@@ -821,7 +827,7 @@ document.addEventListener('mousemove', e => {
 });
 let dragging = false, lastTouch = null;
 canvas.addEventListener('mousedown', e => {
-  if (mode === MODES.DRILL && document.pointerLockElement === canvas) {
+  if (playing() && document.pointerLockElement === canvas) {
     if (e.button === 2) { zooming = true; return; }
     firing = true; fire();
   }
@@ -846,7 +852,7 @@ document.addEventListener('keydown', e => {
     if (e.code === 'KeyR') startReload();
     if (e.code === 'Escape' && !document.pointerLockElement) quitHouse();
   }
-  if (e.code === 'KeyR' && mode === MODES.DRILL) startReload();
+  if (e.code === 'KeyR' && playing()) startReload();
   if (e.code === 'Escape' && !document.pointerLockElement && (mode === MODES.DRILL || mode === MODES.COUNTDOWN)) quitDrill();
 });
 // touch — aim tracked BY TOUCH IDENTIFIER (FIRE finger must not freeze aim)
@@ -861,7 +867,7 @@ canvas.addEventListener('touchstart', e => {
 canvas.addEventListener('touchmove', e => {
   for (const t of e.changedTouches) {
     if (t.identifier !== aimTouchId || !lastTouch) continue;
-    if (mode === MODES.DRILL) {
+    if (playing()) {
       nudgeAim(t.clientX - lastTouch.x, t.clientY - lastTouch.y, 0.004 * AIM.sens);
     } else if (mode === MODES.INSPECT) {
       inspectVel = (t.clientX - lastTouch.x) * 0.01;
@@ -1519,7 +1525,7 @@ function tick(dtOverride) {
     }
   }
   // ADS zoom lerp
-  const targetFov = (mode === MODES.DRILL && zooming && equipped) ? BASE_FOV / equipped.stats.zoom : BASE_FOV;
+  const targetFov = (playing() && zooming && equipped) ? BASE_FOV / equipped.stats.zoom : BASE_FOV;
   if (Math.abs(camera.fov - targetFov) > 0.1) {
     camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 10);
     camera.updateProjectionMatrix();
@@ -1623,6 +1629,12 @@ window.qaProbe = function (x, z) {
 };
 window.qaTeleport = function (x, z) { if (!house) return null; camera.position.set(x, PLAYER.eye, z); pvx = pvz = 0; return window.qaHouseState(); };
 window.qaHouseSpots = function () { return house ? house.spots : null; };
+// the live view/weapon state — lets a test assert ADS and reload actually engaged
+// instead of inferring them from pixels
+window.qaView = function () {
+  return { mode, fov: +camera.fov.toFixed(2), zooming, reloading: +reloading.toFixed(2),
+           ammo, mag: equipped ? equipped.stats.mag : 0, firing };
+};
 window.qaRay = function () {
   const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
   raycaster.set(camera.position, dir);
