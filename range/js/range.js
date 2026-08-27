@@ -1049,7 +1049,9 @@ function enterHouse() {
   $('hud').classList.remove('hidden');
   $('drillname') && ($('drillname').textContent = 'THE SHOOT HOUSE');
   flashBanner('CLEAR THE HOUSE — ' + houseRun.total + ' HOSTILES, MIND THE CIVILIANS', '#c9a227');
-  canvas.requestPointerLock && canvas.requestPointerLock();
+  tryPointerLock();     // NOT requestPointerLock() direct — that leaks an uncaught
+                        // rejection in hidden-doc/embedded contexts, and loses the
+                        // unadjustedMovement raw-input path every other mode uses
 }
 function houseMats() {
   const M = (c, r, m, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: r, metalness: m }, extra || {}));
