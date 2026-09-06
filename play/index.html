@@ -2299,7 +2299,14 @@ async function submitScore(){
   const seth=window.ethereum||wcProvider;
   if(!seth){ lbMsg="no wallet available"; return; }
   const s=gauntlet?Math.floor(lvScore):Math.floor(totalScore());
-  const mode=gauntlet?(bossRush?"bossrush":"gauntlet"):"pepe-wick", lvNo=gauntlet?gWave:lvIdx+1;
+  const mode=gauntlet?(bossRush?"bossrush":"gauntlet"):"pepe-wick";
+  // The campaign score is a CAREER TOTAL — the sum of your best on every contract —
+  // so its "level" must be contracts CLEARED, not whichever level the menu happens
+  // to be sitting on. lvIdx resets to 0 on the way back to the menu, which is how a
+  // 285k career ended up on the prize board labelled "level 1" (reads as a cheat).
+  let lvNo=1;
+  if(gauntlet) lvNo=gWave;
+  else for(let i=0;i<LEVELS.length;i++){ const b=best["l"+i]; if(b&&typeof b.score==="number"&&b.score>0) lvNo=i+1; }
   if(s<=0){ lbMsg="no score yet"; return; }
   // holders-only board — say so here rather than making them sign for a 403
   if(!ownedGunTypes.length){ lbMsg="holders only — mint a gun at mint.wick.pics to enter"; return; }
