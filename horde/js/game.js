@@ -31,6 +31,9 @@ const fx = new FX(scene, camera);
 const post = new Post(renderer);
 const audio = new Audio();
 fx.onFlash = (r, g, b) => post.addFlash(r, g, b);
+// the aim lane marker: a ring on the road where the held click is pointing
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.64, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7cf9a5, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
+reticle.visible = false; reticle.renderOrder = 15; scene.add(reticle);
 let quality = store.get('quality2', 1);   // 'quality2': the first key was polluted by an auto-drop that fired under tool-driven frames
 function applyQuality() {
   const q = quality;
@@ -59,7 +62,8 @@ let member = null, weapon = ARMS.profile(null, []), pref = null;
 let demo = null;
 let timeScale = 1, slowT = 0, bossIntroT = 0, pauseOn = false;
 let lastT = performance.now(), fpsAcc = 0, fpsN = 0, fps = 60, lowT = 0;
-let input = { steer: 0, targetX: null, pointer: false };
+let input = { steer: 0, targetX: null, pointer: false, fire: false, aimX: null, downX: 0, dragging: false };
+let noFireT = 0, coachT = 0, lastInp = {};
 let lbBusy = false;
 const popups = [];
 const unlocked = () => store.get('unlocked', 1);
@@ -179,6 +183,7 @@ function start() {
   $('hWeapon').textContent = weapon.name.toUpperCase();
   $('hGoal').textContent = level.endless ? '' : fmt(level.len) + ' m';
   renderPerkChips();
+  noFireT = 0; coachT = 2; $('hTip').classList.remove('hidden');
   popup(level.name, '#ffffff', 0, 2.5, 'title'); popup(level.sub, '#cfd6e3', 0, 1.8, 'sub');
   input.targetX = null;
 }
@@ -302,6 +307,7 @@ function pick(i) { if (!sim || sim.status !== 'draft') return; if (SIM.choose(si
 const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
+  if (e.code === 'Space' && mode === 'play') e.preventDefault();   // Space = fire in play, never a page scroll
   if (e.code === 'Enter' || e.code === 'Space') { if (mode === 'title') { start(); e.preventDefault(); } else if (mode === 'over' && !$('clear').classList.contains('hidden')) nextRoad(); else if (mode === 'over') { start(); } }
   if (e.code === 'Escape' && mode === 'play') togglePause();
   if (mode === 'play' && sim && sim.status === 'draft') { if (e.code === 'Digit1') pick(0); if (e.code === 'Digit2') pick(1); if (e.code === 'Digit3') pick(2); }
@@ -310,9 +316,10 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 const touch = $('touch');
 function ptrX(e) { const w = window.innerWidth; return Math.max(-1, Math.min(1, ((e.clientX / w) - 0.5) * 2.4)); }
-touch.addEventListener('pointerdown', e => { if (mode !== 'play') return; input.pointer = true; input.targetX = ptrX(e); touch.setPointerCapture(e.pointerId); audio.boot(); });
-touch.addEventListener('pointermove', e => { if (!input.pointer) return; input.targetX = ptrX(e); });
-const endPtr = e => { input.pointer = false; input.targetX = null; };
+// hold = fire (and the held lane is the aim lane); drag past 8 px = steer as well
+touch.addEventListener('pointerdown', e => { if (mode !== 'play') return; input.pointer = true; input.fire = true; input.downX = e.clientX; input.dragging = false; input.aimX = ptrX(e) * 0.85; try { touch.setPointerCapture(e.pointerId); } catch (err) {} audio.boot(); });
+touch.addEventListener('pointermove', e => { if (!input.pointer) return; input.aimX = ptrX(e) * 0.85; if (!input.dragging && Math.abs(e.clientX - input.downX) > 8) input.dragging = true; if (input.dragging) input.targetX = ptrX(e); });
+const endPtr = e => { input.pointer = false; input.fire = false; input.aimX = null; input.targetX = null; input.dragging = false; };
 touch.addEventListener('pointerup', endPtr); touch.addEventListener('pointercancel', endPtr);
 function togglePause() { pauseOn = !pauseOn; $('pause').classList.toggle('hidden', !pauseOn); if (pauseOn && audio.ctx) audio.ctx.suspend(); else if (audio.ctx) audio.ctx.resume(); }
 
@@ -368,7 +375,7 @@ function pilot(s) {
   const hz = s.hazards.find(h => (h.kind === 'acid' || h.kind === 'block' || h.kind === 'car') && h.z < 10 && Math.abs(h.x - s.leaderX) < 0.35);
   if (hz) target = hz.x > s.leaderX ? -0.8 : 0.8;
   if (s.status === 'draft') pick(0);
-  return { targetX: target };
+  return { targetX: target, fire: true };
 }
 function frame(now) {
   requestAnimationFrame(frame);
@@ -388,12 +395,22 @@ function tick(dt, now) {
   if (mode === 'play' && sim) {
     let inp = {};
     if (pilotOn) inp = pilot(sim);
-    else if (input.targetX != null) inp = { targetX: input.targetX };
-    else { const st = (keys.ArrowLeft || keys.KeyA ? -1 : 0) + (keys.ArrowRight || keys.KeyD ? 1 : 0); inp = { steer: st }; }
+    else {
+      const st = (keys.ArrowLeft || keys.KeyA ? -1 : 0) + (keys.ArrowRight || keys.KeyD ? 1 : 0);
+      inp = input.targetX != null ? { targetX: input.targetX } : { steer: st };
+      inp.fire = input.fire || !!keys.Space || !!keys.KeyJ;
+      inp.aimX = input.aimX;
+    }
+    lastInp = inp;
     if (godOn && sim.count < 200) sim.count = 200;
     const evs = SIM.step(sim, sdt, inp);
     sim.tiers = SIM.tiers(sim.count); sim.tierRank = SIM.tierRank(sim.count);
     if (evs.length) handleEvents(evs);
+    if (!pilotOn) {   // coach: the guns are silent and the horde is close
+      if (inp.fire) { noFireT = 0; $('hTip').classList.add('hidden'); } else noFireT += dt;
+      if (coachT > 0) coachT -= dt;
+      if (noFireT > 1.5 && coachT <= 0 && sim.foes.some(f => f.z < 14)) { popup('HOLD TO FIRE', '#ffd23f', 0, 1.4, 'big'); coachT = 5; }
+    }
     if (sim.status !== 'draft') hud();
     audio.setIntensity(Math.min(1, sim.count / 140 + (sim.boss ? 0.4 : 0) + (sim.streak >= 8 ? 0.2 : 0)));
     if (bossIntroT > 0) { bossIntroT -= dt; if (bossIntroT <= 0) $('bossintro').classList.add('hidden'); }
@@ -409,6 +426,8 @@ function tick(dt, now) {
   world.update(sdt, active, camera);
   if (active) crowd.update(sdt, active, camera);
   fx.update(sdt, active ? active.speed * sdt : 0, camera);
+  reticle.visible = mode === 'play' && !pilotOn && !!lastInp.fire && typeof lastInp.aimX === 'number';
+  if (reticle.visible) { reticle.position.set(lastInp.aimX * ROAD, 0.06, -14); reticle.scale.setScalar(1 + 0.08 * Math.sin(now * 0.02)); }
   // camera follows the leader, banks into steering, shakes
   const lx = active ? active.leaderX * ROAD : 0;
   camX += (lx * 0.55 - camX) * (1 - Math.exp(-dt * 4));

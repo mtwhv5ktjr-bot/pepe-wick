@@ -51,6 +51,8 @@
   #hProgFill { height:100%; width:0; background:linear-gradient(90deg,var(--green),var(--gold)); box-shadow:0 0 10px var(--green); transition:width .2s; }
   #hPerks { position:absolute; left:14px; bottom:max(14px,env(safe-area-inset-bottom)); display:flex; flex-wrap:wrap; gap:6px; max-width:60%; }
   .perk { font-size:11px; letter-spacing:1.5px; color:var(--green); background:rgba(10,30,18,.7); border:1px solid #1f5a33; border-radius:4px; padding:3px 7px; }
+  #hTip { position:absolute; left:50%; bottom:max(58px,calc(env(safe-area-inset-bottom) + 44px)); transform:translateX(-50%); font-family:'Black Ops One',Impact,sans-serif; font-size:15px; letter-spacing:4px; color:var(--gold); text-shadow:0 2px 0 #000,0 0 14px rgba(232,197,118,.6); animation:tip 1.2s ease-in-out infinite alternate; pointer-events:none; white-space:nowrap; }
+  @keyframes tip { from{opacity:.55} to{opacity:1} }
   #hStreak { position:absolute; right:14px; bottom:max(16px,env(safe-area-inset-bottom)); width:150px; text-align:right; }
   #hStreakN { font-family:'Black Ops One',Impact,sans-serif; font-size:24px; color:#fff; text-shadow:0 0 12px rgba(255,255,255,.4); height:28px; }
   #hStreakBar { height:5px; background:rgba(255,255,255,.1); border-radius:3px; overflow:hidden; }
@@ -155,6 +157,7 @@
   <button id="pauseBtn">PAUSE</button>
   <div id="hBoss" class="hidden"><div id="hBossName"></div><div id="hBossBar"><div id="hBossFill"></div></div></div>
   <div id="hPerks"></div>
+  <div id="hTip">HOLD TO FIRE · DRAG TO STEER</div>
   <div id="hStreak"><div id="hStreakN"></div><div id="hStreakBar"><div id="hStreakFill"></div></div></div>
 </div>
 <div id="popups"></div>
@@ -184,7 +187,7 @@
       <div class="mint">The squad fires whatever you carry. WICK ARSENAL guns keep their card's shape — pellets, pierce, the tri-arc — inside a fair band. Mint or trade at <a href="https://mint.wick.pics" target="_blank" rel="noopener">mint.wick.pics</a>; set a build with WICK MODS at the <a href="https://games.wick.pics/range/" target="_blank" rel="noopener">RANGE</a>.</div>
     </div>
   </div>
-  <div id="rules">Steer with <b>A / D</b>, arrows, or <b>drag anywhere</b>. Pick the better gate. Shoot the barrels. Every 400 m, draft a perk. <b>20 wicks fuse into a MEGA WICK, 400 into a TITAN.</b> A boss waits at the end of every road.</div>
+  <div id="rules"><b>Hold anywhere (or Space) to FIRE</b> — the squad aims down the lane you hold. Let go and the guns go quiet. <b>Drag</b> to steer, or <b>A / D</b>. Pick the better gate. Shoot the barrels. Every 400 m, draft a perk. <b>20 wicks fuse into a MEGA WICK, 400 into a TITAN.</b> A boss waits at the end of every road.</div>
 </div>
 <div id="startRow"><div id="bankLine">BANK <b id="bank">0</b> $WICK</div><button id="startBtn" class="big">START</button></div>
 

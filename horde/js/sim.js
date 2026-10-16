@@ -206,12 +206,16 @@
     if (z < 2.2 && Math.abs(x - s.leaderX) < s.formW / 2 + r) addCount(s, s.count - contactCost(s, 3), 'boom');
   }
 
-  function fire(s, dt) {
+  // the squad only fires while the player holds fire (click / touch / Space); the held lane is where it aims
+  function fire(s, dt, input) {
+    const want = !!(input && input.fire);
+    const aimX = input && typeof input.aimX === 'number' ? input.aimX : null;
     const st = squadStats(s);
     const w = s.weapon;
     for (let i = 0; i < st.streams; i++) {
       const stream = s.streams[i];
       stream.t -= dt;
+      if (!want) { stream.t = Math.min(stream.t, 0.02 + (i / st.streams) / st.rof); continue; }   // trigger up: stay ready, staggered
       if (stream.t > 0) continue;
       stream.t += 1 / st.rof;
       const spread = Math.min(s.formW, 0.08 * st.streams);
@@ -220,10 +224,10 @@
       const arcs = st.arc > 1 ? [-0.4, 0, 0.4] : [0];
       let fired = false;
       for (const ax of arcs) {
-        const target = nearest(s, list, sx + ax);
+        const target = nearest(s, list, (aimX != null ? aimX : sx) + ax);
         if (!target) {
           // no foe — a barrel in the lane?
-          const b = s.barrels.find(b => !b.dead && b.z > 1 && b.z < 36 && Math.abs(b.x - (sx + ax)) < 0.3);
+          const b = s.barrels.find(b => !b.dead && b.z > 1 && b.z < 36 && Math.abs(b.x - ((aimX != null ? aimX : sx) + ax)) < 0.3);
           if (b) {
             fired = true;
             ev(s, { type: 'shot', sx, sz: 0, tx: b.x, tz: b.z, i, style: w.tracer });
@@ -495,7 +499,7 @@
     stepHazards(s, dt);
     stepBoss(s, dt);
     if (s.status === 'dead') return s.events;
-    fire(s, dt);
+    fire(s, dt, input);
     if (s.status === 'play' && s.dist >= s.nextDraftAt) { s.nextDraftAt += CONST.DRAFT_EVERY; offerDraft(s); }
     return s.events;
   }
