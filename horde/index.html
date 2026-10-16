@@ -1,156 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PEPE WICK vs HORDE — coming soon</title>
-<link rel="canonical" href="https://games.wick.pics/horde/">
-<meta property="og:type" content="website">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>PEPE WICK vs HORDE — ten roads through the Wick-verse. Your NFT iron. One Wick becomes an army.</title>
+<meta name="description" content="A crowd-runner through the Wick-verse: ten roads from the Bowery to Sacré-Cœur, a zombified High Table, and your WICK ARSENAL guns as the squad's iron. Start as one Wick. Finish as a titan.">
+<meta name="theme-color" content="#05070c">
+<meta property="og:title" content="PEPE WICK vs HORDE">
+<meta property="og:description" content="Ten roads. One Wick becomes an army. Your NFT guns ride along.">
 <meta property="og:url" content="https://games.wick.pics/horde/">
-<meta property="og:title" content="PEPE WICK vs HORDE — coming soon">
-<meta property="og:description" content="The next cabinet in Arcade Alley. Powering up.">
-<meta property="og:image" content="https://games.wick.pics/horde/soon-art.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="PEPE WICK vs HORDE — coming soon to Arcade Alley. The next chapter of the PEPE WICK arcade on PulseChain.">
-<meta name="theme-color" content="#0a0a12">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230a0a12'/%3E%3Ctext x='50' y='72' font-size='58' text-anchor='middle'%3E%F0%9F%95%B9%3C/text%3E%3C/svg%3E">
+<link rel="canonical" href="https://games.wick.pics/horde/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
 <style>
-  :root{
-    --neon-cyan:#05d9e8;
-    --pepe-green:#7cf9a5;
-    --neon-pink:#ff2a6d;
-    --display:'Press Start 2P', ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  }
-  *{margin:0;padding:0;box-sizing:border-box}
+  @font-face { font-family: 'Black Ops One'; src: url('lib/black-ops-one.woff2') format('woff2'); font-display: swap; }
+  @font-face { font-family: 'Barlow Condensed'; src: url('lib/BarlowCondensed-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Barlow Condensed'; src: url('lib/BarlowCondensed-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anton'; src: url('lib/Anton-Regular.ttf') format('truetype'); font-display: swap; }
+  :root { --ink:#05070c; --panel:rgba(8,11,18,.82); --line:#222b38; --gold:#e8c576; --green:#7cf9a5; --red:#ff5c7a; --pink:#ff2a6d; --cyan:#05d9e8; --txt:#e4e9f1; --dim:#8a95a6;
+    --foil: linear-gradient(120deg,#ff8a8a,#ffd76a 22%,#7cf9a5 42%,#7fd0ff 62%,#b8a8ff 82%,#ff8ae2); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--ink); overflow:hidden; color:var(--txt); font-family:'Barlow Condensed',Arial,sans-serif; font-weight:600; letter-spacing:.5px; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #touch { position:fixed; inset:0; z-index:6; touch-action:none; }
+  .hidden { display:none !important; }
+  .disp { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; letter-spacing:2px; }
+  button { font-family:inherit; font-weight:700; letter-spacing:1.5px; cursor:pointer; border:0; color:var(--txt); background:#121826; border:1px solid var(--line); border-radius:6px; padding:10px 16px; font-size:15px; }
+  button:hover { border-color:var(--gold); }
+  .big { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:20px; letter-spacing:2px; padding:16px 30px; background:linear-gradient(180deg,#16321f,#0c1f13); color:var(--green); border:0; box-shadow:0 0 0 1.5px #2c8a4a,0 0 28px rgba(124,249,165,.25); border-radius:8px; }
+  .big:hover { box-shadow:0 0 0 1.5px var(--green),0 0 40px rgba(124,249,165,.5); }
+  .big:disabled { opacity:.45; cursor:default; }
+  .gold { background:linear-gradient(180deg,#33270f,#1f1708); color:var(--gold); box-shadow:0 0 0 1.5px #8a6a1c,0 0 24px rgba(232,197,118,.3); }
+  .overlay { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 26px; backdrop-filter:blur(10px); box-shadow:0 20px 60px rgba(0,0,0,.6); }
 
-  body{
-    min-height:100vh; min-height:100dvh;
-    background:
-      radial-gradient(ellipse at 50% 40%, rgba(255,42,109,.07) 0%, transparent 52%),
-      linear-gradient(180deg,#0a0a12 0%,#12121f 44%,#0d0d18 100%);
-    display:flex; align-items:center; justify-content:center;
-    padding:1.5rem;
-    font-family:var(--display);
-    color:#e0e0e0;
-  }
-  body::before{
-    content:''; position:fixed; inset:0;
-    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
-    pointer-events:none; z-index:100; opacity:.4;
-  }
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #hTop { position:absolute; top:max(10px,env(safe-area-inset-top)); left:0; right:0; display:flex; align-items:flex-start; justify-content:space-between; padding:0 14px; }
+  #hLevel { font-size:13px; color:var(--dim); letter-spacing:3px; }
+  #hDist { font-family:'Black Ops One',Impact,sans-serif; font-size:34px; line-height:1; color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.8); }
+  #hGoal { font-size:12px; color:var(--dim); letter-spacing:2px; }
+  #hRight { text-align:right; }
+  #hCoins { font-family:'Black Ops One',Impact,sans-serif; font-size:22px; color:var(--gold); text-shadow:0 0 14px rgba(232,197,118,.5); }
+  #hCoins::before { content:'$WICK '; font-size:11px; letter-spacing:2px; color:var(--dim); font-family:'Barlow Condensed'; }
+  #hWeapon { font-size:12px; color:var(--dim); letter-spacing:2px; }
+  #hSquadWrap { display:none; }
+  #hProg { position:absolute; top:0; left:0; right:0; height:3px; background:rgba(255,255,255,.08); }
+  #hProgFill { height:100%; width:0; background:linear-gradient(90deg,var(--green),var(--gold)); box-shadow:0 0 10px var(--green); transition:width .2s; }
+  #hPerks { position:absolute; left:14px; bottom:max(14px,env(safe-area-inset-bottom)); display:flex; flex-wrap:wrap; gap:6px; max-width:60%; }
+  .perk { font-size:11px; letter-spacing:1.5px; color:var(--green); background:rgba(10,30,18,.7); border:1px solid #1f5a33; border-radius:4px; padding:3px 7px; }
+  #hStreak { position:absolute; right:14px; bottom:max(16px,env(safe-area-inset-bottom)); width:150px; text-align:right; }
+  #hStreakN { font-family:'Black Ops One',Impact,sans-serif; font-size:24px; color:#fff; text-shadow:0 0 12px rgba(255,255,255,.4); height:28px; }
+  #hStreakBar { height:5px; background:rgba(255,255,255,.1); border-radius:3px; overflow:hidden; }
+  #hStreakFill { height:100%; width:0; background:var(--gold); transition:width .1s; }
+  #hStreak.hot #hStreakFill { background:var(--red); box-shadow:0 0 12px var(--red); }
+  #hStreak.hot #hStreakN { color:var(--red); }
+  #hBoss { position:absolute; top:70px; left:50%; transform:translateX(-50%); width:min(560px,86%); text-align:center; }
+  #hBossName { font-family:'Black Ops One',Impact,sans-serif; font-size:15px; letter-spacing:4px; color:var(--red); text-shadow:0 0 14px rgba(255,92,122,.6); margin-bottom:5px; }
+  #hBossBar { height:9px; background:rgba(0,0,0,.6); border:1px solid #5a1a2a; border-radius:5px; overflow:hidden; }
+  #hBossFill { height:100%; width:100%; background:linear-gradient(90deg,#ff2a4a,#ff8a5c); transition:width .15s; }
+  #hBossFill.rage { background:linear-gradient(90deg,#ff2a4a,#ffd23f); animation:rage .4s infinite alternate; }
+  @keyframes rage { from{filter:brightness(1)} to{filter:brightness(1.6)} }
+  #pauseBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); pointer-events:auto; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.15); padding:4px 14px; font-size:12px; letter-spacing:3px; }
+  #popups { position:fixed; inset:0; pointer-events:none; z-index:11; }
+  .pop { position:absolute; left:0; top:0; font-family:'Black Ops One',Impact,sans-serif; font-size:26px; letter-spacing:2px; white-space:nowrap; text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.9); will-change:transform,opacity; }
+  .pop.big { font-size:40px; } .pop.huge { font-size:56px; letter-spacing:5px; } .pop.title { font-size:48px; letter-spacing:8px; } .pop.sub { font-family:'Barlow Condensed'; font-weight:600; font-size:20px; letter-spacing:3px; text-transform:lowercase; }
+  #bossintro { position:fixed; inset:0; z-index:12; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; }
+  #bossintro .bar { height:16%; background:#000; animation:bars .3s ease-out; }
+  @keyframes bars { from{height:0} to{height:16%} }
+  #bossintro .name { position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; }
+  #bossName { font-family:'Black Ops One',Impact,sans-serif; font-size:clamp(40px,9vw,88px); letter-spacing:10px; color:#fff; text-shadow:0 0 30px var(--red),0 4px 0 #000; animation:slam .35s cubic-bezier(.2,1.6,.4,1); }
+  #bossSub { font-size:22px; color:var(--red); letter-spacing:4px; text-transform:lowercase; }
+  @keyframes slam { from{transform:scale(2.4);opacity:0} to{transform:scale(1);opacity:1} }
 
-  .cab{width:min(720px,100%);position:relative;z-index:5}
+  /* ---------- TITLE ---------- */
+  #title { flex-direction:column; align-items:stretch; justify-content:flex-start; overflow:auto; padding:max(14px,env(safe-area-inset-top)) 14px 90px; background:linear-gradient(180deg,rgba(5,7,12,.2),rgba(5,7,12,.55) 45%,rgba(5,7,12,.35) 75%,rgba(5,7,12,.7)); }
+  #logo { text-align:center; margin:14px 0 6px; }
+  #logo h1 { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:clamp(34px,7vw,72px); letter-spacing:6px; margin:0; line-height:.95; background:var(--foil); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 4px 0 #000) drop-shadow(0 0 30px rgba(255,42,109,.35)); }
+  #logo h1 span { display:block; font-size:.42em; letter-spacing:12px; color:var(--pink); -webkit-text-fill-color:var(--pink); filter:none; margin-top:4px; }
+  #logo p { margin:6px 0 0; color:var(--dim); font-size:14px; letter-spacing:3px; }
+  #deck { display:grid; grid-template-columns:1.35fr 1fr; gap:16px; max-width:1180px; width:100%; margin:12px auto 0; }
+  @media (max-width:860px) { #deck { grid-template-columns:1fr; } }
+  #levels { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .lv { position:relative; text-align:left; padding:10px 10px 8px; border:1px solid var(--line); background:linear-gradient(180deg,rgba(18,24,38,.9),rgba(8,11,18,.9)); border-radius:8px; display:flex; flex-direction:column; gap:1px; min-height:84px; overflow:hidden; }
+  .lv::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--lc); box-shadow:0 0 14px var(--lc); }
+  .lv .n { font-family:'Black Ops One',Impact,sans-serif; font-size:22px; color:var(--lc); line-height:1; }
+  .lv .t { font-size:15px; letter-spacing:1px; color:#fff; font-weight:700; }
+  .lv .c { font-size:11px; color:var(--dim); letter-spacing:2px; }
+  .lv .b { font-size:11px; color:var(--gold); letter-spacing:1px; margin-top:auto; }
+  .lv.locked { opacity:.42; cursor:default; } .lv.locked .b { color:var(--dim); }
+  .lv.sel { border-color:var(--lc); box-shadow:0 0 0 1px var(--lc), 0 0 24px color-mix(in srgb,var(--lc) 40%,transparent); }
+  #modes { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  #modes button { text-align:left; padding:12px 14px; display:flex; flex-direction:column; gap:2px; }
+  #modes button b { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:17px; letter-spacing:2px; color:var(--pink); }
+  #modes button span { font-size:12px; color:var(--dim); letter-spacing:2px; }
+  #modes button.sel { border-color:var(--pink); box-shadow:0 0 0 1px var(--pink),0 0 24px rgba(255,42,109,.35); }
+  #loadout { display:flex; flex-direction:column; gap:10px; }
+  #loadout h2 { margin:0; font-size:13px; letter-spacing:4px; color:var(--dim); }
+  #cardRow { display:flex; gap:14px; align-items:flex-start; }
+  #gunCardWrap { position:relative; width:150px; flex:none; }
+  #gunCard { width:150px; border-radius:8px; box-shadow:0 14px 40px rgba(0,0,0,.7); display:block; background:#0b0e15; min-height:210px; }
+  #loanerTag { position:absolute; top:10px; left:-8px; background:var(--gold); color:#000; font-size:10px; letter-spacing:2px; padding:3px 8px; border-radius:3px; transform:rotate(-8deg); box-shadow:0 4px 12px rgba(0,0,0,.6); }
+  #gunInfo { flex:1; min-width:0; }
+  #gunName { font-family:'Black Ops One',Impact,sans-serif; font-size:22px; letter-spacing:1px; background:var(--foil); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #gunClass { font-size:11px; color:var(--dim); letter-spacing:3px; margin:2px 0 8px; }
+  #gunPerk { font-size:15px; color:#fff; } #gunShape { font-size:12px; color:var(--cyan); letter-spacing:2px; margin-top:6px; } #gunMods { font-size:12px; color:var(--gold); letter-spacing:1px; margin-top:4px; }
+  #gunEdge { font-size:12px; color:var(--dim); margin-top:8px; line-height:1.4; }
+  #gunPick { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { font-size:11px; padding:4px 8px; letter-spacing:1px; } .chip.on { border-color:var(--green); color:var(--green); }
+  #loadout .row { display:flex; gap:8px; flex-wrap:wrap; }
+  #loadout .mint { font-size:12px; color:var(--dim); line-height:1.5; }
+  #loadout .mint a { color:var(--gold); }
+  #startRow { position:fixed; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center; justify-content:center; background:linear-gradient(180deg,transparent,rgba(5,7,12,.95) 40%); z-index:21; }
+  #startBtn { min-width:min(420px,70vw); }
+  #bankLine { font-size:12px; color:var(--dim); letter-spacing:2px; } #bankLine b { color:var(--gold); font-family:'Black Ops One'; font-weight:normal; font-size:16px; }
+  #rules { max-width:1180px; margin:14px auto 0; font-size:12px; color:var(--dim); letter-spacing:1px; line-height:1.7; text-align:center; }
+  #rules b { color:var(--txt); }
 
-  .marquee{
-    min-height:52px; padding:8px 10px;
-    background:linear-gradient(180deg,#111,#222);
-    border:3px solid #333; border-bottom:none; border-radius:6px 6px 0 0;
-    display:flex; align-items:center; justify-content:center; text-align:center;
-  }
-  .marquee span{
-    font-size:clamp(.6rem,2.4vw,.85rem); letter-spacing:2px; line-height:1.7;
-    color:var(--pepe-green);
-    text-shadow:0 0 8px currentColor,0 0 20px currentColor;
-    animation:pulse 2.6s ease-in-out infinite;
-  }
-  .marquee b{color:var(--neon-pink);text-shadow:0 0 8px currentColor,0 0 20px currentColor}
+  /* ---------- DRAFT ---------- */
+  #draft { background:rgba(0,0,0,.72); flex-direction:column; gap:14px; }
+  #draft h2 { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:28px; letter-spacing:6px; color:var(--green); margin:0; text-shadow:0 0 24px rgba(124,249,165,.5); }
+  #draftCards { display:flex; gap:14px; padding:0 14px; max-width:100%; }
+  .card { width:200px; max-width:30vw; aspect-ratio:3/4.2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:14px; background:linear-gradient(180deg,#141a28,#070a10); border:1px solid #2a3446; border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,.6); transition:transform .12s; }
+  .card:hover { transform:translateY(-8px) scale(1.03); border-color:var(--green); box-shadow:0 0 0 1px var(--green),0 24px 50px rgba(0,0,0,.7),0 0 30px rgba(124,249,165,.25); }
+  .card .k { font-size:11px; color:var(--dim); letter-spacing:3px; } .card b { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:clamp(14px,2.2vw,20px); letter-spacing:2px; color:#fff; } .card i { font-style:normal; font-size:clamp(12px,1.6vw,15px); color:var(--dim); line-height:1.35; } .card em { font-style:normal; color:var(--gold); letter-spacing:3px; font-size:12px; }
 
-  .bezel{
-    background:linear-gradient(180deg,#1f1f1f,#151515);
-    padding:14px 12px 12px;
-    border:4px solid #2a2a2a; border-top:none; border-radius:0 0 8px 8px;
-    box-shadow:inset 0 0 20px rgba(0,0,0,.9),0 8px 28px rgba(255,42,109,.10);
-  }
-
-  .screen{
-    position:relative; border-radius:4px; overflow:hidden;
-    background:radial-gradient(ellipse at 50% 45%, #17111d 0%, #05070d 78%);
-    min-height:220px;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .screen img{display:block;width:100%;height:auto;animation:attract 7s ease-in-out infinite}
-  .screen::before{
-    content:''; position:absolute; inset:0;
-    background:radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,.5) 100%);
-    pointer-events:none;
-  }
-  .screen::after{
-    content:''; position:absolute; inset:0;
-    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.18) 3px,rgba(0,0,0,.18) 5px);
-    pointer-events:none;
-  }
-  .tag{position:absolute;left:0;right:0;bottom:9%;text-align:center;pointer-events:none}
-  .tag b{
-    display:inline-block; font-weight:400;
-    font-size:clamp(.9rem,3.4vw,1.6rem); letter-spacing:4px;
-    color:#fff; background:rgba(6,8,14,.55);
-    border:2px solid var(--pepe-green); border-radius:6px; padding:.55em .9em;
-    text-shadow:0 0 10px var(--pepe-green),0 0 26px var(--pepe-green);
-    box-shadow:0 0 18px rgba(124,249,165,.35), inset 0 0 14px rgba(124,249,165,.12);
-    animation:flicker 5.2s linear infinite;
-  }
-
-  .sub{margin-top:.95rem;text-align:center;font-size:.52rem;letter-spacing:2px;color:#48515e;line-height:2}
-  .sub em{font-style:normal;color:var(--neon-cyan);animation:pulse 2.6s ease-in-out infinite}
-
-  .foot{margin-top:1.1rem;text-align:center;font-size:.44rem;letter-spacing:2px;color:#48515e;line-height:2.2}
-  .foot a{color:#5f6b7a;text-decoration:none;border-bottom:1px solid #2a323c}
-  .foot a:hover,.foot a:focus-visible{color:var(--neon-cyan);border-bottom-color:var(--neon-cyan)}
-
-  @keyframes pulse{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.88;filter:brightness(1.28)}}
-  @keyframes attract{0%,100%{filter:brightness(.96) saturate(1)}50%{filter:brightness(1.06) saturate(1.08)}}
-  @keyframes flicker{0%,7%,9%,100%{opacity:1}8%{opacity:.55}62%,64%{opacity:1}63%{opacity:.75}}
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  /* ---------- OVER / CLEAR / PAUSE ---------- */
+  #over, #clear { background:rgba(0,0,0,.6); }
+  #over .panel, #clear .panel { width:min(560px,92vw); text-align:center; }
+  #overTitle, #clearTitle { font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:clamp(24px,4.5vw,40px); letter-spacing:4px; margin:0; }
+  #overTitle { color:var(--red); text-shadow:0 0 24px rgba(255,92,122,.5); } #clearTitle { color:var(--green); text-shadow:0 0 24px rgba(124,249,165,.5); }
+  #overLine, #clearLine { color:var(--dim); font-size:15px; letter-spacing:2px; margin:6px 0 16px; text-transform:lowercase; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .stats div { background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:8px; padding:10px 6px; }
+  .stats b { display:block; font-family:'Black Ops One',Impact,sans-serif; font-weight:normal; font-size:24px; color:#fff; } .stats span { font-size:10px; letter-spacing:3px; color:var(--dim); }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  #lbMsg { font-size:12px; color:var(--gold); min-height:18px; margin-top:10px; letter-spacing:1px; }
+  #pause .panel { display:flex; flex-direction:column; gap:10px; min-width:260px; }
+  #pause h2 { margin:0 0 6px; font-family:'Black Ops One'; font-weight:normal; letter-spacing:5px; text-align:center; }
 </style>
 </head>
 <body>
+<canvas id="c"></canvas>
+<div id="touch"></div>
 
-<div class="cab">
-  <div class="marquee"><span>PEPE WICK <b>vs</b> HORDE</span></div>
-  <div class="bezel">
-    <div class="screen">
-      <img src="soon-art.png" alt="PEPE WICK vs HORDE key art">
-      <div class="tag"><b>COMING SOON</b></div>
-    </div>
-    <p class="sub">CABINET TWO · <em>POWERING UP…</em></p>
+<div id="hud" class="hidden">
+  <div id="hProg"><div id="hProgFill"></div></div>
+  <div id="hTop">
+    <div><div id="hLevel"></div><div id="hDist">0 m</div><div id="hGoal"></div></div>
+    <div id="hRight"><div id="hCoins">0</div><div id="hWeapon"></div><div id="hSquadWrap"><span id="hSquad"></span></div></div>
   </div>
-  <p class="foot">
-    <a href="/">← BACK TO ARCADE ALLEY</a>
-    &nbsp;·&nbsp; <a href="/play/">PLAY PEPE WICK</a>
-    &nbsp;·&nbsp; <a href="/range/">ARSENAL RANGE</a>
-    &nbsp;·&nbsp; <a href="https://mint.wick.pics/">WICK ARSENAL</a>
-  </p>
+  <button id="pauseBtn">PAUSE</button>
+  <div id="hBoss" class="hidden"><div id="hBossName"></div><div id="hBossBar"><div id="hBossFill"></div></div></div>
+  <div id="hPerks"></div>
+  <div id="hStreak"><div id="hStreakN"></div><div id="hStreakBar"><div id="hStreakFill"></div></div></div>
 </div>
+<div id="popups"></div>
+<div id="bossintro" class="hidden"><div class="bar"></div><div class="name"><div id="bossName"></div><div id="bossSub"></div></div><div class="bar"></div></div>
 
+<div id="title" class="overlay">
+  <div id="logo"><h1>PEPE WICK<span>vs HORDE</span></h1><p>TEN ROADS · ONE WICK BECOMES AN ARMY · YOUR IRON RIDES ALONG</p></div>
+  <div id="deck">
+    <div>
+      <div id="levels"></div>
+      <div id="modes">
+        <button id="gauntletBtn"><b>THE GAUNTLET</b><span id="gauntletBest"></span></button>
+        <button id="dailyBtn"><b>DAILY CONTRACT</b><span id="dailyBest"></span></button>
+      </div>
+    </div>
+    <div id="loadout" class="panel">
+      <h2>YOUR IRON</h2>
+      <div id="cardRow">
+        <div id="gunCardWrap"><img id="gunCard" alt="your gun card"><div id="loanerTag">HOUSE ISSUE</div></div>
+        <div id="gunInfo">
+          <div id="gunName" class="disp"></div><div id="gunClass"></div>
+          <div id="gunPerk"></div><div id="gunShape"></div><div id="gunMods"></div><div id="gunEdge"></div>
+        </div>
+      </div>
+      <div id="gunPick"></div>
+      <div class="row"><button id="walletBtn">CONNECT WALLET</button><button id="sndBtn">SOUND ON</button><button id="fxBtn">GRAPHICS: ULTRA</button></div>
+      <div class="mint">The squad fires whatever you carry. WICK ARSENAL guns keep their card's shape — pellets, pierce, the tri-arc — inside a fair band. Mint or trade at <a href="https://mint.wick.pics" target="_blank" rel="noopener">mint.wick.pics</a>; set a build with WICK MODS at the <a href="https://games.wick.pics/range/" target="_blank" rel="noopener">RANGE</a>.</div>
+    </div>
+  </div>
+  <div id="rules">Steer with <b>A / D</b>, arrows, or <b>drag anywhere</b>. Pick the better gate. Shoot the barrels. Every 400 m, draft a perk. <b>20 wicks fuse into a MEGA WICK, 400 into a TITAN.</b> A boss waits at the end of every road.</div>
+</div>
+<div id="startRow"><div id="bankLine">BANK <b id="bank">0</b> $WICK</div><button id="startBtn" class="big">START</button></div>
+
+<div id="draft" class="overlay hidden"><h2>DRAFT A PERK</h2><div id="draftCards"></div></div>
+
+<div id="pause" class="overlay hidden"><div class="panel"><h2>PAUSED</h2><button id="pResume" class="big">RESUME</button><button id="pSound">SOUND ON</button><button id="pFx">GRAPHICS: ULTRA</button><button id="pMenu">QUIT TO THE DESK</button></div></div>
+
+<div id="over" class="overlay hidden"><div class="panel">
+  <h2 id="overTitle"></h2><div id="overLine"></div>
+  <div id="overStats" class="stats"></div>
+  <div class="btns"><button id="retryBtn" class="big">RUN IT BACK</button><button id="submitBtn" class="gold">SUBMIT TO THE BOARD</button><button id="shareBtn">SHARE</button><button id="menuBtn">THE DESK</button></div>
+  <div id="lbMsg"></div>
+</div></div>
+
+<div id="clear" class="overlay hidden"><div class="panel">
+  <h2 id="clearTitle"></h2><div id="clearLine"></div>
+  <div id="clearStats" class="stats"></div>
+  <div class="btns"><button id="nextBtn" class="big">NEXT ROAD</button><button id="menuBtn2">THE DESK</button></div>
+</div></div>
+
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+<script src="js/levels.js"></script>
+<script src="js/roster.js"></script>
+<script src="js/gunart.js"></script>
+<script src="js/nft.js"></script>
+<script src="js/loadout.js"></script>
+<script src="js/arms.js"></script>
+<script src="js/sim.js"></script>
+<script type="module" src="js/game.js"></script>
 <!-- LEGAL-FINEPRINT:START -->
 <!-- generated by tools/legal/apply.mjs from tools/legal/fineprint.mjs — edit the source, re-run apply.mjs; do not hand-edit this block -->
 <style>
-.lfp{display:block;box-sizing:border-box;max-width:1040px;margin:34px auto 0;padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(128,128,128,.35);font:11px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:inherit;opacity:.78;text-align:left;clear:both;position:relative;z-index:5}
-.lfp *{box-sizing:border-box;font-family:inherit}
-.lfp p{margin:0 0 8px}
-.lfp a{color:inherit;text-decoration:underline}
-.lfp-sum{font-size:11px}
-.lfp-full>summary{cursor:pointer;list-style:none;display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:underline;margin:2px 0 6px;user-select:none}
-.lfp-full>summary::-webkit-details-marker{display:none}
-.lfp-full>summary::before{content:"▸ "}
-.lfp-full[open]>summary::before{content:"▾ "}
-.lfp-doc{border:1px solid rgba(128,128,128,.28);border-radius:6px;padding:12px 14px 4px;margin:4px 0 10px;background:rgba(128,128,128,.06)}
-.lfp-doc h4{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 3px}
-.lfp-doc h4:first-child{margin-top:0}
-.lfp-doc p{font-size:10.5px;line-height:1.6}
-.lfp-copy{font-size:10px;text-align:center;opacity:.85;margin:6px 0 0}
+.lfp-pill{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483000;margin:0;padding:0;font:11px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#e6e6e6;text-align:left}
+.lfp-pill *{box-sizing:border-box;font-family:inherit}
+.lfp-pill>summary{list-style:none;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;display:inline-block;font:700 9px/1 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;letter-spacing:.16em;padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;opacity:.55;border:1px solid rgba(255,255,255,.3);white-space:nowrap}
+.lfp-pill>summary::-webkit-details-marker{display:none}
+.lfp-pill>summary:hover,.lfp-pill>summary:focus-visible{opacity:1}
+.lfp-pill>summary .lfp-c{display:none}
+.lfp-pill[open]{left:0;right:0;top:0;bottom:0;transform:none;background:rgba(0,0,0,.86);overflow:auto;padding:14px 12px 30px;-webkit-overflow-scrolling:touch}
+.lfp-pill[open]>summary{position:sticky;top:0;z-index:1;display:block;max-width:880px;margin:0 auto 10px;padding:10px 12px;border-radius:6px;opacity:1;background:#c8102e;border-color:#ff4d5e;text-align:center;font-size:11px}
+.lfp-pill[open]>summary .lfp-o{display:none}
+.lfp-pill[open]>summary .lfp-c{display:inline}
+.lfp-panel{max-width:880px;margin:0 auto;background:#111;color:#dcdcdc;border:1px solid #363636;border-radius:8px;padding:18px 20px 22px;font-size:12px}
+.lfp-panel p{margin:0 0 8px}
+.lfp-panel a{color:inherit}
+.lfp-sum{font-size:12px}
+.lfp-doc{border-top:1px solid #333;margin-top:10px;padding-top:10px}
+.lfp-doc h4{font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 3px;color:#fff}
+.lfp-doc p{font-size:11px;line-height:1.6}
+.lfp-copy{font-size:10px;text-align:center;opacity:.8;margin:10px 0 0}
 </style>
-<footer class="lfp" id="legal-fineprint" lang="en">
+<details class="lfp-pill" id="legal-fineprint" lang="en">
+<summary role="button" aria-label="Legal notice"><span class="lfp-o">§ LEGAL</span><span class="lfp-c">✕ CLOSE LEGAL NOTICE</span></summary>
+<div class="lfp-panel">
 <p class="lfp-sum">PEPE WICK vs HORDE is an independent fan-made parody game provided “as is” for entertainment. It is not affiliated with or endorsed by Lionsgate, the John Wick franchise or its rights holders, or the creator of Pepe the Frog. Contains stylised violence and flashing effects. Any NFT, prize or wager features are speculative, subject to the full notice below, and void where prohibited.</p>
-<details class="lfp-full"><summary>Full legal notice · last updated 2026-09-06</summary>
 <div class="lfp-doc">
 <h4>Who we are and what you accept</h4><p>This notice applies to PEPE WICK vs HORDE (the “Site”, which includes every game, tool, market, bridge, feed, page and app served from it) and is issued by the people who independently build and operate it (“we”, “us”). By loading or using the Site, connecting a wallet, submitting anything to it, or interacting with any contract, feed or feature it exposes, you accept this notice in full. If you do not accept it, do not use the Site.</p>
 <h4>No professional advice</h4><p>Everything on the Site is general information, entertainment or opinion. It is not financial, investment, trading, legal, tax, accounting, medical or other professional advice, and nothing here is an offer, solicitation, recommendation or endorsement to buy, sell, hold or use any asset, product or service. Do your own research and consult a licensed professional before acting on anything you read here. Prices, balances, supplies, burns, scores, statistics and other figures are read from third-party services or public blockchains; they may be delayed, incomplete or wrong and must be verified independently before you rely on them.</p>
+<h4>NFTs, mints and in-game items</h4><p>NFTs minted, sold or traded through the Site are digital collectibles whose only intended use is within our own games and services. That use may change, be reduced or end at any time, and no NFT is a promise of future features, value, scarcity, exclusivity, airdrops or resale demand. Owning an NFT gives you a personal, non-commercial licence to display its associated art; every other right in the art, code, names and designs stays with its owner. Mint prices, supply, rarity odds and reveal mechanics are set by contract code and may be changed for future mints. Marketplace listings, offers and bids are made by other users, not by us; we do not verify, escrow, insure or guarantee any trade beyond what the contract code itself does, and secondary-market royalties or burns are enforced only to the extent the contract enforces them.</p>
 <h4>Independent fan work and parody</h4><p>PEPE WICK vs HORDE is an independent parody made by fans. References to films, series, characters, catchphrases, memes, companies, products and real-world places appear for the purposes of parody, commentary, homage and identification only; they are not authorised by, and do not imply any connection with, the owners of those works, whose trademarks and copyrights remain entirely theirs. All original code, art, animation, music, sound, writing and game design on the Site are ours.</p>
 <h4>Content and photosensitivity warning</h4><p>The Site contains stylised violence, weapons, strong language, dark humour and other themes intended for adults; parental discretion is advised and it is not intended for children. Some effects involve flashing lights, rapid colour changes, strobing and strong contrast that may affect people with photosensitive epilepsy or similar conditions. If you or anyone in your family has ever had seizures or epileptic symptoms, consult a doctor before playing, and stop immediately if you experience dizziness, altered vision, eye or muscle twitching, loss of awareness, disorientation, involuntary movement or convulsions. Play in a well-lit room, take breaks, and keep a reasonable distance from the screen.</p>
+<h4>Leaderboards, prizes, bounties and wager modes</h4><p>Leaderboards are for fun. Scores, ranks, kills, bounties and similar records may be reviewed, corrected, reset, hidden or removed at any time, including where we suspect cheating, tampering, automation, exploits or collusion, and our decision is final. Any prize, bounty, tournament, giveaway or reward programme is a discretionary promotion that may be changed, suspended or cancelled without notice; it is subject to eligibility verification, fraud review, our sole judgement and applicable law, and is void where prohibited. Holding an NFT or token does not guarantee any prize, and prizes have no guaranteed cash value. Head-to-head or wager modes that stake digital tokens are skill-based contests between players; we do not take a position in them and make no cash-out promise. They are offered only to adults and only where such activity is lawful, and it is your sole responsibility to know and comply with the gambling, gaming and contest laws where you live — if they restrict such activity, do not use those modes. Referee and settlement outcomes in those modes are final, and tokens staked in them are subject to every risk described in this notice.</p>
 <h4>Availability, saves and progress</h4><p>Games, modes, servers, matchmaking, leaderboards and features may be changed, paused, rebalanced or shut down at any time without notice, and we have no obligation to maintain, support or preserve any of them. Progress, settings, loadouts, inventory and scores are stored in your browser, on our servers or on public blockchains and may be lost, reset, corrupted or become unavailable; we are not liable for lost progress, scores, ranks, items or anything else that disappears when a game changes.</p>
-<h4>No affiliation</h4><p>The Site is independently operated. It is not affiliated with, endorsed by, sponsored by, approved by or otherwise connected to Lionsgate, Summit Entertainment, Thunder Road Films, 87Eleven Entertainment, the JOHN WICK and THE CONTINENTAL franchises or their rights holders, or Matt Furie (creator of Pepe the Frog), or any other company, network, protocol, project, agency or person named or depicted on it, and none of them has reviewed or is responsible for anything here. Their names, marks, logos and likenesses are used solely for identification, commentary or parody and remain the property of their respective owners.</p>
+<h4>No affiliation</h4><p>The Site is independently operated. It is not affiliated with, endorsed by, sponsored by, approved by or otherwise connected to Lionsgate, Summit Entertainment, Thunder Road Films, 87Eleven Entertainment, the JOHN WICK and THE CONTINENTAL franchises or their rights holders, Matt Furie (creator of Pepe the Frog), PulseChain, PulseX, the Ethereum Foundation, Robinhood Markets, Inc. (Robinhood Chain), or the mobile-game advertisements it parodies, or any other company, network, protocol, project, agency or person named or depicted on it, and none of them has reviewed or is responsible for anything here. Their names, marks, logos and likenesses are used solely for identification, commentary or parody and remain the property of their respective owners.</p>
 <h4>Third-party services and links</h4><p>The Site relies on and links to services we do not control — blockchain networks and RPC nodes, wallets, explorers, price and data APIs, hosting providers, social platforms, portals, public agencies and other websites. We do not endorse them and are not responsible for their content, availability, accuracy, security, pricing or conduct; your use of them is governed by their own terms and privacy policies, and a link is not a recommendation.</p>
 <h4>Eligibility and lawful use</h4><p>You must be at least 18 years old, or the age of majority where you live if that is higher, to connect a wallet, trade, mint, bridge, wager, submit material or otherwise transact through the Site. You are responsible for knowing and complying with every law that applies to you, including tax, securities, gambling, consumer-protection, sanctions and export rules. The Site is not directed at, and must not be used from, any jurisdiction where its use or content would be unlawful, and you confirm that you are not on any sanctions list and are not located in, or ordinarily resident in, a country or territory subject to comprehensive sanctions. You must not attack, exploit, overload, scrape abusively, tamper with, reverse-engineer for a harmful purpose, or otherwise interfere with the Site, its contracts, its servers or other users, and you must not use it to launder money, evade sanctions or commit any other crime.</p>
 <h4>Privacy</h4><p>We do not intentionally collect personal data, sell data or run advertising trackers; preferences the Site keeps live in your browser's local storage, and our hosting provider keeps standard access logs. Anything you write to a public blockchain — including your wallet address, balances, holdings and transaction history — is public, permanent and outside our control, and the third-party RPC nodes, APIs and hosts the Site calls will see your IP address and requests under their own privacy terms.</p>
@@ -160,9 +258,9 @@
 <h4>Intellectual property and takedown requests</h4><p>Except for third-party material identified above, the code, art, text, audio, design and data compilations of the Site are ours and are protected by copyright, trademark and other laws; you may not copy, sell, redistribute or create derivative works from them without permission, except as any open-source licence we publish expressly allows. If you believe material on the Site infringes your copyright, trademark, privacy or other rights, or is inaccurate about you, tell us through the contact or social links shown on the Site with enough detail to identify the material and your interest in it, and we will review the request promptly and in good faith.</p>
 <h4>Changes, governing law and general terms</h4><p>We may change, suspend or discontinue any part of the Site, and may update this notice, at any time by posting a new version here; your continued use after a change means you accept it. This notice is governed by the laws of the State of Texas, United States of America, without regard to its conflict-of-law rules, and any dispute that cannot be resolved informally will be brought exclusively in the state or federal courts located in Travis County, Texas, to whose jurisdiction you consent. If any part of this notice is held unenforceable, the rest remains in effect. Nothing here creates any partnership, agency, employment or fiduciary relationship between you and us, and our failure to enforce a term is not a waiver of it. This notice is written in English; translations are for convenience only.</p>
 </div>
-</details>
 <p class="lfp-copy">© 2026 PEPE WICK vs HORDE. Original code, art and text are ours; third-party marks belong to their owners. Legal notice last updated 2026-09-06.</p>
-</footer>
+</div>
+</details>
 <!-- LEGAL-FINEPRINT:END -->
 </body>
 </html>
